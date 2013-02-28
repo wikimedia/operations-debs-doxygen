@@ -1,0 +1,71 @@
+Source: doxygen
+Section: devel
+Priority: optional
+Maintainer: Matthias Klose <doko@debian.org>
+Uploaders: Helmut Grohne <helmut@subdivi.de>
+Build-Depends: debhelper (>= 5), libqt4-dev, flex, bison (>= 1.875a), python
+Build-Depends-Indep: texlive-fonts-recommended, texlive-generic-recommended, texlive-latex-extra, texlive-latex-recommended, texlive-extra-utils, texlive-font-utils, ghostscript, graphviz, latex-xcolor
+Standards-Version: 3.9.3
+
+Package: doxygen
+Architecture: any
+Multi-Arch: foreign
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: doxygen-latex
+Suggests: doxygen-doc, doxygen-gui, graphviz
+Conflicts: graphviz (<< 1.12)
+Description: Documentation system for C, C++, Java, Python and other languages
+ Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
+ and to some extent PHP, C#, and D.  It can generate an on-line class browser
+ (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
+ documented source files. There is also support for generating man pages
+ and for converting the generated output into Postscript, hyperlinked PDF
+ or compressed HTML.  The documentation is extracted directly from the sources.
+ .
+ Install the doxygen-latex package to build LaTeX based documents.
+
+Package: doxygen-latex
+Architecture: all
+Multi-Arch: foreign
+Depends: doxygen (>= ${source:Version}), ${misc:Depends}, texlive-extra-utils, texlive-latex-extra, latex-xcolor, texlive-font-utils, ghostscript, texlive-fonts-recommended, latex-xcolor
+Description: Documentation system for C, C++, Java, Python and other languages
+ Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
+ and to some extent PHP, C#, and D.  It can generate an on-line class browser
+ (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
+ documented source files.
+ .
+ This dependency package adds dependencies for all LaTeX packages required
+ to build documents using the default stylesheet.
+
+Package: doxygen-doc
+Architecture: all
+Depends: ${misc:Depends}
+Recommends: doxygen
+Section: doc
+Provides: doxygen-docs
+Replaces: doxygen (<< 1.2.14), doxygen-docs
+Conflicts: doxygen-docs
+Description: Documentation for doxygen
+ Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
+ and to some extent PHP, C#, and D.  It can generate an on-line class browser
+ (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
+ documented source files. There is also support for generating man pages
+ and for converting the generated output into Postscript, hyperlinked PDF
+ or compressed HTML.  The documentation is extracted directly from the sources. 
+ .
+ This package contains the documentation for doxygen.
+
+Package: doxygen-gui
+Architecture: any
+Depends: doxygen, ${shlibs:Depends}, ${misc:Depends}
+Suggests: doxygen-doc
+Replaces: doxygen (<< 1.2.14)
+Description: GUI configuration tool for doxygen
+ Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
+ and to some extent PHP, C#, and D.  It can generate an on-line class browser
+ (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
+ documented source files. There is also support for generating man pages
+ and for converting the generated output into Postscript, hyperlinked PDF
+ or compressed HTML.  The documentation is extracted directly from the sources. 
+ .
+ This package contains doxywizard, a GUI configuration tool for doxygen.

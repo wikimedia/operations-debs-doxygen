@@ -1,0 +1,23 @@
+Description: fix for 676423: new segmentation faults in version 1.8.1-1
+ removeEmptyLines() segfaults on empty string
+Author: Thibaut Paumard <paumard@users.sourceforge.net>
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=676423
+Forwarded: no
+Last-Update: 2012-07-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/src/htmlgen.cpp
++++ b/src/htmlgen.cpp
+@@ -936,6 +936,11 @@
+ static QCString removeEmptyLines(const QCString &s)
+ {
+   BufStr out(s.length()+1);
++  if (s.length()==0)
++  {
++    out.addChar('\0');
++    return out.data();
++  }
+   char *p=s.data();
+   char c;
+   while ((c=*p++))

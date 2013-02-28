@@ -1,0 +1,11 @@
+Index: b/doc/doxygen.1
+===================================================================
+--- a/doc/doxygen.1
++++ b/doc/doxygen.1
+@@ -44,3 +44,6 @@
+ Doxygen version VERSION, Copyright Dimitri van Heesch 1997-2012
+ .SH SEE ALSO
+ doxywizard(1).
++.PP
++Please consider installing the doxygen-doc package as it contains additional
++documentation on how to use doxygen.

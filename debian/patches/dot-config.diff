@@ -1,0 +1,33 @@
+--- a/src/configoptions.cpp
++++ b/src/configoptions.cpp
+@@ -2263,8 +2263,21 @@
+                  "png"
+                 );
+   ce->addValue("png");
++  ce->addValue("png:cairo");
++  ce->addValue("png:cairo:cairo");
++  ce->addValue("png:cairo:gd");
++  ce->addValue("png:gd");
++  ce->addValue("png:gd:gd");
+   ce->addValue("jpg");
++  ce->addValue("jpg:cairo");
++  ce->addValue("jpg:cairo:gd");
++  ce->addValue("jpg:gd");
++  ce->addValue("jpg:gd:gd");
+   ce->addValue("gif");
++  ce->addValue("gif:cairo");
++  ce->addValue("gif:cairo:gd");
++  ce->addValue("gif:gd");
++  ce->addValue("gif:gd:gd");
+   ce->addValue("svg");
+   ce->addDependency("HAVE_DOT");
+   //----
+@@ -2336,7 +2349,7 @@
+                  "files in one run (i.e. multiple -o and -T options on the command line). This\n"
+                  "makes dot run faster, but since only newer versions of dot (>1.8.10)\n"
+                  "support this, this feature is disabled by default.",
+-                 FALSE
++                 TRUE
+                 );
+   cb->addDependency("HAVE_DOT");
+   //----
