@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: layout.h,v 1.2 2001/03/19 19:27:41 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -19,11 +19,12 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-#include "qtbc.h"
-#include "memberlist.h"
 #include <qlist.h>
+#include "types.h"
 
 class LayoutParser;
+class MemberList;
+class QTextStream;
 
 /** @brief Base class representing a piece of a documentation page */
 struct LayoutDocEntry
@@ -44,11 +45,11 @@ struct LayoutDocEntry
               ClassUsedFiles,
 
               // Namespace specific items
-              NamespaceNestedNamespaces, NamespaceClasses,
-              NamespaceInlineClasses,
+              NamespaceNestedNamespaces, NamespaceNestedConstantGroups,
+              NamespaceClasses, NamespaceInlineClasses,
 
               // File specific items
-              FileClasses, FileNamespaces, 
+              FileClasses, FileNamespaces, FileConstantGroups,
               FileIncludes, FileIncludeGraph, 
               FileIncludedByGraph, FileSourceLink,
               FileInlineClasses,
@@ -78,32 +79,39 @@ struct LayoutDocEntrySimple : LayoutDocEntry
 struct LayoutDocEntrySection: public LayoutDocEntrySimple
 {
   LayoutDocEntrySection(Kind k,const QCString &tl) :
-    LayoutDocEntrySimple(k), title(tl) {}
-  QCString title;
+    LayoutDocEntrySimple(k), m_title(tl) {}
+  QCString title(SrcLangExt lang) const;
+private:
+  QCString m_title;
 };
 
 /** @brief Represents of a member declaration list with configurable title and subtitle. */
 struct LayoutDocEntryMemberDecl: public LayoutDocEntry
 {
-  LayoutDocEntryMemberDecl(MemberList::ListType tp,
+  LayoutDocEntryMemberDecl(MemberListType tp,
                            const QCString &tl,const QCString &ss) 
-    : type(tp), title(tl),subscript(ss) {}
+    : type(tp), m_title(tl), m_subscript(ss) {}
 
   Kind kind() const { return MemberDecl; }
-  MemberList::ListType type;
-  QCString title;
-  QCString subscript;
+  MemberListType type;
+  QCString title(SrcLangExt lang) const;
+  QCString subtitle(SrcLangExt lang) const;
+private:
+  QCString m_title;
+  QCString m_subscript;
 };
 
 /** @brief Represents of a member definition list with configurable title. */
 struct LayoutDocEntryMemberDef: public LayoutDocEntry
 {
-  LayoutDocEntryMemberDef(MemberList::ListType tp,const QCString &tl) 
-    : type(tp), title(tl) {}
+  LayoutDocEntryMemberDef(MemberListType tp,const QCString &tl) 
+    : type(tp), m_title(tl) {}
 
   Kind kind() const { return MemberDef; }
-  MemberList::ListType type;
-  QCString title;
+  MemberListType type;
+  QCString title(SrcLangExt lang) const;
+private:
+  QCString m_title;
 };
 
 /** @brief Base class for the layout of a navigation item at the top of the HTML pages. */

@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: define.h,v 1.21 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,7 +18,6 @@
 #ifndef DEFINE_H
 #define DEFINE_H
 
-#include "qtbc.h"
 #include <qdict.h>
 #include <qlist.h>
 
@@ -41,6 +40,7 @@ class Define
     QCString anchor;
     FileDef *fileDef;
     int lineNr;
+    int columnNr;
     int nargs;
     bool undef;
     bool varArgs;
@@ -54,9 +54,10 @@ class DefineList : public QList<Define>
   public:
     DefineList() : QList<Define>() {}
    ~DefineList() {}
-    int compareItems(GCI i1,GCI i2) 
+  private:
+    int compareValues(const Define *d1,const Define *d2) const
     {
-      return stricmp(((Define *)i1)->name,((Define *)i2)->name); 
+      return qstricmp(d1->name,d2->name);
     }
 };
 
@@ -67,12 +68,12 @@ class DefineName : public QList<Define>
     DefineName(const char *n) : QList<Define>() { name=n; }
    ~DefineName() {}
     const char *nameString() const { return name; }
-    int compareItems(GCI i1,GCI i2) 
-    {
-      return stricmp(((Define *)i1)->name,((Define *)i2)->name); 
-    }
-    
+
   private:
+    int compareValues(const Define *d1,const Define *d2) const
+    {
+      return qstricmp(d1->name,d2->name);
+    }
     QCString name;
 };
 
@@ -82,10 +83,10 @@ class DefineNameList : public QList<DefineName>
   public:
     DefineNameList() : QList<DefineName>() {}
    ~DefineNameList() {}
-    int compareItems(GCI i1,GCI i2)
+  private:
+    int compareValues(const DefineName *n1,const DefineName *n2) const
     {
-      return stricmp(((DefineName *)i1)->nameString(),
-                    ((DefineName *)i2)->nameString());
+      return qstricmp(n1->nameString(),n2->nameString());
     }
 };
 

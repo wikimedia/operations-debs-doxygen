@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: definition.h,v 1.21 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,13 +18,10 @@
 #ifndef DEFINITION_H
 #define DEFINITION_H
 
-#include "qtbc.h"
 #include <qlist.h>
 #include <qdict.h>
-#include <sys/types.h>
 
-#include "lockingptr.h"
-#include "util.h"
+#include "types.h"
 
 class FileDef;
 class OutputList;
@@ -37,7 +34,7 @@ struct ListItemInfo;
 struct SectionInfo;
 class Definition;
 class DefinitionImpl;
-
+  
 /** Data associated with a detailed description. */
 struct DocInfo
 {
@@ -91,13 +88,13 @@ class DefinitionIntf
  *  This can be a class or a member function, or a file, or a namespace, etc.
  *  Use definitionType() to find which type of definition this is.
  */
-class Definition : public DefinitionIntf, public LockableObj
+class Definition : public DefinitionIntf
 {
   public:
     
     /*! Create a new definition */
     Definition(
-        const char *defFileName,int defLine,
+        const char *defFileName,int defLine,int defColumn,
         const char *name,const char *b=0,const char *d=0,
         bool isSymbol=TRUE);
 
@@ -133,22 +130,25 @@ class Definition : public DefinitionIntf, public LockableObj
     /*! Returns the anchor within a page where this item can be found */
     virtual QCString anchor() const = 0;
 
-    /*! Returns the name of the source listing of this file. */
-    virtual QCString getSourceFileBase() const { ASSERT(0); return "NULL"; }
+    /*! Returns the name of the source listing of this definition. */
+    virtual QCString getSourceFileBase() const;
+
+    /*! Returns the anchor of the source listing of this definition. */
+    virtual QCString getSourceAnchor() const;
 
     /*! Returns the detailed description of this definition */
-    QCString documentation() const;
-    
+    virtual QCString documentation() const;
+
     /*! Returns the line number at which the detailed documentation was found. */
     int docLine() const;
 
-    /*! Returns the file in which the detailed documentation block was found. 
+    /*! Returns the file in which the detailed documentation block was found.
      *  This can differ from getDefFileName().
      */
     QCString docFile() const;
 
     /*! Returns the brief description of this definition. This can include commands. */
-    QCString briefDescription(bool abbreviate=FALSE) const;
+    virtual QCString briefDescription(bool abbreviate=FALSE) const;
 
     /*! Returns a plain text version of the brief description suitable for use
      *  as a tool tip. 
@@ -181,6 +181,9 @@ class Definition : public DefinitionIntf, public LockableObj
 
     /*! returns the line number at which the definition was found */
     int getDefLine() const { return m_defLine; }
+
+    /*! returns the column number at which the definition was found */
+    int getDefColumn() const { return m_defColumn; }
 
     /*! Returns TRUE iff the definition is documented 
      *  (which could be generated documentation) 
@@ -240,29 +243,38 @@ class Definition : public DefinitionIntf, public LockableObj
     /*! Returns the file in which the body of this item is located or 0 if no
      *  body is available.
      */
-    FileDef *getBodyDef();
+    FileDef *getBodyDef() const;
 
     /** Returns the programming language this definition was written in. */
     SrcLangExt getLanguage() const;
 
-    LockingPtr<GroupList> partOfGroups() const;
+    GroupList *partOfGroups() const;
 
-    LockingPtr< QList<ListItemInfo> > xrefListItems() const;
+    QList<ListItemInfo> *xrefListItems() const;
 
     virtual Definition *findInnerCompound(const char *name);
     virtual Definition *getOuterScope() const;
 
-    LockingPtr<MemberSDict> getReferencesMembers() const;
-    LockingPtr<MemberSDict> getReferencedByMembers() const;
+    MemberSDict *getReferencesMembers() const;
+    MemberSDict *getReferencedByMembers() const;
 
     bool hasSections() const;
+    bool hasSources() const;
+
+    /** returns TRUE if this class has a brief description */
+    bool hasBriefDescription() const;
+
+    QCString id() const;
 
     //-----------------------------------------------------------------------------------
     // ----  setters -----
     //-----------------------------------------------------------------------------------
 
     /*! Sets a new \a name for the definition */
-    void setName(const char *name);
+    virtual void setName(const char *name);
+
+    /*! Sets a unique id for the symbol. Used for libclang integration. */
+    void setId(const char *name);
 
     /*! Sets the documentation of this definition to \a d. */
     virtual void setDocumentation(const char *d,const char *docFile,int docLine,bool stripWhiteSpace=TRUE);
@@ -330,14 +342,9 @@ class Definition : public DefinitionIntf, public LockableObj
 
   protected:
 
-    virtual void flushToDisk() const;
-    virtual void loadFromDisk() const;
-    virtual void makeResident() const;
-    void lock() const {}
-    void unlock() const {}
+    Definition(const Definition &d);
 
   private: 
-
     static void addToMap(const char *name,Definition *d);
     static void removeFromMap(Definition *d);
 
@@ -349,12 +356,13 @@ class Definition : public DefinitionIntf, public LockableObj
     void _setBriefDescription(const char *b,const char *briefFile,int briefLine);
     void _setDocumentation(const char *d,const char *docFile,int docLine,bool stripWhiteSpace,bool atTop);
     void _setInbodyDocumentation(const char *d,const char *docFile,int docLine);
-    bool _docsAlreadyAdded(const QCString &doc);
+    bool _docsAlreadyAdded(const QCString &doc,QCString &sigList);
     DefinitionImpl *m_impl; // internal structure holding all private data
     QCString m_name;
     bool m_isSymbol;
     QCString m_symbolName;
     int m_defLine;
+    int m_defColumn;
 };
 
 /** A list of Definition objects. */
@@ -363,11 +371,9 @@ class DefinitionList : public QList<Definition>, public DefinitionIntf
   public:
     ~DefinitionList() {}
     DefType definitionType() const { return TypeSymbolList; }
-    int compareItems(GCI item1,GCI item2)
+    int compareValues(const Definition *item1,const Definition *item2) const
     {
-      return stricmp(((Definition *)item1)->name(),
-                     ((Definition *)item2)->name()
-                    );
+      return qstricmp(item1->name(),item2->name());
     }
 
 };
@@ -381,4 +387,12 @@ class DefinitionListIterator : public QListIterator<Definition>
     ~DefinitionListIterator() {}
 };
 
+/** Reads a fragment from file \a fileName starting with line \a startLine
+ *  and ending with line \a endLine. The result is returned as a string 
+ *  via \a result. The function returns TRUE if successful and FALSE 
+ *  in case of an error.
+ */
+bool readCodeFragment(const char *fileName, 
+                      int &startLine,int &endLine,
+                      QCString &result);
 #endif

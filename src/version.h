@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: version.h,v 1.4 2001/03/19 19:27:42 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 

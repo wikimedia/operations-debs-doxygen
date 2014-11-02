@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -35,10 +35,6 @@ class SectionDict;
 
 //---------------------------------------------------------------------------
 
-/*! Initialize the documentation parser */
-void initDocParser();
-/*! Cleanup the documentation parser */
-void finializeDocParser();
 
 /*! Main entry point for the documentation parser.
  *  @param fileName  File in which the documentation block is found (or the
@@ -60,7 +56,7 @@ void finializeDocParser();
  *  @returns         Root node of the abstract syntax tree. Ownership of the
  *                   pointer is handed over to the caller.
  */
-DocNode *validatingParseDoc(const char *fileName,int startLine,
+DocRoot *validatingParseDoc(const char *fileName,int startLine,
                             Definition *context, MemberDef *md,
                             const char *input,bool indexWords,
                             bool isExample,const char *exampleName=0,
@@ -69,7 +65,7 @@ DocNode *validatingParseDoc(const char *fileName,int startLine,
 /*! Main entry point for parsing simple text fragments. These 
  *  fragments are limited to words, whitespace and symbols.
  */
-DocNode *validatingParseText(const char *input);
+DocText *validatingParseText(const char *input);
 
 /*! Searches for section and anchor commands in the input */
 void docFindSections(const char *input,
@@ -133,7 +129,10 @@ class DocNode
                 Kind_Copy           = 46,
                 Kind_Text           = 47,
                 Kind_MscFile        = 48,
-                Kind_HtmlBlockQuote = 49
+                Kind_HtmlBlockQuote = 49,
+                Kind_VhdlFlow       = 50,
+                Kind_ParBlock       = 51,
+                Kind_DiaFile        = 52
               };
     /*! Creates a new node */
     DocNode() : m_parent(0), m_insidePre(FALSE) {}
@@ -337,34 +336,84 @@ class DocStyleChange : public DocNode
 class DocSymbol : public DocNode
 {
   public:
-    enum SymType { Unknown=0, BSlash, At, Less, Greater, Amp, Dollar, Hash,
-                   DoubleColon, Percent, Copy, Tm, Reg, Apos, Quot, Uml, Acute, 
-                   Grave, Circ, Tilde, Szlig, Cedil, Ring, Nbsp, Slash, 
-                   Lsquo, Rsquo, Ldquo, Rdquo, Ndash, Mdash, Aelig, AElig,
-                   GrkGamma, GrkDelta, GrkTheta, GrkLambda, GrkXi, GrkPi,
-                   GrkSigma, GrkUpsilon, GrkPhi, GrkPsi, GrkOmega, Grkalpha,
-                   Grkbeta, Grkgamma, Grkdelta, Grkepsilon, Grkzeta, Grketa,
-                   Grktheta, Grkiota, Grkkappa, Grklambda, Grkmu, Grknu, Grkxi,
-                   Grkpi, Grkrho, Grksigma, Grktau, Grkupsilon, Grkphi, Grkchi,
-                   Grkpsi, Grkomega, Grkvarsigma, Section, Degree, Prime,
-                   DoublePrime, Infinity, EmptySet, PlusMinus, Times, Minus,
-                   CenterDot, Partial, Nabla, SquareRoot, Perpendicular, Sum,
-                   Integral, Product, Similar, Approx, NotEqual, Equivalent,
-                   Proportional, LessEqual, GreaterEqual, LeftArrow, RightArrow,
-                   SetIn, SetNotIn, LeftCeil, RightCeil, LeftFloor, RightFloor,
-                   Pipe
+    enum SymType { Sym_Unknown = -1,
+                   Sym_nbsp, Sym_iexcl, Sym_cent, Sym_pound, Sym_curren,
+                   Sym_yen, Sym_brvbar, Sym_sect, Sym_uml, Sym_copy,
+                   Sym_ordf, Sym_laquo, Sym_not, Sym_shy, Sym_reg,
+                   Sym_macr, Sym_deg, Sym_plusmn, Sym_sup2, Sym_sup3,
+                   Sym_acute, Sym_micro, Sym_para, Sym_middot, Sym_cedil,
+                   Sym_sup1, Sym_ordm, Sym_raquo, Sym_frac14, Sym_frac12,
+                   Sym_frac34, Sym_iquest, Sym_Agrave, Sym_Aacute, Sym_Acirc,
+                   Sym_Atilde, Sym_Auml, Sym_Aring, Sym_AElig, Sym_Ccedil,
+                   Sym_Egrave, Sym_Eacute, Sym_Ecirc, Sym_Euml, Sym_Igrave,
+                   Sym_Iacute, Sym_Icirc, Sym_Iuml, Sym_ETH, Sym_Ntilde,
+                   Sym_Ograve, Sym_Oacute, Sym_Ocirc, Sym_Otilde, Sym_Ouml,
+                   Sym_times, Sym_Oslash, Sym_Ugrave, Sym_Uacute, Sym_Ucirc,
+                   Sym_Uuml, Sym_Yacute, Sym_THORN, Sym_szlig, Sym_agrave,
+                   Sym_aacute, Sym_acirc, Sym_atilde, Sym_auml, Sym_aring,
+                   Sym_aelig, Sym_ccedil, Sym_egrave, Sym_eacute, Sym_ecirc,
+                   Sym_euml, Sym_igrave, Sym_iacute, Sym_icirc, Sym_iuml,
+                   Sym_eth, Sym_ntilde, Sym_ograve, Sym_oacute, Sym_ocirc,
+                   Sym_otilde, Sym_ouml, Sym_divide, Sym_oslash, Sym_ugrave,
+                   Sym_uacute, Sym_ucirc, Sym_uuml, Sym_yacute, Sym_thorn,
+                   Sym_yuml, Sym_fnof, Sym_Alpha, Sym_Beta, Sym_Gamma,
+                   Sym_Delta, Sym_Epsilon, Sym_Zeta, Sym_Eta, Sym_Theta,
+                   Sym_Iota, Sym_Kappa, Sym_Lambda, Sym_Mu, Sym_Nu,
+                   Sym_Xi, Sym_Omicron, Sym_Pi, Sym_Rho, Sym_Sigma,
+                   Sym_Tau, Sym_Upsilon, Sym_Phi, Sym_Chi, Sym_Psi,
+                   Sym_Omega, Sym_alpha, Sym_beta, Sym_gamma, Sym_delta,
+                   Sym_epsilon, Sym_zeta, Sym_eta, Sym_theta, Sym_iota,
+                   Sym_kappa, Sym_lambda, Sym_mu, Sym_nu, Sym_xi,
+                   Sym_omicron, Sym_pi, Sym_rho, Sym_sigmaf, Sym_sigma,
+                   Sym_tau, Sym_upsilon, Sym_phi, Sym_chi, Sym_psi,
+                   Sym_omega, Sym_thetasym, Sym_upsih, Sym_piv, Sym_bull,
+                   Sym_hellip, Sym_prime, Sym_Prime, Sym_oline, Sym_frasl,
+                   Sym_weierp, Sym_image, Sym_real, Sym_trade, Sym_alefsym,
+                   Sym_larr, Sym_uarr, Sym_rarr, Sym_darr, Sym_harr,
+                   Sym_crarr, Sym_lArr, Sym_uArr, Sym_rArr, Sym_dArr,
+                   Sym_hArr, Sym_forall, Sym_part, Sym_exist, Sym_empty,
+                   Sym_nabla, Sym_isin, Sym_notin, Sym_ni, Sym_prod,
+                   Sym_sum, Sym_minus, Sym_lowast, Sym_radic, Sym_prop,
+                   Sym_infin, Sym_ang, Sym_and, Sym_or, Sym_cap,
+                   Sym_cup, Sym_int, Sym_there4, Sym_sim, Sym_cong,
+                   Sym_asymp, Sym_ne, Sym_equiv, Sym_le, Sym_ge,
+                   Sym_sub, Sym_sup, Sym_nsub, Sym_sube, Sym_supe,
+                   Sym_oplus, Sym_otimes, Sym_perp, Sym_sdot, Sym_lceil,
+                   Sym_rceil, Sym_lfloor, Sym_rfloor, Sym_lang, Sym_rang,
+                   Sym_loz, Sym_spades, Sym_clubs, Sym_hearts, Sym_diams,
+                   Sym_quot, Sym_amp, Sym_lt, Sym_gt, Sym_OElig,
+                   Sym_oelig, Sym_Scaron, Sym_scaron, Sym_Yuml, Sym_circ,
+                   Sym_tilde, Sym_ensp, Sym_emsp, Sym_thinsp, Sym_zwnj,
+                   Sym_zwj, Sym_lrm, Sym_rlm, Sym_ndash, Sym_mdash,
+                   Sym_lsquo, Sym_rsquo, Sym_sbquo, Sym_ldquo, Sym_rdquo,
+                   Sym_bdquo, Sym_dagger, Sym_Dagger, Sym_permil, Sym_lsaquo,
+                   Sym_rsaquo, Sym_euro,
+
+                   /* doxygen extensions */
+                   Sym_tm, Sym_apos,
+
+                   /* doxygen commands mapped */
+                   Sym_BSlash, Sym_At, Sym_Less, Sym_Greater, Sym_Amp,
+                   Sym_Dollar, Sym_Hash, Sym_DoubleColon, Sym_Percent, Sym_Pipe,
+                   Sym_Quot, Sym_Minus
                  };
-    DocSymbol(DocNode *parent,SymType s,char letter='\0') : 
-      m_symbol(s), m_letter(letter) { m_parent = parent; }
+    enum PerlType { Perl_unknown = 0, Perl_string, Perl_char, Perl_symbol, Perl_umlaut,
+                    Perl_acute, Perl_grave, Perl_circ, Perl_slash, Perl_tilde,
+                    Perl_cedilla, Perl_ring
+                  };
+    typedef struct PerlSymb {
+      const char     *symb;
+      const PerlType  type;
+    }PerlSymb;
+    DocSymbol(DocNode *parent,SymType s) : 
+      m_symbol(s) { m_parent = parent; }
     SymType symbol() const     { return m_symbol; }
-    char letter() const        { return m_letter; }
     Kind kind() const          { return Kind_Symbol; }
     void accept(DocVisitor *v) { v->visit(this); }
-    static SymType decodeSymbol(const QCString &symName,char *letter);
+    static SymType decodeSymbol(const QCString &symName);
 
   private:
     SymType  m_symbol;
-    char     m_letter;
 };
 
 /** Node representing some amount of white space */
@@ -384,10 +433,10 @@ class DocWhiteSpace : public DocNode
 class DocVerbatim : public DocNode
 {
   public:
-    enum Type { Code, HtmlOnly, ManOnly, LatexOnly, RtfOnly, XmlOnly, Verbatim, Dot, Msc };
+    enum Type { Code, HtmlOnly, ManOnly, LatexOnly, RtfOnly, XmlOnly, Verbatim, Dot, Msc, DocbookOnly, PlantUML };
     DocVerbatim(DocNode *parent,const QCString &context,
                 const QCString &text, Type t,bool isExample,
-                const QCString &exampleFile,const QCString &lang=QCString());
+                const QCString &exampleFile,bool isBlock=FALSE,const QCString &lang=QCString());
     Kind kind() const            { return Kind_Verbatim; }
     Type type() const            { return m_type; }
     QCString text() const        { return m_text; }
@@ -397,6 +446,7 @@ class DocVerbatim : public DocNode
     QCString exampleFile() const { return m_exampleFile; }
     QCString relPath() const     { return m_relPath; }
     QCString language() const    { return m_lang; }
+    bool isBlock() const         { return m_isBlock; }
 
   private:
     QCString  m_context;
@@ -406,6 +456,7 @@ class DocVerbatim : public DocNode
     QCString  m_exampleFile;
     QCString  m_relPath;
     QCString  m_lang;
+    bool      m_isBlock;
 };
 
 
@@ -413,7 +464,7 @@ class DocVerbatim : public DocNode
 class DocInclude : public DocNode
 {
   public:
-    enum Type { Include, DontInclude, VerbInclude, HtmlInclude, IncWithLines, Snippet };
+  enum Type { Include, DontInclude, VerbInclude, HtmlInclude, LatexInclude, IncWithLines, Snippet };
     DocInclude(DocNode *parent,const QCString &file,
                const QCString context, Type t,
                bool isExample,const QCString exampleFile,
@@ -508,7 +559,7 @@ class DocIndexEntry : public DocNode
 {
   public:
     DocIndexEntry(DocNode *parent,Definition *scope,MemberDef *md) 
-      : m_scope(scope), m_member(md) { m_parent = parent; }
+      : m_scope(scope), m_member(md){ m_parent = parent; }
     Kind kind() const { return Kind_IndexEntry; }
     int parse();
     Definition *scope() const    { return m_scope;  }
@@ -617,7 +668,7 @@ class DocXRefItem : public CompAccept<DocXRefItem>, public DocNode
 class DocImage : public CompAccept<DocImage>, public DocNode
 {
   public:
-    enum Type { Html, Latex, Rtf };
+    enum Type { Html, Latex, Rtf, DocBook };
     DocImage(DocNode *parent,const HtmlAttribList &attribs,
              const QCString &name,Type t,const QCString &url=QCString());
     Kind kind() const           { return Kind_Image; }
@@ -690,6 +741,41 @@ class DocMscFile : public CompAccept<DocMscFile>, public DocNode
     QCString  m_context;
 };
 
+/** Node representing a dia file */
+class DocDiaFile : public CompAccept<DocDiaFile>, public DocNode
+{
+  public:
+    DocDiaFile(DocNode *parent,const QCString &name,const QCString &context);
+    void parse();
+    Kind kind() const          { return Kind_DiaFile; }
+    QCString name() const      { return m_name; }
+    QCString file() const      { return m_file; }
+    QCString relPath() const   { return m_relPath; }
+    bool hasCaption() const    { return !m_children.isEmpty(); }
+    QCString width() const     { return m_width; }
+    QCString height() const    { return m_height; }
+    QCString context() const   { return m_context; }
+    void accept(DocVisitor *v) { CompAccept<DocDiaFile>::accept(this,v); }
+  private:
+    QCString  m_name;
+    QCString  m_file;
+    QCString  m_relPath;
+    QCString  m_width;
+    QCString  m_height;
+    QCString  m_context;
+};
+
+/** Node representing a VHDL flow chart */
+class DocVhdlFlow : public CompAccept<DocVhdlFlow>, public DocNode
+{
+  public:
+    DocVhdlFlow(DocNode *parent);
+    void parse();
+    Kind kind() const    { return Kind_VhdlFlow; }
+    bool hasCaption()    { return !m_children.isEmpty(); }
+    void accept(DocVisitor *v) { CompAccept<DocVhdlFlow>::accept(this,v); }
+  private:
+};
 
 /** Node representing a link to some item */
 class DocLink : public CompAccept<DocLink>, public DocNode
@@ -892,6 +978,19 @@ class DocInternal : public CompAccept<DocInternal>, public DocNode
   private:
 };
 
+/** Node representing an block of paragraphs */
+class DocParBlock : public CompAccept<DocParBlock>, public DocNode
+{
+  public:
+    DocParBlock(DocNode *parent) { m_parent = parent; }
+    int parse();
+    Kind kind() const          { return Kind_ParBlock; }
+    void accept(DocVisitor *v) { CompAccept<DocParBlock>::accept(this,v); }
+
+  private:
+};
+
+
 /** Node representing a simple list */
 class DocSimpleList : public CompAccept<DocSimpleList>, public DocNode
 {
@@ -975,8 +1074,7 @@ class DocParamSect : public CompAccept<DocParamSect>, public DocNode
        In=1, Out=2, InOut=3, Unspecified=0
     };
     DocParamSect(DocNode *parent,Type t) 
-      : m_type(t), m_dir(Unspecified), 
-        m_hasInOutSpecifier(FALSE), m_hasTypeSpecifier(FALSE) 
+      : m_type(t), m_hasInOutSpecifier(FALSE), m_hasTypeSpecifier(FALSE) 
     { m_parent = parent; }
     int parse(const QCString &cmdName,bool xmlContext,Direction d);
     Kind kind() const          { return Kind_ParamSect; }
@@ -987,7 +1085,6 @@ class DocParamSect : public CompAccept<DocParamSect>, public DocNode
 
   private:
     Type            m_type;
-    Direction       m_dir;
     bool            m_hasInOutSpecifier;
     bool            m_hasTypeSpecifier;
 };
@@ -1019,12 +1116,14 @@ class DocPara : public CompAccept<DocPara>, public DocNode
     void handleImage(const QCString &cmdName);
     void handleDotFile(const QCString &cmdName);
     void handleMscFile(const QCString &cmdName);
+    void handleDiaFile(const QCString &cmdName);
     void handleInclude(const QCString &cmdName,DocInclude::Type t);
     void handleLink(const QCString &cmdName,bool isJavaLink);
     void handleCite();
     void handleRef(const QCString &cmdName);
     void handleSection(const QCString &cmdName);
     void handleInheritDoc();
+    void handleVhdlFlow();
     int handleStartCode();
     int handleHtmlHeader(const HtmlAttribList &tagHtmlAttribs,int level);
 
@@ -1180,7 +1279,6 @@ class DocHtmlCaption : public CompAccept<DocHtmlCaption>, public DocNode
 
   private:
     HtmlAttribList m_attribs;
-    bool           m_atTop;
 };
 
 /** Node representing a HTML table row */
@@ -1256,6 +1354,7 @@ class DocText : public CompAccept<DocText>, public DocNode
     Kind kind() const       { return Kind_Text; }
     void accept(DocVisitor *v) { CompAccept<DocText>::accept(this,v); }
     void parse();
+    bool isEmpty() const    { return m_children.isEmpty(); }
 };
 
 /** Root node of documentation tree */
@@ -1268,6 +1367,7 @@ class DocRoot : public CompAccept<DocRoot>, public DocNode
     void parse();
     bool indent() const { return m_indent; }
     bool singleLine() const { return m_singleLine; }
+    bool isEmpty() const { return m_children.isEmpty(); }
 
   private:
     bool m_indent;

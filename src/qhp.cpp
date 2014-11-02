@@ -20,15 +20,28 @@
 #include "config.h"
 #include "memberdef.h"
 #include "groupdef.h"
+#include "doxygen.h"
 #include "filedef.h"
 
 #include <qstringlist.h>
 #include <string.h>
+#include <qfile.h>
 
 static QCString makeFileName(const char * withoutExtension)
 {
-  if (!withoutExtension) return QCString();
-  return QCString(withoutExtension)+".html";
+  QCString result=withoutExtension;
+  if (!result.isEmpty())
+  {
+    if (result.at(0)=='!') // relative URL -> strip marker
+    {
+      result=result.mid(1);
+    }
+    else // add specified HTML extension
+    {
+      result+=Doxygen::htmlFileExtension;
+    }
+  }
+  return result;
 }
 
 static QCString makeRef(const char * withoutExtension, const char * anchor)
@@ -71,6 +84,8 @@ void Qhp::initialize()
   QCString nameSpace       = Config_getString("QHP_NAMESPACE");
   QCString virtualFolder   = Config_getString("QHP_VIRTUAL_FOLDER");
 
+  m_doc.declaration("1.0", "UTF-8");
+
   const char * rootAttributes[] =
   { "version", "1.0", 0 };
 
@@ -112,12 +127,14 @@ void Qhp::initialize()
 
   // Add extra root node
   QCString fullProjectname = getFullProjectName();
+  QCString indexFile = "index"+Doxygen::htmlFileExtension;
   const char * const attributes[] =
   { "title", fullProjectname,
-    "ref",   "index.html",
+    "ref",   indexFile,
     NULL
   };
   m_toc.open("section", attributes);
+  m_prevSectionTitle = getFullProjectName();
   m_prevSectionLevel = 1;
   m_sectionLevel = 1;
 
@@ -175,16 +192,20 @@ void Qhp::decContentsDepth()
 
 void Qhp::addContentsItem(bool /*isDir*/, const char * name, 
                           const char * /*ref*/, const char * file, 
-                          const char * /*anchor*/,bool /* separateIndex */,
+                          const char *anchor, bool /* separateIndex */,
                           bool /* addToNavIndex */,
                           Definition * /*def*/)
 {
   //printf("Qhp::addContentsItem(%s) %d\n",name,m_sectionLevel);
   // Backup difference before modification
+
+  QCString f = file;
+  if (!f.isEmpty() && f.at(0)=='^') return; // absolute URL not supported
+
   int diff = m_prevSectionLevel - m_sectionLevel;
 
   handlePrevSection();
-  setPrevSection(name, file, m_sectionLevel);
+  setPrevSection(name, f, anchor, m_sectionLevel);
 
   // Close sections as needed
   for (; diff > 0; diff--)
@@ -194,7 +215,7 @@ void Qhp::addContentsItem(bool /*isDir*/, const char * name,
 }
 
 void Qhp::addIndexItem(Definition *context,MemberDef *md,
-                       const char *word)
+                       const char *sectionAnchor,const char *word)
 {
   (void)word;
   //printf("addIndexItem(%s %s %s\n",
@@ -218,7 +239,7 @@ void Qhp::addIndexItem(Definition *context,MemberDef *md,
     QCString level1  = context->name();
     QCString level2  = word ? QCString(word) : md->name();
     QCString contRef = separateMemberPages ? cfname : cfiname;
-    QCString anchor  = md->anchor();
+    QCString anchor  = sectionAnchor ? QCString(sectionAnchor) : md->anchor();
 
     QCString ref;
 
@@ -236,10 +257,10 @@ void Qhp::addIndexItem(Definition *context,MemberDef *md,
   }
   else if (context) // container
   {
-    // <keyword name="Foo" id="Foo" ref="doc.html"/>
+    // <keyword name="Foo" id="Foo" ref="doc.html#Foo"/>
     QCString contRef = context->getOutputFileBase();
     QCString level1  = word ? QCString(word) : context->name();
-    QCString ref = makeFileName(contRef);
+    QCString ref = makeRef(contRef,sectionAnchor);
     const char * attributes[] =
     {
       "name", level1,
@@ -289,9 +310,9 @@ void Qhp::handlePrevSection()
   }
 
   // We skip "Main Page" as our extra root is pointing to that
-  if (!((m_prevSectionLevel==1) && (m_prevSectionTitle=="Main Page")))
+  if (!((m_prevSectionLevel==1) && (m_prevSectionTitle==getFullProjectName())))
   {
-    QCString finalRef = makeFileName(m_prevSectionRef);
+    QCString finalRef = makeRef(m_prevSectionBaseName, m_prevSectionAnchor);
 
     const char * const attributes[] =
     { "title", m_prevSectionTitle,
@@ -314,17 +335,19 @@ void Qhp::handlePrevSection()
   clearPrevSection();
 }
 
-void Qhp::setPrevSection(const char * title, const char * ref, int level)
+void Qhp::setPrevSection(const char * title, const char * basename, const char * anchor, int level)
 {
   m_prevSectionTitle = title;
-  m_prevSectionRef   = ref;
+  m_prevSectionBaseName = basename;
+  m_prevSectionAnchor = anchor;
   m_prevSectionLevel = level;
 }
 
 void Qhp::clearPrevSection()
 {
   m_prevSectionTitle.resize(0);
-  m_prevSectionRef.resize(0);
+  m_prevSectionBaseName.resize(0);
+  m_prevSectionAnchor.resize(0);
 }
 
 void Qhp::addFile(const char * fileName)

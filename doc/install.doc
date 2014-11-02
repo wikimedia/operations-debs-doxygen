@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,7 +21,7 @@
 
 First go to the 
 <a href="http://www.doxygen.org/download.html">download</a> page
-to get the latest distribution, if you did not downloaded doxygen already.
+to get the latest distribution, if you have not downloaded doxygen already.
 
 \section install_src_unix Compiling from source on UNIX
 
@@ -29,16 +29,17 @@ If you downloaded the source distribution, you need at least the
 following to build the executable:
 <ul>
 <li>The <a href="ftp://prep.ai.mit.edu/pub/gnu/">GNU</a> tools 
-    flex, bison and GNU make, and strip
+    \c flex, \c bison, \c libiconv and <code>GNU make</code>, and \c strip
     \addindex flex
     \addindex bison
+    \addindex libiconv
     \addindex make
     \addindex strip
-<li>In order to generate a Makefile for your platform, you need 
+<li>In order to generate a \c Makefile for your platform, you need 
     <a href="http://www.perl.com/">perl</a>
     \addindex perl
 <li>The configure script assume the availability of standard UNIX tools such 
-    as sed, date, find, uname, mv, cp, cat, echo, tr, cd, and rm.
+    as <code>sed, date, find, uname, mv, cp, cat, echo, tr, cd</code> and \c rm.
 </ul>
 
 To take full advantage of doxygen's features the following additional
@@ -46,13 +47,13 @@ tools should be installed.
 
 <ul>
 <li>Qt Software's GUI toolkit 
-    <a href="http://qt.nokia.com/">Qt</A>
+    <a href="http://qt-project.org/">Qt</A>
     \addindex Qt
-    version 4.3 or higher.
+    version 4.3 or higher (but currently, Qt 5.x is not supported).
     This is needed to build the GUI front-end doxywizard. 
-<li>A \f$\mbox{\LaTeX}\f$ distribution: for instance
-    <a href="http://www.tug.org/interest.html#free">teTeX 1.0</a>
-    This is needed for generating LaTeX, Postscript, and PDF output.
+<li>A \LaTeX distribution: for instance
+    <a href="http://www.tug.org/interest.html#free">TeX Live</a>
+    This is needed for generating \LaTeX, Postscript, and PDF output.
 <li><a href="http://www.graphviz.org/">
     the Graph visualization toolkit version 1.8.10 or higher</a>
     Needed for the include dependency graphs, 
@@ -60,7 +61,7 @@ tools should be installed.
     If you compile graphviz yourself, make sure you do include
     freetype support (which requires the freetype library and header files), 
     otherwise the graphs will not render proper text labels.
-<li>For formulas or if you do not wish to use pdflatex, the ghostscript interpreter
+<li>For formulas or if you do not wish to use `pdflatex, the ghostscript interpreter
     is needed. You can find it at 
     <a href="http://www.ghostscript.com/">www.ghostscript.com</a>.
 <li>In order to generate doxygen's own documentation, Python is needed, you
@@ -93,7 +94,7 @@ Compilation is now done by performing the following steps:
 
     If you have Qt-4.3 or higher installed and want to build the GUI 
     front-end, you should run the configure script with 
-    the <code>--with-doxywizard</code> option:
+    the `--with-doxywizard` option:
 
         configure --with-doxywizard
 
@@ -135,42 +136,42 @@ Compilation is now done by performing the following steps:
 
 \section install_bin_unix    Installing the binaries on UNIX
 
-    After the compilation of the source code do a <code>make install</code>
-    to install doxygen. If you downloaded the binary distribution for UNIX,
-    type:
+After the compilation of the source code do a <code>make install</code>
+to install doxygen. If you downloaded the binary distribution for UNIX,
+type:
 
-        ./configure
-        make install
+    ./configure
+    make install
 
-    Binaries are installed into the directory <code>\<prefix\>/bin</code>.
-    Use <code>make install_docs</code> to install the
-    documentation and examples into <code>\<docdir\>/doxygen</code>. 
+Binaries are installed into the directory <code>\<prefix\>/bin</code>.
+Use <code>make install_docs</code> to install the
+documentation and examples into <code>\<docdir\>/doxygen</code>. 
 
-    <code>\<prefix\></code> defaults to <code>/usr/local</code> but can be changed with 
-    the <code>--prefix</code> option of the configure script. 
-    The default <code>\<docdir\></code> directory is 
-    <code>\<prefix\>/share/doc/packages</code> and can be changed with
-    the <code>--docdir</code> option of the configure script.
+<code>\<prefix\></code> defaults to <code>/usr/local</code> but can be changed with 
+the `--prefix` option of the configure script. 
+The default <code>\<docdir\></code> directory is 
+<code>\<prefix\>/share/doc/packages</code> and can be changed with
+the `--docdir` option of the configure script.
 
-    Alternatively, you can also copy the binaries from the <code>bin</code> 
-    directory manually to some <code>bin</code> directory in your search path.
-    This is sufficient to use doxygen.
+Alternatively, you can also copy the binaries from the <code>bin</code> 
+directory manually to some <code>bin</code> directory in your search path.
+This is sufficient to use doxygen.
 
-    \note You need the GNU install tool for this to work (it is part of
-    the coreutils package). Other install tools may put the binaries in 
-    the wrong directory!
+\note You need the GNU install tool for this to work (it is part of
+the coreutils package). Other install tools may put the binaries in 
+the wrong directory!
 
-    If you have a RPM or DEP package, then please follow the 
-    standard installation procedure that is required for these packages. 
+If you have a RPM or DEP package, then please follow the 
+standard installation procedure that is required for these packages. 
 
 \section unix_problems Known compilation problems for UNIX
 
 <b>Qt problems</b>
 
 The Qt include files and libraries are not a subdirectory of the
-directory pointed to by QTDIR on some systems
-(for instance on Red Hat 6.0 includes are in /usr/include/qt and
-libs are in /usr/lib).
+directory pointed to by <code>QTDIR</code> on some systems
+(for instance on Red Hat 6.0 includes are in <code>/usr/include/qt</code> and
+libs are in <code>/usr/lib</code>).
   
 The solution: go to the root of the doxygen distribution and do:
 
@@ -181,96 +182,26 @@ The solution: go to the root of the doxygen distribution and do:
     ln -s your-qt-bin-dir-here bin
     export QTDIR=$PWD
 
-If you have a csh-like shell you should use <code>setenv QTDIR \$PWD</code>
+If you have a <code>csh</code>-like shell you should use <code>setenv QTDIR \$PWD</code>
 instead of the <code>export</code> command above.
   
 Now install doxygen as described above.  
 
 <b>Bison problems</b>
 
-Versions 1.31 to 1.34 of bison contain a "bug" that results in a 
+Versions 1.31 to 1.34 of \c bison contain a "bug" that results in a 
 compiler errors like this:
 
-ce_parse.cpp:348: member `class CPPValue yyalloc::yyvs' with 
+<code>ce_parse.cpp:348: member `class CPPValue yyalloc::yyvs' with </code>
 constructor not allowed in union
 
 This problem has been solved in version 1.35 (versions before 1.31 
 will also work).
 
-<b>Latex problems</b>
-
-The file <code>a4wide.sty</code> is not available for all distributions. If
-your distribution does not have it please select another paper type
-in the config file (see the \ref cfg_paper_type "PAPER_TYPE" tag in the 
-config file).
-
-<b>HP-UX \& Digital UNIX problems</b>
-
-If you are compiling for HP-UX with aCC and you get this error:
-
-    /opt/aCC/lbin/ld: Unsatisfied symbols:
-    alloca (code)
-
-then you should (according to Anke Selig) edit <code>ce_parse.cpp</code> 
-and replace
-
-    extern "C" {
-      void *alloca (unsigned int);
-    };
-
-with
-
-    #include <alloca.h>  
-
-If that does not help, try removing <code>ce_parse.cpp</code> and let 
-bison rebuild it (this worked for me).
-
-If you are compiling for Digital UNIX, the same problem can be solved
-(according to Barnard Schmallhof) by replacing the following in 
-ce_parse.cpp:
-   
-\verbatim
-    #else /* not GNU C.  */
-    #if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__) \
-        || defined (__sparc) || defined (__sgi)
-    #include <alloca.h>
-\endverbatim
-
-  with
-
-\verbatim
-    #else /* not GNU C.  */
-    #if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__) \
-        || defined (__sparc) || defined (__sgi) || defined (__osf__)
-    #include <alloca.h>
-\endverbatim
-
-  Alternatively, one could fix the problem at the bison side.
-  Here is patch for bison.simple (provided by Andre Johansen):
- 
-\verbatim
---- bison.simple~       Tue Nov 18 11:45:53 1997
-+++ bison.simple        Mon Jan 26 15:10:26 1998
-@@ -27,7 +27,7 @@
- #ifdef __GNUC__
- #define alloca __builtin_alloca
- #else /* not GNU C.  */
--#if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__) \
-     || defined (__sparc) || defined (__sgi)
-+#if (!defined (__STDC__) && defined (sparc)) || defined (__sparc__) \
-     || defined (__sparc) || defined (__sgi) || defined (__alpha)
- #include <alloca.h>
- #else /* not sparc */
- #if defined (MSDOS) && !defined (__TURBOC__)
-\endverbatim
-
-  The generated scanner.cpp that comes with doxygen is build with this
-  patch applied.  
-
 <b>Sun compiler problems</b>
 
 It appears that doxygen doesn't work properly if it is compiled 
-with Sun's C++ WorkShop 6 Compiler. I cannot verify this myself as I do 
+with Sun's C++ WorkShop Compiler. I cannot verify this myself as I do 
 not have access to a Solaris machine with this compiler. With GNU compiler
 it does work and installing Sun patch 111679-13 has also been reported 
 as a way to fix the problem.
@@ -295,14 +226,14 @@ Manually adding `-Bdynamic` after the target rule in
 
 Older versions of the GNU compiler have problems with constant strings
 containing characters with character codes larger than 127. Therefore 
-the compiler will fail to compile some of the translator_xx.h files. 
+the compiler will fail to compile some of the `translator_xx.h` files. 
 A workaround, if you are planning to use the English translation only, 
-is to configure doxygen with the <code>--english-only</code> option.  
+is to configure doxygen with the `--english-only` option.  
 
 On some platforms (such as OpenBSD) using some versions of gcc with
 -O2 can lead to eating all memory during the compilation of files 
-such as config.cpp. As a workaround use --debug as a configure option 
-or omit the -O2 for the particular files in the Makefile.
+such as config.cpp. As a workaround use `--debug` as a configure option 
+or omit the `-O2` for the particular files in the Makefile.
 
 Gcc versions before 2.95 may produce broken binaries due to bugs in 
 these compilers. 
@@ -338,26 +269,24 @@ compile doxygen. Alternatively, you can compile doxygen
 <a href="http://en.wikipedia.org/wiki/Cygwin">Cygwin</a>
 or <a href="http://www.mingw.org/">MinGW</a>.
 
-The next step is to install unxutils (see http://sourceforge.net/projects/unxutils).
-This packages contains the tools \c flex and \c bison which are needed during the
-compilation process if you use a CVS snapshot of doxygen (the official source releases 
+The next step is to install modern versions of \c bison and \c flex
+(see http://sourceforge.net/projects/winflexbison. After installation and adding them to
+your `path` rename `win_flex.exe` to `flex.exe` and `win_bison.exe` to `bison.exe`)
+Furthermore you have to install \c python (version 2.6 or higher, see http://www.python.org).
+These packages are needed during the
+compilation process if you use a GitHub snapshot of doxygen (the official source releases 
 come with pre-generated sources).
-Download the zip extract it to e.g. <code>c:\\tools\\unxutils</code>.
-
-Now you need to add/adjust the following environment variables 
-(via Control Panel/System/Advanced/Environment Variables):
-- add <code>c:\\tools\\unxutils\\usr\\local\\wbin;</code> to the start of <code>PATH</code>
-- set <code>BISON_SIMPLE</code> to <code>c:\\tools\\unxutils\\usr\\local\\share\\bison.simple</code>
 
 Download doxygen's source tarball and put it somewhere (e.g. use <code>c:\\tools</code>)
 
 Now start a new command shell and type
 \verbatim
 cd c:\tools
-gunzip doxygen-x.y.z.src.tar.gz
-tar xvf doxygen-x.y.z.src.tar
+tar zxvf doxygen-x.y.z.src.tar.gz
 \endverbatim
-to unpack the sources.
+to unpack the sources (you can obtain \c tar from e.g. http://gnuwin32.sourceforge.net/packages.html).
+Alternatively you can use an unpack program, like 7-Zip (see http://www.7-zip.org)
+or use the build in unpack feature of modern Windows systems).
 
 Now your environment is setup to build \c doxygen.
 
@@ -367,7 +296,7 @@ You can now build the Release or Debug flavor of Doxygen by right-clicking
 the project in the solutions explorer, and selecting Build.
 
 Note that compiling Doxywizard currently requires Qt version 4
-(see http://qt.nokia.com/products/platform/qt-for-windows).
+(see http://qt-project.org/).
 
 Also read the next section for additional tools you may need to install to run
 doxygen with certain features enabled.
@@ -405,7 +334,7 @@ Here is what is required:
 
     The good, tested, and free alternative is the <code>tar</code> utility
     supplied with <a href="http://sourceware.cygnus.com/cygwin/">cygwin
-    tools</a>. Anyway, the cygwin's flex, bison, and sed are also
+    tools</a>. Anyway, the Cygwin's \c flex, \c bison, and \c sed are also
     recommended below.
 
 <li>Microsoft Visual C++ (I only tested with version 6.0).
@@ -418,7 +347,7 @@ Here is what is required:
 <li>Perl 5.0 or higher for Windows. This can be downloaded from:
     http://www.ActiveState.com/Products/ActivePerl/
 
-<li>The GNU tools flex, bison, and sed.
+<li>The GNU tools \c flex, \c bison, and \c sed.
     To get these working on Windows you should install the 
     <a href="http://sources.redhat.com/cygwin/">cygwin tools</a>
     
@@ -452,7 +381,7 @@ Here is what is required:
     of Qt that is needed for to compile doxygen.
     The Windows specific part were also created.
     As a result doxygen (without the wizard) can be compiled on systems 
-    without X11 or (the commerical version of) Qt. 
+    without X11 or (the commercial version of) Qt.
 
 <li>If you used WinZip to extract the tar archive it will (apparently) not 
     create empty folders, so you have to add the folders
@@ -473,7 +402,7 @@ Compilation is now done by performing the following steps:
     the command-line (add them to the PATH environment variable if
     needed).
 
-    Notice: The use of LaTeX is optional and only needed for compilation
+    Notice: The use of \LaTeX is optional and only needed for compilation
     of the documentation into PostScript or PDF. 
     It is \e not needed for compiling the doxygen's binaries. 
     
@@ -508,7 +437,7 @@ Compilation is now done by performing the following steps:
     The generated HTML docs are located in the <code>..\\html</code>
     subdirectory.
 
-    The sources for LaTeX documentation are located in the <code>..\\latex</code>
+    The sources for \LaTeX documentation are located in the <code>..\\latex</code>
     subdirectory. From those sources, the DVI, PostScript, and PDF
     documentation can be generated. 
 </ol>
@@ -529,25 +458,25 @@ If you want to produce compressed HTML files (see \ref
 cfg_generate_htmlhelp "GENERATE_HTMLHELP") in the config file, then 
 you need the Microsoft HTML help workshop. 
 You can download it from 
-<a href="http://msdn.microsoft.com/library/default.asp?url=/library/en-us/htmlhelp/html/vsconHH1Start.asp">Microsoft</a>.
+<a href="http://www.microsoft.com/en-us/download/details.aspx?id=21138">Microsoft</a>.
 
 If you want to produce Qt Compressed Help files (see \ref 
 cfg_qhg_location "QHG_LOCATION") in the config file, then 
 you need qhelpgenerator which is part of Qt. 
-You can download Qt from <a href="http://trolltech.com/downloads/">Qt Software Downloads</a>.
+You can download Qt from <a href="http://qt-project.org/downloads">Qt Software Downloads</a>.
 
 In order to generate PDF output or use scientific formulas you will also need to
 install <a href="http://en.wikipedia.org/wiki/LaTeX">LaTeX</a> and 
 <a href="http://en.wikipedia.org/wiki/Ghostscript">Ghostscript</a>. 
 
-For LaTeX a number of distributions exists. Popular ones that should work with
+For \LaTeX a number of distributions exists. Popular ones that should work with
 doxygen are <a href="http://www.miktex.org">MikTex</a> 
-and <a href="http://www.xemtex.org">XemTex</a>.
+and <a href="http://www.tug.org/protext/">proTeXt</a>.
 
 Ghostscript can be <a href="http://sourceforge.net/projects/ghostscript/">downloaded</a> 
 from Sourceforge.
 
-After installing LaTeX and Ghostscript you'll need to make sure the tools
+After installing \LaTeX and Ghostscript you'll need to make sure the tools
 latex.exe, pdflatex.exe, and gswin32c.exe are present in the search path of a
 command box. Follow <a href="http://www.computerhope.com/issues/ch000549.htm">these</a>
 instructions if you are unsure and run the commands from a command box to verify it works.
@@ -564,7 +493,7 @@ There are a couple of tools you may want to install to use all of doxygen's
 features:
 
 <ul>
-<li>To generate LaTeX documentation or formulas in HTML you need the tools:
+<li>To generate \LaTeX documentation or formulas in HTML you need the tools:
     <code>latex</code>, <code>dvips</code> and <code>gswin32</code>. 
     To get these working under Windows
     install the fpTeX distribution. You can find more info at:
@@ -575,8 +504,8 @@ features:
     Make sure the tools are available from a dos box, by adding the 
     directory they are in to the search path.
 
-    For your information, the LaTeX is freely available set of so
-    called macros and styles on the top of the famous TeX program
+    For your information, \LaTeX is a freely available set of so
+    called macros and styles on the top of the famous \TeX program
     (by famous Donald Knuth) and the accompanied utilities (all
     available for free). It is used for high quality
     typesetting. The result -- in the form of so called
@@ -586,7 +515,7 @@ features:
     to convert the <code>dvi</code> to the high quality PostScript
     (i.e. PostScript that can be processed by utilities like 
     <code>psnup</code>, <code>psbook</code>, <code>psselect</code>,
-    and others). The derived version of TeX (the pdfTeX) can be used
+    and others). The derived version of \TeX (the pdfTeX) can be used
     to produce PDF output instead of DVI, or the PDF can be produced
     from PostScript using the utility <code>ps2pdf</code>.
 
@@ -607,7 +536,7 @@ features:
     cfg_qhelgenerator_loc "QHG_LOCATION") in the config file,
     then you need qhelpgenerator which is part of Qt. 
     You can download Qt from
-    <a href="http://trolltech.com/downloads/">Qt Software Downloads</a>.
+    <a href="http://qt-project.org/downloads">Qt Software Downloads</a>.
 
 <li><a href="http://www.graphviz.org/">
     the Graph visualization toolkit version 1.8.10</a><br>
@@ -622,16 +551,13 @@ features:
 Doxygen was developed and tested under Linux &amp; MacOSX using the following 
 open-source tools:
 <ul>
-<li>GCC version 3.3.6 (Linux) and 4.0.1 (MacOSX)
-<li>GNU flex version 2.5.33 (Linux) and 2.5.4 (MacOSX)
-<li>GNU bison version 1.75
-<li>GNU make version 3.80
-<li>Perl version 5.8.1
-<li>VIM version 6.2
-<li>Firefox 1.5
-<li>Trolltech's tmake version 1.3 (included in the distribution) 
-<li>teTeX version 2.0.2
-<li>CVS 1.12.12
+<li>GCC version 4.6.3 (Linux) and 4.2.1 (MacOSX)
+<li>GNU flex version 2.5.35 
+<li>GNU bison version 2.5 (Linux) and 2.3 (MacOSX)
+<li>GNU make version 3.81
+<li>Perl version 5.12
+<li>Python version 2.7 and 3.4
+<li>TeX Live 2009 (or later)
 </ul>
 
 \htmlonly

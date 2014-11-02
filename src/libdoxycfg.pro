@@ -1,11 +1,11 @@
 #
-# This file was generated from libdoxycfg.pro.in on Thu Jul 12 20:08:34 CEST 2012
+# This file was generated from libdoxycfg.pro.in on Thu Aug 21 10:48:35 CEST 2014
 #
 
 #
-# $Id: libdoxycfg.pro.in,v 1.1 2001/03/19 19:27:41 root Exp $
+# 
 #
-# Copyright (C) 1997-2012 by Dimitri van Heesch.
+# Copyright (C) 1997-2014 by Dimitri van Heesch.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation under the terms of the GNU General Public License is hereby 
@@ -21,12 +21,14 @@
 TEMPLATE     =	libdoxycfg.t
 CONFIG       =	console warn_on staticlib debug
 HEADERS      =  config.h configoptions.h portable.h
-SOURCES      =	config.cpp configoptions.cpp portable.cpp portable_c.c
+SOURCES      =	../generated_src/doxygen/config.cpp ../generated_src/doxygen/configoptions.cpp portable.cpp portable_c.c
 win32:TMAKE_CXXFLAGS       += -DQT_NODLL
 win32-g++:TMAKE_CXXFLAGS   += -fno-exceptions -fno-rtti
-INCLUDEPATH                += ../qtools
-win32:INCLUDEPATH          += .
+DEPENDPATH                 += ../generated_src/doxygen
+INCLUDEPATH                += ../generated_src/doxygen . ../qtools
 DESTDIR                    =  ../lib
 TARGET                     =  doxycfg
-OBJECTS_DIR                =  ../objects
+OBJECTS_DIR                =  ../objects/doxygen
 TMAKE_MOC = /usr/bin/moc
+LIBS += -L/opt/local/lib
+INCLUDEPATH += /opt/local/include

@@ -3,7 +3,7 @@
  * $Id: $
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,6 +21,7 @@
 
 #include <qcstring.h>
 #include <qlist.h>
+#include <stdio.h>
 #include "htmlattrib.h"
 
 class Definition;
@@ -60,7 +61,10 @@ enum Tokens
   RetVal_Internal       = 0x10011,
   RetVal_SwitchLang     = 0x10012,
   RetVal_CloseXml       = 0x10013,
-  RetVal_EndBlockQuote  = 0x10014
+  RetVal_EndBlockQuote  = 0x10014,
+  RetVal_CopyDoc        = 0x10015,
+  RetVal_EndInternal    = 0x10016,
+  RetVal_EndParBlock    = 0x10017
 };
 
 /** @brief Data associated with a token used by the comment block parser. */
@@ -135,6 +139,7 @@ void doctokenizerYYsetStateHtmlOnly();
 void doctokenizerYYsetStateManOnly();
 void doctokenizerYYsetStateLatexOnly();
 void doctokenizerYYsetStateXmlOnly();
+void doctokenizerYYsetStateDbOnly();
 void doctokenizerYYsetStateRtfOnly();
 void doctokenizerYYsetStateVerbatim();
 void doctokenizerYYsetStateDot();
@@ -153,5 +158,8 @@ void doctokenizerYYsetStateAnchor();
 void doctokenizerYYsetInsidePre(bool b);
 void doctokenizerYYpushBackHtmlTag(const char *tag);
 void doctokenizerYYsetStateSnippet();
+void doctokenizerYYstartAutoList();
+void doctokenizerYYendAutoList();
+void doctokenizerYYsetStatePlantUML();
 
 #endif

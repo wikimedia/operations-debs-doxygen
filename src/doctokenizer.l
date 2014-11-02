@@ -3,7 +3,7 @@
  * $Id: $
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,6 +18,8 @@
 
 
 %{
+
+#include <ctype.h>
 
 #include <qfile.h>
 #include <qstring.h>
@@ -36,6 +38,7 @@
 #include "portable.h"
 
 #define YY_NEVER_INTERACTIVE 1
+#define YY_NO_INPUT 1
   
 //--------------------------------------------------------------------------
 
@@ -54,11 +57,13 @@ static QCString     g_secLabel;
 static QCString     g_secTitle;
 static SectionInfo::SectionType g_secType;
 static QCString     g_endMarker;
+static int          g_autoListLevel;
 
 struct DocLexerContext
 {
   TokenInfo *token;
   int rule;
+  int autoListLevel;
   int inputPos;
   const char *inputString;
   YY_BUFFER_STATE state;
@@ -72,6 +77,7 @@ void doctokenizerYYpushContext()
 {
   DocLexerContext *ctx = new DocLexerContext;
   ctx->rule = YY_START;
+  ctx->autoListLevel = g_autoListLevel;
   ctx->token = g_token;
   ctx->inputPos = g_inputPos;
   ctx->inputString = g_inputString;
@@ -84,6 +90,7 @@ bool doctokenizerYYpopContext()
 {
   if (g_lexerStack.isEmpty()) return FALSE;
   DocLexerContext *ctx = g_lexerStack.pop();
+  g_autoListLevel = ctx->autoListLevel;
   g_inputPos = ctx->inputPos;
   g_inputString = ctx->inputString;
   yy_delete_buffer(YY_CURRENT_BUFFER);
@@ -158,7 +165,7 @@ static void processSection()
     warn(g_fileName,yylineno,"Found section/anchor %s without context\n",g_secLabel.data()); 
   }
   SectionInfo *si=0;
-  if ((si=Doxygen::sectionDict.find(g_secLabel)))
+  if ((si=Doxygen::sectionDict->find(g_secLabel)))
   {
     si->fileName = file;
     //si = new SectionInfo(file,g_secLabel,g_secTitle,g_secType);
@@ -313,6 +320,9 @@ static int yyread(char *buf,int max_size)
 }
 
 //--------------------------------------------------------------------------
+#define REAL_YY_DECL int doctokenizerYYlex (void)
+#define YY_DECL static int local_doctokinizer(void)
+#define LOCAL_YY_DECL local_doctokinizer()
 
 %}
 
@@ -323,38 +333,43 @@ BLANK     [ \t\r]
 ID        "$"?[a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF]*
 LABELID   [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-]*
 PHPTYPE   [\\:a-z_A-Z0-9\x80-\xFF\-]+
-CITEID    [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-:/]*
+CITESCHAR [a-z_A-Z\x80-\xFF]
+CITEECHAR [a-z_A-Z0-9\x80-\xFF\-\+:\/]*
+CITEID    {CITESCHAR}*{CITEECHAR}+("."{CITESCHAR}*{CITEECHAR}+)*
 MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z_A-Z0-9\-]+
 OPTSTARS  ("//"{BLANK}*)?"*"*{BLANK}*
 LISTITEM  {BLANK}*[-]("#")?{WS}
 MLISTITEM {BLANK}*[+*]{WS}
 OLISTITEM {BLANK}*[1-9][0-9]*"."{BLANK}
 ENDLIST   {BLANK}*"."{BLANK}*\n
-ATTRIB    {ID}{WS}*("="{WS}*(("\""[^\"]*"\"")|("'"[^\']*"'")|[^ \t\r\n'"><]+))?
+ATTRNAME  [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-]*
+ATTRIB    {ATTRNAME}{WS}*("="{WS}*(("\""[^\"]*"\"")|("'"[^\']*"'")|[^ \t\r\n'"><]+))?
 URLCHAR   [a-z_A-Z0-9\!\~\,\:\;\'\$\?\@\&\%\#\.\-\+\/\=]
 URLMASK   ({URLCHAR}+([({]{URLCHAR}*[)}])?)+
-FILESCHAR [a-z_A-Z0-9\\:\\\/\-\+]
-FILEECHAR [a-z_A-Z0-9\-\+]
+FILESCHAR [a-z_A-Z0-9\\:\\\/\-\+@&#]
+FILEECHAR [a-z_A-Z0-9\-\+@&#]
 HFILEMASK ("."{FILESCHAR}*{FILEECHAR}+)*
 FILEMASK  ({FILESCHAR}*{FILEECHAR}+("."{FILESCHAR}*{FILEECHAR}+)*)|{HFILEMASK}
 LINKMASK  [^ \t\n\r\\@<&${}]+("("[^\n)]*")")?({BLANK}*("const"|"volatile"){BLANK}+)? 
 VERBATIM  "verbatim"{BLANK}*
-SPCMD1    {CMD}([a-z_A-Z][a-z_A-Z0-9]*|{VERBATIM})
+SPCMD1    {CMD}([a-z_A-Z][a-z_A-Z0-9]*|{VERBATIM}|"--"|"---")
 SPCMD2    {CMD}[\\@<>&$#%~".|]
 SPCMD3    {CMD}form#[0-9]+
 SPCMD4    {CMD}"::"
-INOUT	  "in"|"out"|("in"{BLANK}*","{BLANK}*"out")|("out"{BLANK}*","{BLANK}*"in")
+INOUT	  "inout"|"in"|"out"|("in"{BLANK}*","{BLANK}*"out")|("out"{BLANK}*","{BLANK}*"in")
 PARAMIO   {CMD}param{BLANK}*"["{BLANK}*{INOUT}{BLANK}*"]"
-TEMPCHAR  [a-z_A-Z0-9,: \t\*\&]
-FUNCCHAR  [a-z_A-Z0-9,:\<\> \t\*\&\[\]]
+TEMPCHAR  [a-z_A-Z0-9.,: \t\*\&\(\)\[\]]
+FUNCCHAR  [a-z_A-Z0-9,:\<\> \t\^\*\&\[\]]
+FUNCPART  {FUNCCHAR}*("("{FUNCCHAR}*")"{FUNCCHAR}*)?
 SCOPESEP  "::"|"#"|"."
 TEMPLPART "<"{TEMPCHAR}*">"
-SCOPEPRE  {ID}{TEMPLPART}?{SCOPESEP}
+ANONNS    "anonymous_namespace{"[^}]*"}"
+SCOPEPRE  (({ID}{TEMPLPART}?)|{ANONNS}){SCOPESEP}
 SCOPEKEYS ":"({ID}":")*
-SCOPECPP  {SCOPEPRE}*(~)?{ID}("<"{TEMPCHAR}*">")?
+SCOPECPP  {SCOPEPRE}*(~)?{ID}{TEMPLPART}?
 SCOPEOBJC {SCOPEPRE}?{ID}{SCOPEKEYS}?
 SCOPEMASK {SCOPECPP}|{SCOPEOBJC}
-FUNCARG   "("{FUNCCHAR}*")"({BLANK}*("volatile"|"const"){BLANK})?
+FUNCARG   "("{FUNCPART}")"({BLANK}*("volatile"|"const"){BLANK})?
 OPNEW     {BLANK}+"new"({BLANK}*"[]")?
 OPDEL     {BLANK}+"delete"({BLANK}*"[]")?
 OPNORM    {OPNEW}|{OPDEL}|"+"|"-"|"*"|"/"|"%"|"^"|"&"|"|"|"~"|"!"|"="|"<"|">"|"+="|"-="|"*="|"/="|"%="|"^="|"&="|"|="|"<<"|">>"|"<<="|">>="|"=="|"!="|"<="|">="|"&&"|"||"|"++"|"--"|","|"->*"|"->"|"[]"|"()"
@@ -375,9 +390,9 @@ HTMLTAG   "<"(("/")?){ID}({WS}+{ATTRIB})*{WS}*(("/")?)">"
 HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"pre"|"sub"|"sup"|"tr"|"td"|"th"|"ol"|"ul"|"li"|"tt"|"kbd"|"em"|"hr"|"dl"|"dt"|"dd"|"br"|"i"|"a"|"b"|"p"
 HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"
 HTMLKEYW  {HTMLKEYL}|{HTMLKEYU}
-REFWORD2  ("#"|"::")?({ID}{TEMPLPART}?("."|"#"|"::"|"-"|"/"))*({ID}(":")?){FUNCARG}?
+REFWORD2  ("#"|"::")?((({ID}{TEMPLPART}?)|{ANONNS})("."|"#"|"::"|"-"|"/"))*({ID}{TEMPLPART}?(":")?){FUNCARG}?
 REFWORD3  ({ID}":")*{ID}":"?
-REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
+REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 
 %option noyywrap
 %option yylineno
@@ -393,13 +408,17 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 %x St_CodeOpt
 %x St_XmlCode
 %x St_HtmlOnly
+%x St_HtmlOnlyOption
 %x St_ManOnly
 %x St_LatexOnly
 %x St_RtfOnly
 %x St_XmlOnly
+%x St_DbOnly
 %x St_Verbatim
 %x St_Dot
 %x St_Msc
+%x St_PlantUMLOpt
+%x St_PlantUML
 %x St_Param
 %x St_XRefItem
 %x St_XRefItem2
@@ -540,6 +559,13 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 			 ASSERT(ok);
 			 return TK_COMMAND;
   		       }
+<St_Para>{CMD}"n"\n    { /* \n followed by real newline */
+                         yylineno++;
+                         g_token->name = yytext+1;
+			 g_token->name = g_token->name.stripWhiteSpace();
+			 g_token->paramDir=TokenInfo::Unspecified;
+                         return TK_COMMAND;
+                       }
 <St_Para>{SPCMD1}      |
 <St_Para>{SPCMD2}      |
 <St_Para>{SPCMD4}      { /* special command */
@@ -606,8 +632,16 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 <St_Para>"$"{ID}":"[^\n$]+"$" { /* RCS tag */
                          QCString tagName(yytext+1);
 			 int index=tagName.find(':');
-  			 g_token->name = tagName.left(index+1);
-			 g_token->text = tagName.mid(index+2,tagName.length()-index-3);
+  			 g_token->name = tagName.left(index);
+			 int text_begin = index+2;
+			 int text_end = tagName.length()-1;
+			 if (tagName[text_begin-1]==':') /* check for Subversion fixed-length keyword */
+			 {
+				 ++text_begin;
+				 if (tagName[text_end-1]=='#')
+					 --text_end;
+			 }
+			 g_token->text = tagName.mid(text_begin,text_end-text_begin);
 			 return TK_RCSTAG;
   		       }
 <St_Para,St_HtmlOnly>"$("{ID}")"   { /* environment variable */
@@ -684,38 +718,41 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
                          g_token->name = yytext;
                          return TK_COMMAND;
   		       }
+<St_Para>({BLANK}*\n)+{BLANK}*\n/{LISTITEM} { /* skip trailing paragraph followed by new list item */
+                         if (g_insidePre || g_autoListLevel==0)
+                         {
+                           REJECT;
+                         }
+                       }
+<St_Para>({BLANK}*\n)+{BLANK}*\n/{MLISTITEM} { /* skip trailing paragraph followed by new list item */
+                         if (!Doxygen::markdownSupport || g_insidePre || g_autoListLevel==0)
+                         {
+                           REJECT;
+                         }
+                       }
+<St_Para>({BLANK}*\n)+{BLANK}*\n/{OLISTITEM} { /* skip trailing paragraph followed by new list item */
+                         if (!Doxygen::markdownSupport || g_insidePre || g_autoListLevel==0)
+                         {
+                           REJECT;
+                         }
+                       }
 <St_Para>({BLANK}*\n)+{BLANK}*\n{BLANK}* {
-                         // g_insidePre was always FALSE, so the next section
-                         // was never executed, now g_insidePre is set properly
-                         // again, so the section is commented out to keep the
-                         // old behavior.
-                         //if (g_insidePre)
-			 //{
-			 //  /* Inside a <pre>..</pre> blank lines are treated
-			 //   * as whitespace.
-			 //   */
-                         //  g_token->chars=yytext;
-			 //  return TK_WHITESPACE;
-			 //}
-			 //else // found end of a paragraph
-			 {
-                           g_token->indent=computeIndent(yytext,(int)yyleng);
-                           int i;
-                           // put back the indentation (needed for list items)
-                           for (i=0;i<g_token->indent;i++)
-                           {
-                             unput(' ');
-                           }
-                           // tell flex that after putting the last indent 
-                           // back we are at the beginning of the line
-                           YY_CURRENT_BUFFER->yy_at_bol=1;
-                           // start of a new paragraph
-  		           return TK_NEWPARA;
-			 }
+                         g_token->indent=computeIndent(yytext,(int)yyleng);
+                         int i;
+                         // put back the indentation (needed for list items)
+                         for (i=0;i<g_token->indent;i++)
+                         {
+                           unput(' ');
+                         }
+                         // tell flex that after putting the last indent 
+                         // back we are at the beginning of the line
+                         YY_CURRENT_BUFFER->yy_at_bol=1;
+                         // start of a new paragraph
+  		         return TK_NEWPARA;
                        }
 <St_CodeOpt>{BLANK}*"{"(".")?{LABELID}"}" {
                          g_token->name = yytext;
-                         int i=g_token->name.find('{');
+                         int i=g_token->name.find('{'); /* } to keep vi happy */
                          g_token->name = g_token->name.mid(i+1,g_token->name.length()-i-2);
                          BEGIN(St_Code);
                        }
@@ -735,6 +772,14 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 <St_Code,St_XmlCode>.           {
   			 g_token->verb+=yytext;
   		       }
+<St_HtmlOnlyOption>" [block]" { // the space is added in commentscan.l
+                         g_token->name="block";
+                         BEGIN(St_HtmlOnly);
+                        }
+<St_HtmlOnlyOption>.|\n {
+                         unput(*yytext);
+                         BEGIN(St_HtmlOnly);
+                        }
 <St_HtmlOnly>{CMD}"endhtmlonly" {
                          return RetVal_OK;
                        }
@@ -775,6 +820,14 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 <St_XmlOnly>.          {
   			 g_token->verb+=yytext;
   		       }
+<St_DbOnly>{CMD}"enddocbookonly" {
+                         return RetVal_OK;
+                       }
+<St_DbOnly>[^\\@\n]+  |
+<St_DbOnly>\n         |
+<St_DbOnly>.          {
+  			 g_token->verb+=yytext;
+  		       }
 <St_Verbatim>{CMD}"endverbatim" {
   			 g_token->verb=stripEmptyLines(g_token->verb);
                          return RetVal_OK;
@@ -792,12 +845,29 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 <St_Dot>.              { /* dot text */
   			 g_token->verb+=yytext;
   		       }
-<St_Msc>{CMD}"endmsc"  {
+<St_Msc>{CMD}("endmsc")  {
                          return RetVal_OK;
                        }
 <St_Msc>[^\\@\n]+      |
 <St_Msc>\n             |
 <St_Msc>.              { /* msc text */
+  			 g_token->verb+=yytext;
+  		       }
+<St_PlantUMLOpt>\n     {
+                         g_token->sectionId=g_token->sectionId.stripWhiteSpace();
+                         BEGIN(St_PlantUML);
+                       }
+<St_PlantUMLOpt>["{}]   { // skip curly brackets or quotes around the optional image name
+                       }
+<St_PlantUMLOpt>.      {
+                         g_token->sectionId += yytext;
+                       }
+<St_PlantUML>{CMD}"enduml"  {
+                         return RetVal_OK;
+                       }
+<St_PlantUML>[^\\@\n]+ |
+<St_PlantUML>\n        |
+<St_PlantUML>.         { /* plantuml text */
   			 g_token->verb+=yytext;
   		       }
 <St_Title>"\""	       { // quoted title
@@ -992,8 +1062,12 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 			 g_token->name = types+"#"+params.mid(i);
 			 return TK_WORD;
   		       }
-<St_Param>[^ \t\n,]+   {
+<St_Param>[^ \t\n,@\\]+  {
   			 g_token->name = yytext;
+                         if (g_token->name.at(yyleng-1)==':')
+                         {
+                           g_token->name=g_token->name.left(yyleng-1);
+                         }
 			 return TK_WORD;
                        }
 <St_Param>{WS}*","{WS}*  /* param separator */
@@ -1066,6 +1140,10 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
                                       g_endMarker="endmsc";
 				      BEGIN(St_SecSkip);
   				    }
+<St_Sections>{CMD}"startuml"/[^a-z_A-Z0-9] {
+                                      g_endMarker="enduml";
+				      BEGIN(St_SecSkip);
+  				    }
 <St_Sections>{CMD}"htmlonly"/[^a-z_A-Z0-9] {
                                       g_endMarker="endhtmlonly";
 				      BEGIN(St_SecSkip);
@@ -1078,6 +1156,10 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
                                       g_endMarker="endxmlonly";
 				      BEGIN(St_SecSkip);
                                     }
+<St_Sections>{CMD}"docbookonly"/[^a-z_A-Z0-9] {
+                                      g_endMarker="enddocbookonly";
+				      BEGIN(St_SecSkip);
+                                    }
 <St_Sections>{CMD}"code"/[^a-z_A-Z0-9] {
                                       g_endMarker="endcode";
 				      BEGIN(St_SecSkip);
@@ -1087,13 +1169,13 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 				      BEGIN(St_SecSkip);
                                     }
 <St_SecSkip>{CMD}{ID}		    {
-                                      if (strcmp(yytext+1,g_endMarker)==0)
+                                      if (qstrcmp(yytext+1,g_endMarker)==0)
 				      {
 					BEGIN(St_Sections);
 				      }
                                     }
 <St_SecSkip>"-->"		    {
-                                      if (strcmp(yytext,g_endMarker)==0)
+                                      if (qstrcmp(yytext,g_endMarker)==0)
 				      {
 					BEGIN(St_Sections);
 				      }
@@ -1122,7 +1204,7 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
                          BEGIN(St_Sections);
 		       }
 <St_SecTitle,St_SecLabel1,St_SecLabel2>. {
-                         warn(g_fileName,yylineno,"warning: Unexpected character `%s' while looking for section label or title",yytext); 
+                         warn(g_fileName,yylineno,"Unexpected character `%s' while looking for section label or title",yytext); 
                        }
 
 <St_Snippet>[^\n]+     |
@@ -1134,15 +1216,15 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
    
      /* Generic rules that work for all states */ 
 <*>\n                  { 
-                         warn(g_fileName,yylineno,"warning: Unexpected new line character"); 
+                         warn(g_fileName,yylineno,"Unexpected new line character"); 
 		       }
 <*>[\\@<>&$#%~"=]      { /* unescaped special character */
-                         //warn(g_fileName,yylineno,"warning: Unexpected character `%s', assuming command \\%s was meant.",yytext,yytext); 
+                         //warn(g_fileName,yylineno,"Unexpected character `%s', assuming command \\%s was meant.",yytext,yytext); 
 			 g_token->name = yytext;
 			 return TK_COMMAND;
                        }
 <*>.                   { 
-                         warn(g_fileName,yylineno,"warning: Unexpected character `%s'",yytext); 
+                         warn(g_fileName,yylineno,"Unexpected character `%s'",yytext); 
 		       }
 %%
 
@@ -1152,6 +1234,7 @@ void doctokenizerYYFindSections(const char *input,Definition *d,
                                 MemberGroup *mg,const char *fileName)
 {
   if (input==0) return;
+  printlex(yy_flex_debug, TRUE, __FILE__, fileName);
   g_inputString = input;
   //printf("parsing --->`%s'<---\n",input);
   g_inputPos    = 0;
@@ -1161,10 +1244,12 @@ void doctokenizerYYFindSections(const char *input,Definition *d,
   BEGIN(St_Sections);
   doctokenizerYYlineno = 1;
   doctokenizerYYlex();
+  printlex(yy_flex_debug, FALSE, __FILE__, fileName);
 }
 
 void doctokenizerYYinit(const char *input,const char *fileName)
 {
+  g_autoListLevel = 0;
   g_inputString = input;
   g_inputPos    = 0;
   g_fileName    = fileName;
@@ -1204,7 +1289,8 @@ void doctokenizerYYsetStateXmlCode()
 void doctokenizerYYsetStateHtmlOnly()
 {
   g_token->verb="";
-  BEGIN(St_HtmlOnly);
+  g_token->name="";
+  BEGIN(St_HtmlOnlyOption);
 }
 
 void doctokenizerYYsetStateManOnly()
@@ -1223,6 +1309,12 @@ void doctokenizerYYsetStateXmlOnly()
 {
   g_token->verb="";
   BEGIN(St_XmlOnly);
+}
+
+void doctokenizerYYsetStateDbOnly()
+{
+  g_token->verb="";
+  BEGIN(St_DbOnly);
 }
 
 void doctokenizerYYsetStateLatexOnly()
@@ -1247,6 +1339,13 @@ void doctokenizerYYsetStateMsc()
 {
   g_token->verb="";
   BEGIN(St_Msc);
+}
+
+void doctokenizerYYsetStatePlantUML()
+{
+  g_token->verb="";
+  g_token->sectionId="";
+  BEGIN(St_PlantUMLOpt);
 }
 
 void doctokenizerYYsetStateParam()
@@ -1331,6 +1430,23 @@ void doctokenizerYYpushBackHtmlTag(const char *tag)
   unput('<');
 }
 
+void doctokenizerYYstartAutoList()
+{
+  g_autoListLevel++;
+}
+
+void doctokenizerYYendAutoList()
+{
+  g_autoListLevel--;
+}
+
+REAL_YY_DECL
+{
+  printlex(yy_flex_debug, TRUE, __FILE__, g_fileName);
+  int retval = LOCAL_YY_DECL;
+  printlex(yy_flex_debug, FALSE, __FILE__, g_fileName);
+  return retval;
+}
 #if !defined(YY_FLEX_SUBMINOR_VERSION) 
 extern "C" { // some bogus code to keep the compiler happy
     void doctokenizerYYdummy() { yy_flex_realloc(0,0); }

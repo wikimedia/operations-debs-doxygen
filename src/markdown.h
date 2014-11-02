@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -22,19 +22,25 @@
 class Entry;
 
 /** processes string \a s and converts markdown into doxygen/html commands. */
-QCString processMarkdown(const QCString &fileName,Entry *e,const QCString &s);
+QCString processMarkdown(const QCString &fileName,const int lineNr,Entry *e,const QCString &s);
+QCString markdownFileNameToId(const QCString &fileName);
 
 class MarkdownFileParser : public ParserInterface
 {
   public:
     virtual ~MarkdownFileParser() {}
+    void startTranslationUnit(const char *) {}
+    void finishTranslationUnit() {}
     void parseInput(const char *fileName, 
                     const char *fileBuf, 
-                    Entry *root);
+                    Entry *root,
+                    bool sameTranslationUnit,
+                    QStrList &filesInSameTranslationUnit);
     bool needsPreprocessing(const QCString &) { return FALSE; }
     void parseCode(CodeOutputInterface &codeOutIntf,
                    const char *scopeName,
                    const QCString &input,
+                   SrcLangExt lang,
                    bool isExampleBlock,
                    const char *exampleName=0,
                    FileDef *fileDef=0,
@@ -42,7 +48,9 @@ class MarkdownFileParser : public ParserInterface
                    int endLine=-1,
                    bool inlineFragment=FALSE,
                    MemberDef *memberDef=0,
-                   bool showLineNumbers=TRUE
+                   bool showLineNumbers=TRUE,
+                   Definition *searchCtx=0,
+                   bool collectXRefs=TRUE
                   );
     void resetCodeParserState();
     void parsePrototype(const char *text);

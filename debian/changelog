@@ -1,19 +1,141 @@
-doxygen (1.8.1.2-2) unstable; urgency=low
+doxygen (1.8.8-5) unstable; urgency=medium
 
-  [ Mònica Ramírez Arceda ]
-  * Non-maintainer upload.
-  * Include jquery-1.7.1.js source in debian/jquery and update its license.
-    This file has the source code for src/jquery_p[123].js. 
-    Closes: #625956.
-  * Include jquery.scrollTo-1.4.2.js in debian/jquery and add its license.
-    This file has the source code for src/jquery_fx.js.
-  * Include jquery-ui*.js and jquery.ba-hashchange.js in debian/jquery and 
-    add their licenses. These files have the source code for src/jquery_ui.js.
+  * Cherry pick c83db38ea83499be19d9ff242bfa22ae534ee80c. (Closes: #762272)
+  * Fix FTBFS: Update syntax of Build-Profiles header. (Closes: #767658)
 
-  [ Helmut Grohne ]
-  * Added myself as uploader.
+ -- Helmut Grohne <helmut@subdivi.de>  Sun, 02 Nov 2014 15:07:52 +0100
 
- -- Helmut Grohne <helmut@subdivi.de>  Thu, 28 Feb 2013 10:09:45 +0100
+doxygen (1.8.8-4) unstable; urgency=medium
+
+  * Cherry pick 6d4044ad43ae1424a256eb1c26992301e7c64f4a. (Closes: #760700)
+  * Declare compliance with policy 3.9.6: No changes needed.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Sun, 05 Oct 2014 17:52:01 +0200
+
+doxygen (1.8.8-3) unstable; urgency=medium
+
+  * Fix sqlite3 configuration.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 21 Aug 2014 23:32:13 +0200
+
+doxygen (1.8.8-2) unstable; urgency=medium
+
+  * Build-depend on libxapian-dev.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 21 Aug 2014 22:37:17 +0200
+
+doxygen (1.8.8-1) unstable; urgency=medium
+
+  * doxygen 1.8.8 release.
+  * Build-depend on python3.
+  * Build using libclang where available.
+  * Really enable sqlite support.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 21 Aug 2014 20:22:21 +0200
+
+doxygen (1.8.7-3) unstable; urgency=medium
+
+  * doxygen-latex: Depend on cm-super-minimal.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 25 Jul 2014 10:33:14 +0200
+
+doxygen (1.8.7-2) unstable; urgency=medium
+
+  * Reorder latex packages to avoid bogus syntax check. Thanks to Mattias
+    Ellert for tracking down the issue and providing a patch. (Closes:
+    #750536).
+  * Indent debian/doxygen.NEWS for valid formatting.
+  * Bump copyright years.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Wed, 04 Jun 2014 16:18:45 +0200
+
+doxygen (1.8.7-1) unstable; urgency=medium
+
+  * doxygen 1.8.7 release.
+    + Standard build regenerates *_js.h now. Update README.jquery.
+    + Add doxygen.NEWS for GENERATE_HTML default change.
+    + Refresh patches. dot-config.diff completely rewritten against
+      config.xml.
+  * Uglify javascript during build. Therefore B-D: yui-compressor.
+  * Also remove winbuild to avoid accidentally using it.
+  * Add half a stage1 build-profile to drop libqt4-dev. Not annotating the
+    dependency because #744246. Thanks to Daniel Schepler and Wookey.
+    (Addresses: #738263)
+
+ -- Helmut Grohne <helmut@subdivi.de>  Fri, 16 May 2014 20:58:26 +0200
+
+doxygen (1.8.6-2) unstable; urgency=medium
+
+  * Fix autopkgtest.
+    + Missing dependency on dpkg-dev for apt-get source.
+    + apt-get source prints to stderr.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Fri, 24 Jan 2014 19:31:58 +0100
+
+doxygen (1.8.6-1) unstable; urgency=low
+
+  * doxygen 1.8.6 release.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 06 Jan 2014 00:58:54 +0100
+
+doxygen (1.8.5-1) unstable; urgency=low
+
+  * doxygen 1.8.5 release.
+    + Refresh patches. dot-config.diff had a failed hunk.
+    + README got renamed to README.md.
+  * Add debug package doxygen-dbg.
+  * Demote recommends doxygen-latex from doxygen to suggests. (Closes:
+    #720493)
+  * LDFLAGS are called QMAKE_LFLAGS_RELEASE (not ...LDFLAGS...),
+    this should fix the build log checks and hardening.
+  * Install upstream changelog. (Closes: #569504)
+  * Shrink doxygen-doc binary package using hardlinks (rdfind).
+    + Add lintian-override for package-contains-hardlink
+  * Rewrite debian/copyright in DEP5 syntax.
+  * Bump standards version to 3.9.5: No changes needed.
+  * Explain that jquery embedding is going to stay in README.jquery.
+    (Closes: #630982)
+  * Add an autopkgtest building the documentation of osmium.
+    It managed to crash Doxygen earlier, see #657917.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Sun, 10 Nov 2013 17:32:18 +0100
+
+doxygen (1.8.4-1) unstable; urgency=low
+
+  * doxygen 1.8.4 release
+    + Upstream now ships jquery sources. (Closes: #625956)
+    + Add libsqlite3-dev to Build-Depends.
+    + Refresh patches. All hunks succeeded.
+    + Upstream changelog included in source package for #569504.
+  * Acknowledge upload version 1.8.1.2-2.
+    + Added myself as uploader.
+  * Enable doxygen-gui on hurd. (Closes: #700631)
+  * Clean before build, to ensure that no prebuilt files are used.
+  * Use packaged tmake.
+    + Add tmake Build-Depends, patch configure to use packaged tmake.
+    + Add a tmake wrapper that forces our CFLAGS into tmake. This fixes
+      the tmake part of #596636.
+  * Add a qmake wrapper that forces our... you know the story. (Closes:
+    #596636)
+  * Bump standards version to 3.9.4: No changes needed.
+  * Add an initial dh_doxygen helper that cleans generated documentation for
+    inclusion in binary packages. This is a small aspect of #630982.
+  * Added Homepage to control.
+  * Removed duplicate dependency latex-xcolor from doxygen-latex.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Tue, 21 May 2013 16:04:41 +0200
+
+doxygen (1.8.3.1-1) experimental; urgency=low
+
+  * doxygen 1.8.3.1 release.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 20 Jan 2013 17:18:39 +0100
+
+doxygen (1.8.2-1) experimental; urgency=low
+
+  * doxygen 1.8.2 release.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 15 Aug 2012 18:03:15 +0200
 
 doxygen (1.8.1.2-1) unstable; urgency=low
 

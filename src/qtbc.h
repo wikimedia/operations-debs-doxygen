@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: qtbc.h,v 1.4 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -17,29 +17,5 @@
 
 #ifndef QTBC_H
 #define QTBC_H
-
-/*! This file contains some hacks to make Doxygen work with 
- *  Qt version 2.00 and Qt version 1.xx 
- */
-
-#include <qglobal.h>
-
-#if QT_VERSION >= 200
-
-#include <locale.h>
-
-#define GCI QCollection::Item
-
-#include <qcstring.h>
-#include <qstring.h>
-inline QCString convertToQCString(const QString &s) { return s.utf8(); }
-
-#else /* QT_VERSION < 200 */
-
-#include <qstring.h>
-#define QCString QString
-inline QCString convertToQCString(const QCString &s) { return s; }
-
-#endif
 
 #endif

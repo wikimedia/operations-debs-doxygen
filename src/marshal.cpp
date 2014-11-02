@@ -33,6 +33,12 @@ void marshalUInt(StorageIntf *s,uint v)
   s->write((const char *)b,4);
 }
 
+void marshalUInt64(StorageIntf *s,uint64 v)
+{
+  marshalUInt(s, uint(v>>32));
+  marshalUInt(s, uint(v&0xFFFFFFFF));
+}
+
 void marshalBool(StorageIntf *s,bool b)
 {
   char c = b;
@@ -55,32 +61,7 @@ void marshalQGString(StorageIntf *s,const QGString &str)
 
 void marshalArgumentList(StorageIntf *s,ArgumentList *argList)
 {
-  if (argList==0)
-  {
-    marshalUInt(s,NULL_LIST); // null pointer representation
-  }
-  else
-  {
-    marshalUInt(s,argList->count());
-    if (argList->count()>0)
-    {
-      ArgumentListIterator ali(*argList);
-      Argument *a;
-      for (ali.toFirst();(a=ali.current());++ali)
-      {
-        marshalQCString(s,a->attrib);    
-        marshalQCString(s,a->type);    
-        marshalQCString(s,a->canType);    
-        marshalQCString(s,a->name);    
-        marshalQCString(s,a->array);    
-        marshalQCString(s,a->defval);    
-        marshalQCString(s,a->docs);    
-      }
-    }
-    marshalBool(s,argList->constSpecifier);
-    marshalBool(s,argList->volatileSpecifier);
-    marshalBool(s,argList->pureSpecifier);
-  }
+  ArgumentList::marshal(s,argList);
 }
 
 void marshalArgumentLists(StorageIntf *s,QList<ArgumentList> *argLists)
@@ -158,6 +139,7 @@ void marshalSectionInfoList(StorageIntf *s, QList<SectionInfo> *anchors)
       marshalQCString(s,si->ref);
       marshalInt(s,(int)si->type);
       marshalQCString(s,si->fileName);
+      marshalInt(s,si->lineNr);
       marshalInt(s,si->level);
     }
   }
@@ -370,7 +352,7 @@ void marshalEntry(StorageIntf *s,Entry *e)
   marshalInt(s,e->section);
   marshalInt(s,(int)e->protection);
   marshalInt(s,(int)e->mtype);
-  marshalInt(s,e->spec);
+  marshalUInt64(s,e->spec);
   marshalInt(s,e->initLines);
   marshalBool(s,e->stat);
   marshalBool(s,e->explicitExternal);
@@ -416,6 +398,7 @@ void marshalEntry(StorageIntf *s,Entry *e)
   marshalBool(s,e->hidden);
   marshalBool(s,e->artificial);
   marshalInt(s,(int)e->groupDocType);
+  marshalQCString(s,e->id);
 }
 
 void marshalEntryTree(StorageIntf *s,Entry *e)
@@ -447,6 +430,13 @@ uint unmarshalUInt(StorageIntf *s)
   s->read((char *)b,4);
   uint result=(((uint)b[0])<<24)+((uint)b[1]<<16)+((uint)b[2]<<8)+(uint)b[3];
   //printf("unmarshalUInt: %x %x %x %x: %x offset=%llx\n",b[0],b[1],b[2],b[3],result,f.pos());
+  return result;
+}
+
+uint64 unmarshalUInt64(StorageIntf *s)
+{
+  uint64 result=uint64(unmarshalUInt(s))<<32;
+  result|=unmarshalUInt(s);
   return result;
 }
 
@@ -488,28 +478,7 @@ QGString unmarshalQGString(StorageIntf *s)
 
 ArgumentList *unmarshalArgumentList(StorageIntf *s)
 {
-  uint i;
-  uint count = unmarshalUInt(s);
-  if (count==NULL_LIST) return 0; // null list
-  ArgumentList *result = new ArgumentList;
-  assert(count<1000000);
-  //printf("unmarshalArgumentList: %d\n",count);
-  for (i=0;i<count;i++)
-  {
-    Argument *a = new Argument;
-    a->attrib  = unmarshalQCString(s);
-    a->type    = unmarshalQCString(s);
-    a->canType = unmarshalQCString(s);
-    a->name    = unmarshalQCString(s);
-    a->array   = unmarshalQCString(s);
-    a->defval  = unmarshalQCString(s);
-    a->docs    = unmarshalQCString(s);
-    result->append(a);
-  }
-  result->constSpecifier    = unmarshalBool(s);
-  result->volatileSpecifier = unmarshalBool(s);
-  result->pureSpecifier     = unmarshalBool(s);
-  return result;
+  return ArgumentList::unmarshal(s);
 }
 
 QList<ArgumentList> *unmarshalArgumentLists(StorageIntf *s)
@@ -578,8 +547,9 @@ QList<SectionInfo> *unmarshalSectionInfoList(StorageIntf *s)
     QCString ref   = unmarshalQCString(s);
     SectionInfo::SectionType type = (SectionInfo::SectionType)unmarshalInt(s);
     QCString fileName = unmarshalQCString(s);
+    int lineNr = unmarshalInt(s);
     int level = unmarshalInt(s);
-    result->append(new SectionInfo(fileName,label,title,type,level,ref));
+    result->append(new SectionInfo(fileName,lineNr,label,title,type,level,ref));
   }
   return result;
 }
@@ -764,7 +734,7 @@ Entry * unmarshalEntry(StorageIntf *s)
   e->section          = unmarshalInt(s);
   e->protection       = (Protection)unmarshalInt(s);
   e->mtype            = (MethodTypes)unmarshalInt(s);
-  e->spec             = unmarshalInt(s);
+  e->spec             = unmarshalUInt64(s);
   e->initLines        = unmarshalInt(s);
   e->stat             = unmarshalBool(s);
   e->explicitExternal = unmarshalBool(s);
@@ -814,6 +784,7 @@ Entry * unmarshalEntry(StorageIntf *s)
   e->hidden           = unmarshalBool(s);
   e->artificial       = unmarshalBool(s);
   e->groupDocType     = (Entry::GroupDocType)unmarshalInt(s);
+  e->id               = unmarshalQCString(s);
   return e;
 }
 

@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: entry.cpp,v 1.29 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -81,8 +81,7 @@ Entry::Entry(const Entry &e)
   virt        = e.virt;
   args        = e.args;
   bitfields   = e.bitfields;
-  argList     = new ArgumentList;
-  argList->setAutoDelete(TRUE);
+  argList     = e.argList->deepCopy();
   tArgLists = 0;
   program     = e.program;
   initializer = e.initializer;
@@ -114,6 +113,7 @@ Entry::Entry(const Entry &e)
   anchors     = new QList<SectionInfo>;
   fileName    = e.fileName;
   startLine   = e.startLine;
+  startColumn = e.startColumn;
   if (e.sli)
   {
     sli = new QList<ListItemInfo>;
@@ -133,6 +133,7 @@ Entry::Entry(const Entry &e)
   hidden      = e.hidden;
   artificial  = e.artificial;
   groupDocType = e.groupDocType;
+  id          = e.id;
 
   m_parent    = e.m_parent;
   m_sublist   = new QList<Entry>;
@@ -169,27 +170,10 @@ Entry::Entry(const Entry &e)
     anchors->append(new SectionInfo(*s));
   }
 
-  // deep copy argument list
-  QListIterator<Argument> ali(*e.argList);
-  Argument *a;
-  for (;(a=ali.current());++ali)
-  {
-    argList->append(new Argument(*a));
-  }
-  argList->constSpecifier    = e.argList->constSpecifier;
-  argList->volatileSpecifier = e.argList->volatileSpecifier;
-  argList->pureSpecifier     = e.argList->pureSpecifier;
-  
   // deep copy type contraint list
   if (e.typeConstr)
   {
-    typeConstr  = new ArgumentList;
-    typeConstr->setAutoDelete(TRUE);
-    QListIterator<Argument> tcli(*e.typeConstr);
-    for (;(a=tcli.current());++tcli)
-    {
-      typeConstr->append(new Argument(*a));
-    }
+    typeConstr  = e.typeConstr->deepCopy();
   }
 
   // deep copy template argument lists
@@ -257,6 +241,7 @@ void Entry::reset()
   initializer.resize(0);
   initLines = -1;
   startLine = 1;
+  startColumn = 1;
   bodyLine = -1;
   endBodyLine = -1;
   mGrpId = -1;
@@ -275,6 +260,7 @@ void Entry::reset()
   subGrouping = TRUE;
   protection = Public;
   groupDocType = GROUPDOC_NORMAL;
+  id.resize(0);
   m_sublist->clear();
   extends->clear();
   groups->clear();

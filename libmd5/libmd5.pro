@@ -1,5 +1,5 @@
 #
-# This file was generated from libmd5.pro.in on Thu Jul 12 20:08:34 CEST 2012
+# This file was generated from libmd5.pro.in on Thu Aug 21 10:48:35 CEST 2014
 #
 
 TEMPLATE	= lib
@@ -10,6 +10,8 @@ win32:INCLUDEPATH          += .
 win32-g++:TMAKE_CFLAGS     += -D__CYGWIN__ -DALL_STATIC
 DESTDIR                    =  ../lib
 TARGET                     =  md5
-OBJECTS_DIR                =  ../objects
+OBJECTS_DIR                =  ../objects/md5
 
 TMAKE_MOC = /usr/bin/moc
+LIBS += -L/opt/local/lib
+INCLUDEPATH += /opt/local/include

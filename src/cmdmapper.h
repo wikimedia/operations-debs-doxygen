@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -117,7 +117,19 @@ enum CommandType
   CMD_SNIPPET      = 87,
   CMD_RTFONLY      = 88, 
   CMD_ENDRTFONLY   = 89,
-  CMD_PIPE         = 90
+  CMD_PIPE         = 90,
+  CMD_VHDLFLOW     = 91,
+  CMD_DBONLY       = 92,
+  CMD_ENDDBONLY    = 93,
+  CMD_ENDINTERNAL  = 94,
+  CMD_PARBLOCK     = 95,
+  CMD_ENDPARBLOCK  = 96,
+  CMD_DIAFILE      = 97,
+  CMD_LATEXINCLUDE = 98,
+  CMD_NDASH        = 99,
+  CMD_MDASH        = 100,
+  CMD_STARTUML     = 101,
+  CMD_ENDUML       = 102
 };
 
 enum HtmlTagType

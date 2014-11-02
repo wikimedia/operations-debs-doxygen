@@ -1,0 +1,20 @@
+Author: Helmut Grohne <helmut@subdivi.de>
+Description: adapt configure to use the system copy of tmake
+Last-Update: 2013-05-22
+
+Index: b/configure
+===================================================================
+--- a/configure
++++ b/configure
+@@ -751,9 +751,9 @@ configPWD=`pwd`
+ 
+ cat > .makeconfig <<EOF
+ DOXYGEN   = $configPWD
+-TMAKEPATH = $configPWD/tmake/lib/$f_platform
++TMAKEPATH = /usr/share/tmake/$f_platform
+ ENV       = env TMAKEPATH="\$(TMAKEPATH)"
+-TMAKE     = $configPWD/tmake/bin/tmake
++TMAKE     = $configPWD/debian/tmake
+ MAKE      = $f_make
+ PYTHON    = $f_python
+ PERL      = $f_perl

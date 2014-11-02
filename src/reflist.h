@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: reflist.h,v 1.2 2001/03/19 19:27:41 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -19,7 +19,6 @@
 #ifndef _REFLIST_H
 #define _REFLIST_H
 
-#include "qtbc.h"
 #include <qintdict.h>
 #include <qlist.h>
 #include "sortdict.h"
@@ -45,11 +44,10 @@ class SortedRefItems : public SDict<RefItem>
   public:
     SortedRefItems(int size=17) : SDict<RefItem>(size) {}
     virtual ~SortedRefItems() {}
-    int compareItems(GCI item1,GCI item2)
+  private:
+    int compareValues(const RefItem *r1,const RefItem *r2) const
     {
-      RefItem *r1 = (RefItem*)item1;
-      RefItem *r2 = (RefItem*)item2;
-      return stricmp(r1->title,r2->title);
+      return qstricmp(r1->title,r2->title);
     }
 };
 

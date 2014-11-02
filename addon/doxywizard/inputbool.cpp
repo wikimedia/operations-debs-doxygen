@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -43,6 +43,8 @@ void InputBool::setEnabled(bool b)
 { 
   m_enabled = b;
   m_cb->setEnabled(b); 
+  m_lab->setEnabled(b); 
+  updateDefault();
   updateDependencies();
 }
 
@@ -69,7 +71,7 @@ void InputBool::setValue( bool s )
 
 void InputBool::updateDefault()
 {
-  if (m_state==m_default)
+  if (m_state==m_default || !m_lab->isEnabled())
   {
     m_lab->setText(QString::fromAscii("<qt>")+m_id+QString::fromAscii("</qt"));
   }

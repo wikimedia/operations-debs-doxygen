@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,6 +18,12 @@
 #include "config.h"
 #include "message.h"
 #include "doxygen.h"
+#include "groupdef.h"
+#include "classdef.h"
+#include "filedef.h"
+#include "memberdef.h"
+#include "namespacedef.h"
+#include "util.h"
 
 DocSets::DocSets() : m_nodes(17), m_scopes(17)
 {
@@ -66,7 +72,7 @@ void DocSets::initialize()
         "DOCSET_RESOURCES=$(DOCSET_CONTENTS)/Resources\n"
         "DOCSET_DOCUMENTS=$(DOCSET_RESOURCES)/Documents\n"
         "DESTDIR=~/Library/Developer/Shared/Documentation/DocSets\n"
-        "XCODE_INSTALL=$(shell xcode-select -print-path)\n"
+        "XCODE_INSTALL=\"$(shell xcode-select -print-path)\"\n"
         "\n"
         "all: docset\n"
         "\n"
@@ -87,6 +93,9 @@ void DocSets::initialize()
         "\trm -f $(DOCSET_DOCUMENTS)/Makefile\n"
         "\trm -f $(DOCSET_RESOURCES)/Nodes.xml\n"
         "\trm -f $(DOCSET_RESOURCES)/Tokens.xml\n"
+        "\n"
+        "clean:\n"
+        "\trm -rf $(DOCSET_NAME)\n"
         "\n"
         "install: docset\n"
         "\tmkdir -p $(DESTDIR)\n"
@@ -126,6 +135,11 @@ void DocSets::initialize()
         "     <string>" << publisherId << "</string>\n"
         "     <key>DocSetPublisherName</key>\n"
         "     <string>" << publisherName << "</string>\n"
+        // markers for Dash
+        "     <key>DashDocSetFamily</key>\n" 
+        "     <string>doxy</string>\n"
+        "     <key>DocSetPlatformFamily</key>\n"
+        "     <string>doxygen</string>\n"
         "</dict>\n"
         "</plist>\n";
   }
@@ -194,6 +208,7 @@ QCString DocSets::indent()
 
 void DocSets::incContentsDepth()
 {
+  //printf("DocSets::incContentsDepth() m_dc=%d\n",m_dc);
   ++m_dc;
   m_nts << indent() << "<Subnodes>" << endl;
   m_firstNode.resize(m_dc);
@@ -211,6 +226,7 @@ void DocSets::decContentsDepth()
   }
   m_nts << indent() << "</Subnodes>" << endl;
   --m_dc;
+  //printf("DocSets::decContentsDepth() m_dc=%d\n",m_dc);
 }
 
 void DocSets::addContentsItem(bool isDir,
@@ -223,7 +239,8 @@ void DocSets::addContentsItem(bool isDir,
                               Definition * /*def*/)
 {
   (void)isDir;
-  if (file && ref==0)
+  //printf("DocSets::addContentsItem(%s) m_dc=%d\n",name,m_dc);
+  if (ref==0)
   {
     if (!m_firstNode.at(m_dc-1))
     {
@@ -232,17 +249,33 @@ void DocSets::addContentsItem(bool isDir,
     m_firstNode.at(m_dc-1)=FALSE;
     m_nts << indent() << " <Node>" << endl;
     m_nts << indent() << "  <Name>" << convertToXML(name) << "</Name>" << endl;
-    m_nts << indent() << "  <Path>";
-    m_nts << file << Doxygen::htmlFileExtension;
-    m_nts << "</Path>" << endl;
-    if (anchor)
+    if (file && file[0]=='^') // URL marker
     {
-      m_nts << indent() << "  <Anchor>" << anchor << "</Anchor>" << endl;
+      m_nts << indent() << "  <URL>" << convertToXML(&file[1]) 
+            << "</URL>" << endl;
+    }
+    else // relative file
+    {
+      m_nts << indent() << "  <Path>";
+      if (file && file[0]=='!') // user specified file
+      {
+        m_nts << convertToXML(&file[1]);
+      }
+      else if (file) // doxygen generated file
+      {
+        m_nts << file << Doxygen::htmlFileExtension;
+      }
+      m_nts << "</Path>" << endl;
+      if (file && anchor)
+      {
+        m_nts << indent() << "  <Anchor>" << anchor << "</Anchor>" << endl;
+      }
     }
   }
 }
 
-void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
+void DocSets::addIndexItem(Definition *context,MemberDef *md,
+                           const char *,const char *)
 {
   if (md==0 && context==0) return;
 
@@ -316,9 +349,9 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
 
     switch (md->memberType())
     {
-      case MemberDef::Define:
+      case MemberType_Define:
         type="macro"; break;
-      case MemberDef::Function:
+      case MemberType_Function:
         if (cd && (cd->compoundType()==ClassDef::Interface ||
               cd->compoundType()==ClassDef::Class))
         {
@@ -337,32 +370,36 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
         else
           type="func";
         break;
-      case MemberDef::Variable:
+      case MemberType_Variable:
         type="data"; break;
-      case MemberDef::Typedef:
+      case MemberType_Typedef:
         type="tdef"; break;
-      case MemberDef::Enumeration:
+      case MemberType_Enumeration:
         type="enum"; break;
-      case MemberDef::EnumValue:
+      case MemberType_EnumValue:
         type="econst"; break;
         //case MemberDef::Prototype:
         //  type="prototype"; break;
-      case MemberDef::Signal:
+      case MemberType_Signal:
         type="signal"; break;
-      case MemberDef::Slot:
+      case MemberType_Slot:
         type="slot"; break;
-      case MemberDef::Friend:
+      case MemberType_Friend:
         type="ffunc"; break;
-      case MemberDef::DCOP:
+      case MemberType_DCOP:
         type="dcop"; break;
-      case MemberDef::Property:
+      case MemberType_Property:
         if (cd && cd->compoundType()==ClassDef::Protocol) 
           type="intfp";         // interface property
         else 
           type="instp";         // instance property
         break;
-      case MemberDef::Event:
+      case MemberType_Event:
         type="event"; break;
+      case MemberType_Interface:
+        type="ifc"; break;
+      case MemberType_Service:
+        type="svc"; break;
     }
     cd = md->getClassDef();
     nd = md->getNamespaceDef();
@@ -374,7 +411,16 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
     {
       scope = nd->name();
     }
-    writeToken(m_tts,md,type,lang,scope,md->anchor());
+    MemberDef *declMd = md->memberDeclaration();
+    if (declMd==0) declMd = md;
+    {
+      fd = md->getFileDef();
+      if (fd)
+      {
+        decl = fd->name();
+      }
+    }
+    writeToken(m_tts,md,type,lang,scope,md->anchor(),decl);
   }
   else if (context && context->isLinkable())
   {

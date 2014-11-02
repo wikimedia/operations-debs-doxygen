@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: rtfgen.cpp,v 1.14 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Parker Waechter & Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Parker Waechter & Dimitri van Heesch.
  *
  * Style sheet additions by Alexander Bartolich
  *
@@ -19,9 +19,9 @@
 
 #include <stdlib.h>
 
-#include "qtbc.h"
 #include <qdir.h>
 #include <qregexp.h>
+#include <qtextstream.h>
 
 #include "rtfgen.h"
 #include "config.h"
@@ -39,6 +39,10 @@
 #include "dirdef.h"
 #include "vhdldocgen.h"
 #include "portable.h"
+#include "groupdef.h"
+#include "classlist.h"
+#include "filename.h"
+#include "namespacedef.h"
 
 //#define DBG_RTF(x) x;
 #define DBG_RTF(x)
@@ -174,7 +178,7 @@ void RTFGenerator::init()
   while(def->reference != 0)
   {
     if (def->definition == 0)
-      err("Internal error: rtf_Style_Default[%s] has no definition.\n", def->name);
+      err("Internal: rtf_Style_Default[%s] has no definition.\n", def->name);
     StyleData* styleData = new StyleData(def->reference, def->definition);
     rtf_Style.insert(def->name, styleData);
     def++;
@@ -212,7 +216,7 @@ void RTFGenerator::beginRTFDocument()
   t <<"{\\rtf1\\ansi\\ansicpg" << theTranslator->trRTFansicp();
   t <<"\\uc1 \\deff0\\deflang1033\\deflangfe1033\n";
 
-  DBG_RTF(t <<"{\\comment Begining font list}\n")
+  DBG_RTF(t <<"{\\comment Beginning font list}\n")
   t <<"{\\fonttbl ";
   t <<"{\\f0\\froman\\fcharset" << theTranslator->trRTFCharSet();
   t <<"\\fprq2{\\*\\panose 02020603050405020304}Times New Roman;}\n";
@@ -263,7 +267,7 @@ void RTFGenerator::beginRTFDocument()
     }
     if (array.at(index) != 0)
     {
-      QCString key(convertToQCString(iter.currentKey()));
+      QCString key(iter.currentKey());
       msg("Style '%s' redefines \\s%d.\n", key.data(), index);
     }
     array.at(index) = style;
@@ -488,11 +492,13 @@ void RTFGenerator::startIndexSection(IndexSections is)
       {
         //File Documentation
         bool isFirst=TRUE;
-        FileName *fn=Doxygen::inputNameList->first();
-        while (fn)
+        FileNameListIterator fnli(*Doxygen::inputNameList); 
+        FileName *fn;
+        for (fnli.toFirst();(fn=fnli.current());++fnli)
         {
-          FileDef *fd=fn->first();
-          while (fd)
+          FileNameIterator fni(*fn);
+          FileDef *fd;
+          for (;(fd=fni.current());++fni)
           {
             if (fd->isLinkableInProject())
             {
@@ -503,9 +509,7 @@ void RTFGenerator::startIndexSection(IndexSections is)
                 break;
               }
             }
-            fd=fn->next();
           }
-          fn=Doxygen::inputNameList->next();
         }
       }
       break;
@@ -788,13 +792,15 @@ void RTFGenerator::endIndexSection(IndexSections is)
     case isFileDocumentation:
       {
         bool isFirst=TRUE;
-        FileName *fn=Doxygen::inputNameList->first();
 
         t << "{\\tc \\v " << theTranslator->trFileDocumentation() << "}"<< endl;
-        while (fn)
+        FileNameListIterator fnli(*Doxygen::inputNameList);
+        FileName *fn;
+        for (fnli.toFirst();(fn=fnli.current());++fnli)
         {
-          FileDef *fd=fn->first();
-          while (fd)
+          FileNameIterator fni(*fn);
+          FileDef *fd;
+          for (;(fd=fni.current());++fni)
           {
             if (fd->isLinkableInProject())
             {
@@ -815,9 +821,7 @@ void RTFGenerator::endIndexSection(IndexSections is)
                 t << ".rtf\" \\\\*MERGEFORMAT}{\\fldrslt includedstuff}}\n";
               }
             }
-            fd=fn->next();
           }
-          fn=Doxygen::inputNameList->next();
         }
       }
       break;
@@ -1045,7 +1049,7 @@ void RTFGenerator::startHtmlLink(const char *url)
 
   if (Config_getBool("RTF_HYPERLINKS"))
   {
-    t << "{\\field {\\*\\fldinst { HYPERLINK  \\\\l \"";
+    t << "{\\field {\\*\\fldinst { HYPERLINK \"";
     t << url;
     t << "\" }{}";
     t << "}{\\fldrslt {\\cs37\\ul\\cf2 ";
@@ -1769,21 +1773,6 @@ void RTFGenerator::codify(const char *str)
 
       c=*p++;
 
-#if 0
-      if( MultiByte )
-      {
-        t << getMultiByte( c );
-        MultiByte = FALSE;
-        continue;
-      }
-      if( c >= 0x80 )
-      {
-        MultiByte = TRUE;
-        t << getMultiByte( c );
-        continue;
-      }
-#endif
-
       switch(c)
       {
         case '\t':  spacesToNextTabStop = Config_getInt("TAB_SIZE") - (col%Config_getInt("TAB_SIZE"));
@@ -1796,7 +1785,7 @@ void RTFGenerator::codify(const char *str)
         case '{':   t << "\\{"; col++;          break;
         case '}':   t << "\\}"; col++;          break;
         case '\\':  t << "\\\\"; col++;         break;
-        default:    t << (char)c; col++;           break;
+        default:    p=(const unsigned char *)writeUtf8Char(t,(const char *)p-1); col++; break;
       }
     }
   }
@@ -1840,7 +1829,7 @@ void RTFGenerator::endClassDiagram(const ClassDiagram &d,
 void RTFGenerator::startMemberItem(const char *,int,const char *)
 {
   DBG_RTF(t <<"{\\comment startMemberItem }" << endl)
-  t << rtf_Style_Reset << rtf_BList_DepthStyle() << endl; // set style to apropriate depth
+  t << rtf_Style_Reset << rtf_BList_DepthStyle() << endl; // set style to appropriate depth
 }
 
 void RTFGenerator::endMemberItem()
@@ -1964,9 +1953,11 @@ void RTFGenerator::endMemberList()
 //  // not yet implemented
 //}
 //
-void RTFGenerator::startDescTable()
+void RTFGenerator::startDescTable(const char *title)
 {
   DBG_RTF(t << "{\\comment (startDescTable) }"    << endl)
+  startSimpleSect(EnumValues,0,0,title);
+  startDescForItem();
   //t << "{" << endl;
   //incrementIndentLevel();
   //t << rtf_Style_Reset << rtf_CList_DepthStyle();
@@ -1976,6 +1967,8 @@ void RTFGenerator::endDescTable()
 {
   //decrementIndentLevel();
   DBG_RTF(t << "{\\comment (endDescTable)}"      << endl)
+  endDescForItem();
+  endSimpleSect();
   //t << "}" << endl;
   //t << rtf_Style_Reset << styleStack.top();
 }
@@ -2016,7 +2009,7 @@ void RTFGenerator::incrementIndentLevel()
   m_listLevel++;
   if (m_listLevel>rtf_maxIndentLevels-1)
   {
-    err("error: Maximum indent level (%d) exceeded while generating RTF output!\n",rtf_maxIndentLevels);
+    err("Maximum indent level (%d) exceeded while generating RTF output!\n",rtf_maxIndentLevels);
     m_listLevel=rtf_maxIndentLevels-1;
   }
 }
@@ -2026,7 +2019,7 @@ void RTFGenerator::decrementIndentLevel()
   m_listLevel--;
   if (m_listLevel<0)
   {
-    err("error: Negative indent level while generating RTF output!\n");
+    err("Negative indent level while generating RTF output!\n");
     m_listLevel=0;
   }
 }
@@ -2291,11 +2284,11 @@ static void encodeForOutput(FTextStream &t,const QCString &s)
     {
       size_t iLeft=l;
       size_t oLeft=enc.size();
-      const char *inputPtr = s.data();
+      char *inputPtr = s.data();
       char *outputPtr = enc.data();
       if (!portable_iconv(cd, &inputPtr, &iLeft, &outputPtr, &oLeft))
       {
-        enc.resize(enc.size()-oLeft);
+        enc.resize(enc.size()-(unsigned int)oLeft);
         converted=TRUE;
       }
       portable_iconv_close(cd);
@@ -2344,7 +2337,7 @@ static bool preProcessFile(QDir &d,QCString &infName, FTextStream &t, bool bIncl
   QFile f(infName);
   if (!f.open(IO_ReadOnly))
   {
-    err("error: problems opening rtf file %s for reading\n",infName.data());
+    err("problems opening rtf file %s for reading\n",infName.data());
     return FALSE;
   }
 
@@ -2359,7 +2352,7 @@ static bool preProcessFile(QDir &d,QCString &infName, FTextStream &t, bool bIncl
   {
     if (f.readLine(lineBuf.data(),maxLineLength)==-1)
     {
-      err("ERROR - read error in %s before end of RTF header!\n",infName.data());
+      err("read error in %s before end of RTF header!\n",infName.data());
       return FALSE;
     }
     if (bIncludeHeader) encodeForOutput(t,lineBuf);
@@ -2415,14 +2408,14 @@ void RTFGenerator::endDotGraph(const DotClassGraph &g)
 {
   newParagraph();
 
-  QCString fileName =
-    g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),fileName,relPath,TRUE,FALSE);
+  QCString fn =
+    g.writeGraph(t,GOF_BITMAP,EOF_Rtf,Config_getString("RTF_OUTPUT"),fileName,relPath,TRUE,FALSE);
 
   // display the file
   t << "{" << endl;
   t << rtf_Style_Reset << endl;
   t << "\\par\\pard \\qc {\\field\\flddirty {\\*\\fldinst INCLUDEPICTURE \"";
-  t << fileName << "." << Config_getEnum("DOT_IMAGE_FORMAT");
+  t << fn << "." << Config_getEnum("DOT_IMAGE_FORMAT");
   t << "\" \\\\d \\\\*MERGEFORMAT}{\\fldrslt IMAGE}}\\par" << endl;
   t << "}" << endl;
   newParagraph();
@@ -2438,7 +2431,7 @@ void RTFGenerator::endInclDepGraph(const DotInclDepGraph &g)
 {
   newParagraph();
 
-  QCString fn = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
+  QCString fn = g.writeGraph(t,GOF_BITMAP,EOF_Rtf,Config_getString("RTF_OUTPUT"),
                          fileName,relPath,FALSE);
 
   // display the file
@@ -2468,7 +2461,7 @@ void RTFGenerator::endCallGraph(const DotCallGraph &g)
 {
   newParagraph();
 
-  QCString fn = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
+  QCString fn = g.writeGraph(t,GOF_BITMAP,EOF_Rtf,Config_getString("RTF_OUTPUT"),
                         fileName,relPath,FALSE);
 
   // display the file
@@ -2490,14 +2483,14 @@ void RTFGenerator::endDirDepGraph(const DotDirDeps &g)
 {
   newParagraph();
 
-  QCString fileName = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
+  QCString fn = g.writeGraph(t,GOF_BITMAP,EOF_Rtf,Config_getString("RTF_OUTPUT"),
                         fileName,relPath,FALSE);
 
   // display the file
   t << "{" << endl;
   t << rtf_Style_Reset << endl;
   t << "\\par\\pard \\qc {\\field\\flddirty {\\*\\fldinst INCLUDEPICTURE \"";
-  t << fileName << "." << Config_getEnum("DOT_IMAGE_FORMAT");
+  t << fn << "." << Config_getEnum("DOT_IMAGE_FORMAT");
   t << "\" \\\\d \\\\*MERGEFORMAT}{\\fldrslt IMAGE}}\\par" << endl;
   t << "}" << endl;
   DBG_RTF(t << "{\\comment (endDirDepGraph)}"    << endl)
@@ -2542,9 +2535,9 @@ void testRTFOutput(const char *name)
   }
   if (bcount==0) return; // file is OK.
 err:
-  err("error: RTF integrity test failed at line %d of %s due to a bracket mismatch.\n",line,name);
-  err("       Please try to create a small code example that produces this error \n"
-      "       and send that to dimitri@stack.nl.\n");
+  err("RTF integrity test failed at line %d of %s due to a bracket mismatch.\n"
+      "       Please try to create a small code example that produces this error \n"
+      "       and send that to dimitri@stack.nl.\n",line,name);
 }
 
 /**
@@ -2557,10 +2550,10 @@ bool RTFGenerator::preProcessFileInplace(const char *path,const char *name)
   // store the original directory
   if (!d.exists())
   {
-    err("error: Output dir %s does not exist!\n",path);
+    err("Output dir %s does not exist!\n",path);
     return FALSE;
   }
-  QCString oldDir = convertToQCString(QDir::currentDirPath());
+  QCString oldDir = QDir::currentDirPath().utf8();
 
   // go to the html output directory (i.e. path)
   QDir::setCurrent(d.absPath());
@@ -2708,9 +2701,19 @@ void RTFGenerator::endParameterType()
   t << " ";
 }
 
-void RTFGenerator::printDoc(DocNode *n,const char *langExt)
+void RTFGenerator::exceptionEntry(const char* prefix,bool closeBracket)
 {
-  RTFDocVisitor *visitor = new RTFDocVisitor(t,*this,langExt);
+  DBG_RTF(t << "{\\comment (exceptionEntry)}"    << endl)
+  if (prefix)
+      t << " " << prefix;
+  else if (closeBracket)
+      t << ")";
+  t << " ";
+}
+
+void RTFGenerator::writeDoc(DocNode *n,Definition *ctx,MemberDef *)
+{
+  RTFDocVisitor *visitor = new RTFDocVisitor(t,*this,ctx?ctx->getDefFileExtension():QCString(""));
   n->accept(visitor);
   delete visitor; 
   m_omitParagraph = TRUE;

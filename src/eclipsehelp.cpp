@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -17,8 +17,9 @@
 #include "config.h"
 #include "message.h"
 #include "doxygen.h"
+#include <qfile.h>
 
-EclipseHelp::EclipseHelp() : m_depth(0), m_endtag(FALSE), m_tocfile(0) 
+EclipseHelp::EclipseHelp() : m_depth(0), m_endtag(FALSE), m_openTags(0), m_tocfile(0) 
 {
 }
 
@@ -50,6 +51,7 @@ void EclipseHelp::openedTag()
   {
     m_tocstream << ">" << endl;
     m_endtag = FALSE;
+    ++m_openTags;
   }
 }
 
@@ -143,8 +145,13 @@ void EclipseHelp::decContentsDepth()
   // -- end of the opened topic
   closedTag();
   --m_depth;
-  indent();
-  m_tocstream << "</topic>" << endl;
+
+  if (m_openTags==m_depth)
+  {
+    --m_openTags;
+    indent();
+    m_tocstream << "</topic>" << endl;
+  }
 }
 
 /*!
@@ -171,24 +178,47 @@ void EclipseHelp::addContentsItem(
 {
   // -- write the topic tag 
   closedTag();
-  indent();
-  m_tocstream << "<topic label=\"" << convertToXML(name) << "\"";
   if (file) 
   { 
-    m_tocstream << " href=\"" << convertToXML(m_pathprefix) 
-                << file << Doxygen::htmlFileExtension;
-    if (anchor)
+    switch (file[0]) // check for special markers (user defined URLs)
     {
-      m_tocstream << "#" << anchor;
+      case '^':
+        // URL not supported by eclipse toc.xml
+	break;
+
+      case '!':
+        indent();
+        m_tocstream << "<topic label=\"" << convertToXML(name) << "\"";
+        m_tocstream << " href=\"" << convertToXML(m_pathprefix) << &file[1] << "\"";
+        m_endtag = TRUE;
+	break;
+
+      default:
+        indent();
+        m_tocstream << "<topic label=\"" << convertToXML(name) << "\"";
+        m_tocstream << " href=\"" << convertToXML(m_pathprefix) 
+                    << file << Doxygen::htmlFileExtension;
+        if (anchor)
+        {
+          m_tocstream << "#" << anchor;
+        }
+        m_tocstream << "\"";
+        m_endtag = TRUE;
+	break;
     }
-    m_tocstream << "\"";
   }
-  m_endtag = TRUE;
+  else
+  {
+    indent();
+    m_tocstream << "<topic label=\"" << convertToXML(name) << "\"";
+    m_endtag = TRUE;
+  }
 }
 
 void EclipseHelp::addIndexItem(
     Definition * /* context */,
     MemberDef * /* md */,
+    const char * /* sectionAnchor */,
     const char * /* title */)
 {
 }

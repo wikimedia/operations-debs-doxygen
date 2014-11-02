@@ -1,3 +1,9 @@
+#if (defined(__APPLE__) || defined(macintosh)) && !defined(DMG_BUILD)
+// define this before including iconv.h to avoid a mapping of
+// iconv_open and friends to libicon_open (done by mac ports),
+// while the symbols without 'lib' are linked from /usr/lib/libiconv
+#define LIBICONV_PLUG
+#endif
 #include <iconv.h>
 
 // These functions are implemented in a C file, because there are different
@@ -11,8 +17,8 @@ void * portable_iconv_open(const char* tocode, const char* fromcode)
   return iconv_open(tocode,fromcode);
 }
 
-size_t portable_iconv (void *cd, const char** inbuf,  size_t *inbytesleft, 
-                                       char** outbuf, size_t *outbytesleft)
+size_t portable_iconv (void *cd, char** inbuf,  size_t *inbytesleft, 
+                                 char** outbuf, size_t *outbytesleft)
 {
   return iconv((iconv_t)cd,inbuf,inbytesleft,outbuf,outbytesleft);
 }

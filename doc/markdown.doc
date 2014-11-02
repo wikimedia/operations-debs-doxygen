@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -65,11 +65,11 @@ Just like Markdown, doxygen supports two types of headers
 
 Level 1 or 2 headers can be made as the follows
 
-    This is an level 1 header
-    =========================
+    This is a level 1 header
+    ========================
 
-    This is an level 2 header
-    -------------------------
+    This is a level 2 header
+    ------------------------
 
 A header is followed by a line containing only ='s or -'s.
 Note that the exact amount of ='s or -'s is not important as long as
@@ -283,6 +283,9 @@ To create a link to an URL or e-mail address Markdown supports the following
 syntax:
 
     <http://www.example.com>
+    <https://www.example.com>
+    <ftp://www.example.com>
+    <mailto:address@example.com>
     <address@example.com>
 
 Note that doxygen will also produce the links without the angle brackets.
@@ -442,6 +445,12 @@ when processed by doxygen:
 
     Documentation that will appear on the main page
 
+If a page has a label you can link to it using \ref cmdref "\@ref" as 
+is shown above. To refer to a markdown page without
+such label you can simple use the file name of the page, e.g.
+
+    See [the other page](other.md) for more info.
+
 \subsection md_html_blocks Treatment of HTML blocks
 
 Markdown is quite strict in the way it processes block-level HTML:
@@ -461,6 +470,13 @@ and in other sections that need to be processed without changes
 (for instance formulas or inline dot graphs).
 
 \subsection mddox_code_blocks Code Block Indentation
+
+Markdown allows both a single tab or 4 spaces to start a code block.
+Since doxygen already replaces tabs by spaces before doing Markdown
+processing, the effect will only be same if TAB_SIZE in the config file
+has been set to 4. When it is set to a higher value spaces will be
+present in the code block. A lower value will prevent a single tab to be 
+interpreted as the start of a code block.
 
 With Markdown any block that is indented by 4 spaces (and 8 spaces
 inside lists) is treated as a code block. This indentation amount
@@ -513,8 +529,8 @@ stars, so the following will appear as-is:
 
     a_nice_identifier
 
-Futhermore, a `*` or `_` only starts an emphasis if
-- it is followed by an alphanumberical character, and
+Furthermore, a `*` or `_` only starts an emphasis if
+- it is followed by an alphanumerical character, and
 - it is preceded by a space, newline, or one the following characters `<{([,:;`
 
 An emphasis ends if
@@ -549,15 +565,16 @@ Example:
     2. Item2 of list 2
 
 With Markdown the actual numbers you use to mark the list have no 
-effect on the HTML output Markdown produces. I.e. it treats the 
-following as a list with 3 numbered items:
+effect on the HTML output Markdown produces. I.e. standard Markdown treats the 
+following as one list with 3 numbered items:
 
     1. Item1
     1. Item2
     1. Item3
 
 Doxygen however requires that the numbers used as marks are in 
-strictly ascending order; an item with a equal or lower number than 
+strictly ascending order, so the above example would produce 3 lists 
+with one item. An item with an equal or lower number than 
 the preceding item, will start a new list. For example:
 
     1. Item1 of list 1

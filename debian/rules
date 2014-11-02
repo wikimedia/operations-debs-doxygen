@@ -2,13 +2,25 @@
 
 #export DH_VERBOSE=1
 export DH_OPTIONS=
-export QTDIR=/usr/share/qt4/QtGui
+export QTDIR=/usr/share/qt4
 
 CFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CFLAGS)
+CXXFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CXXFLAGS)
 LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+export CFLAGS
+export CXXFLAGS
+export LDFLAGS
 DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
-with_doxywizard := yes
-ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386))
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+clang_archs = alpha amd64 armel armhf arm64 i386 mips mipsel \
+	powerpc powerpcspe ppc64 ppc64el s390x \
+	kfreebsd-amd64 kfreebsd-i386
+
+ifeq (,$(findstring stage1,$(DEB_BUILD_PROFILES)))
+  with_doxywizard := yes
+else
   with_doxywizard := no
 endif
 
@@ -17,10 +29,23 @@ ifeq ($(with_doxywizard),yes)
 endif
 CONFIGUREFLAGS+=--dot /usr/bin/dot
 CONFIGUREFLAGS+=--install /usr/bin/install
+CONFIGUREFLAGS+=--python python3
+CONFIGUREFLAGS+=--with-doxysearch
+CONFIGUREFLAGS+=--with-sqlite3
+ifneq (,$(filter $(DEB_HOST_ARCH),$(clang_archs)))
+  CONFIGUREFLAGS+=--with-libclang
+endif
+
+# used by jquery/Makefile
+export MINIFIER=/usr/share/yui-compressor/yui-compressor
 
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
+	$(MAKE) -C jquery install
+	./configure $(CONFIGUREFLAGS)
+	# get rid of prebuilt files from orig.tar.gz
+	$(MAKE) distclean
 	./configure $(CONFIGUREFLAGS)
 	sed -i 's/^TMAKE_MOC *=.*/TMAKE_MOC = moc/' addon/doxywizard/doxywizard.pro
 	touch $@
@@ -30,17 +55,19 @@ build-arch: build-stamp
 build-indep: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
-	TMAKE_CFLAGS_RELEASE="$(CFLAGS)" TMAKE_LFLAGS_RELEASE="$(LDFLAGS)" \
-		$(MAKE) QMAKE=/usr/bin/qmake-qt4
+	$(MAKE) QMAKE=$(shell pwd)/debian/qmake
 	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
 	rm -f configure-stamp build-stamp install*stamp
-	rm -rf qt
+	rm -rf qt tmake winbuild
+	$(MAKE) -C jquery clean
+	rm -f src/jquery_*.js
 	[ ! -f Makefile ] || $(MAKE) distclean
 	rm -f qtools/Makefile.qtools
+	rm -f doxygen_sqlite3.db
 	dh_clean
 
 uninstall:
@@ -75,6 +102,7 @@ install-arch-stamp:
 	dh_installdirs
 	$(MAKE) install \
 		INSTALL=$(INSDIR) DOCDIR=$(DOCDIR) MAN1DIR=share/man/man1
+	cd debian/dh-doxygen && pod2man -c Debhelper -r '' dh_doxygen dh_doxygen.1
 ifeq ($(with_doxywizard),yes)
 	dh_movefiles -Ndoxygen --sourcedir=debian/doxygen \
 		usr/bin/doxywizard \
@@ -90,8 +118,11 @@ binary-indep: install-indep
 	dh_testdir
 	dh_testroot
 	dh_installdocs
-	dh_installchangelogs 
-	dh_strip
+	dh_lintian
+	./debian/dh-doxygen/dh_doxygen
+	rdfind -outputname /dev/null -makehardlinks true debian/doxygen-doc/usr/share/doc/doxygen
+	dh_installchangelogs doc/changelog.doc
+	dh_strip --dbg-package=doxygen-dbg
 	dh_link
 	dh_compress -X.pdf
 	dh_fixperms
@@ -109,10 +140,11 @@ endif
 binary-arch: install-arch
 	dh_testdir
 	dh_testroot
-	dh_installdocs LANGUAGE.HOWTO PLATFORMS README VERSION
+	dh_install
+	dh_installdocs LANGUAGE.HOWTO PLATFORMS README.md VERSION
 	dh_installman
-	dh_installchangelogs 
-	dh_strip
+	dh_installchangelogs doc/changelog.doc
+	dh_strip --dbg-package=doxygen-dbg
 	dh_link
 	dh_installmenu
 	dh_compress

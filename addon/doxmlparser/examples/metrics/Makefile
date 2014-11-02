@@ -1,16 +1,18 @@
 #
-# This file was generated from Makefile.in on Thu Jul 12 20:08:34 CEST 2012
+# This file was generated from Makefile.in on Thu Aug 21 10:48:35 CEST 2014
 #
 
 DOXYGEN   = /Users/dimitri/doxygen
 TMAKEPATH = /Users/dimitri/doxygen/tmake/lib/macosx-c++
-ENV       = env TMAKEPATH=$(TMAKEPATH)
+ENV       = env TMAKEPATH="$(TMAKEPATH)"
 TMAKE     = /Users/dimitri/doxygen/tmake/bin/tmake
 MAKE      = /opt/local/bin/gmake
+PYTHON    = /opt/local/bin/python2
 PERL      = /opt/local/bin/perl
+LEX       = /usr/bin/flex
 RM        = rm -f
 CP        = cp
-VERSION   = 1.8.1.2
+VERSION   = 1.8.8
 INSTALL   = /usr/local
 INSTTOOL  = /opt/local/bin/ginstall
 DOXYDOCS  = ..
@@ -23,6 +25,8 @@ all clean depend: Makefile.metrics
 
 distclean: clean
 	$(RM) -rf Makefile.metrics metrics.pro Makefile obj
+
+realclean: distclean
 
 tmake:
 	$(ENV) $(PERL) $(TMAKE) metrics.pro >Makefile.metrics

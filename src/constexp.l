@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: constexp.l,v 1.11 2001/03/19 19:27:40 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,8 +21,10 @@
 #include "constexp.h"  
 #include "cppvalue.h"
 #include "ce_parse.h" // generated header file
+#include "message.h"
 
 #define YY_NEVER_INTERACTIVE 1
+#define YY_NO_INPUT 1
   
 QCString    g_strToken;  
 CPPValue    g_resultValue;
@@ -102,19 +104,21 @@ CONSTSUFFIX ([uU][lL]?[lL]?)|([lL][lL]?[uU]?)
 
 %%
 
-bool parseCppExpression(const char *fileName,int lineNr,const QCString &s)
+bool parseconstexp(const char *fileName,int lineNr,const QCString &s)
 {
+  printlex(yy_flex_debug, TRUE, __FILE__, fileName);
   //printf("Expression: `%s'\n",s.data());
   g_constExpFileName = fileName;
   g_constExpLineNr = lineNr;
   g_inputString = s;
   g_inputPosition = 0;
-  cppExpYYrestart( cppExpYYin );
-  cppExpYYparse();
+  constexpYYrestart( constexpYYin );
+  constexpYYparse();
   //printf("Result: %ld\n",(long)g_resultValue);
+  printlex(yy_flex_debug, FALSE, __FILE__, fileName);
   return (long)g_resultValue!=0;
 }
 
 extern "C" {
-  int cppExpYYwrap() { return 1; }
+  int constexpYYwrap() { return 1; }
 }

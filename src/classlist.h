@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: classlist.h,v 1.8 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -28,12 +28,13 @@ class Definition;
 
 /** A list of ClassDef objects. */
 class ClassList : public QList<ClassDef>
-{ 
+{
   public:
     ClassList();
    ~ClassList();
-   
-   int compareItems(GCI item1,GCI item2);
+
+  private:
+    int compareValues(const ClassDef *item1,const ClassDef *item2) const;
 };
 
 /** An iterator for ClassDef objects in a ClassList. */
@@ -57,11 +58,30 @@ class ClassSDict : public SDict<ClassDef>
   public:
     ClassSDict(int size=17) : SDict<ClassDef>(size) {}
    ~ClassSDict() {}
-   int compareItems(GCI item1,GCI item2);
-   void writeDeclaration(OutputList &ol,const ClassDef::CompoundType *filter=0,
+    void writeDeclaration(OutputList &ol,const ClassDef::CompoundType *filter=0,
                          const char *header=0,bool localNames=FALSE);
-   void writeDocumentation(OutputList &ol,Definition *container=0);
-   bool declVisible(const ClassDef::CompoundType *filter=0) const;
+    void writeDocumentation(OutputList &ol,Definition *container=0);
+    bool declVisible(const ClassDef::CompoundType *filter=0) const;
+  private:
+    int compareValues(const ClassDef *item1,const ClassDef *item2) const;
+};
+
+class GenericsCollection : public QIntDict<ClassDef>
+{
+  public:
+    GenericsCollection() : QIntDict<ClassDef>(17) {}
+   ~GenericsCollection() {}
+};
+
+class GenericsSDict 
+{
+  public:
+   GenericsSDict() : m_dict(17) { m_dict.setAutoDelete(TRUE); }
+  ~GenericsSDict() {}
+   void insert(const QCString &key,ClassDef *cd);
+   ClassDef *find(const QCString &key);
+  private:
+   SDict<GenericsCollection> m_dict;
 };
 
 #endif

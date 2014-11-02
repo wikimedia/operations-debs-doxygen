@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: pycode.h,v 1.9 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -25,17 +25,19 @@
 #ifndef PYCODE_H
 #define PYCODE_H
 
-#include "qtbc.h"
-#include <stdio.h>
+#include "types.h"
 
 class CodeOutputInterface;
 class FileDef;
 class MemberDef;
+class QCString;
+class Definition;
 
-extern void parsePythonCode(CodeOutputInterface &,const char *,const QCString &, 
-             bool ,const char *,FileDef *fd=0,
-	     int startLine=-1,int endLine=-1,bool inlineFragment=FALSE,
-             MemberDef *memberDef=0,bool showLineNumbers=TRUE);
+extern void parsePythonCode(CodeOutputInterface &,const char *,const QCString &,
+             bool ,const char *,FileDef *fd,
+	     int startLine,int endLine,bool inlineFragment,
+             MemberDef *memberDef,bool showLineNumbers,Definition *searchCtx,
+             bool collectXRefs);
 extern void resetPythonCodeParserState();
 
 #endif

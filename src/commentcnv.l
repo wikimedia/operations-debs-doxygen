@@ -1,8 +1,8 @@
 /*****************************************************************************
  *
- * $Id: commentcnv.l,v 1.80 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,6 +18,7 @@
 %{
 
 #define YY_NEVER_INTERACTIVE 1
+
   
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,8 +34,11 @@
 #include "config.h"
 #include "doxygen.h"
 #include "util.h"
+#include "condparser.h"
 
 #include <assert.h>
+
+#define YY_NO_INPUT 1
 
 #define ADDCHAR(c)    g_outBuf->addChar(c)
 #define ADDARRAY(a,s) g_outBuf->addArray(a,s)
@@ -46,6 +50,13 @@ struct CondCtx
   int lineNr;
   QCString sectionId;
   bool skip;
+};
+  
+struct CommentCtx
+{
+  CommentCtx(int line) 
+    : lineNr(line) {}
+  int lineNr;
 };
   
 static BufStr * g_inBuf;
@@ -60,6 +71,7 @@ static QCString g_fileName;
 static int      g_lineNr;
 static int      g_condCtx;
 static QStack<CondCtx> g_condStack;
+static QStack<CommentCtx> g_commentStack;
 static QCString g_blockName;
 static int      g_lastCommentContext;
 static bool     g_inSpecialComment;
@@ -74,9 +86,10 @@ static int      g_blockCount;
 static bool     g_lastEscaped;
 static int      g_lastBlockContext;
 static bool     g_pythonDocString;
-
+static int      g_nestingCount;
 
 static SrcLangExt g_lang;
+static bool       isFixedForm; // For Fortran
 
 static void replaceCommentMarker(const char *s,int len)
 {
@@ -116,7 +129,7 @@ static void replaceCommentMarker(const char *s,int len)
     ADDCHAR(' ');
   }
   // copy comment line to output
-  ADDARRAY(p,len-(p-s));
+  ADDARRAY(p,len-(int)(p-s));
 }
 
 static inline int computeIndent(const char *s)
@@ -169,14 +182,12 @@ static inline void copyToOutput(const char *s,int len)
 
 static void startCondSection(const char *sectId)
 {
+  //printf("startCondSection: skip=%d stack=%d\n",g_skip,g_condStack.count());
+  CondParser prs;
+  bool expResult = prs.parse(g_fileName,g_lineNr,sectId);
   g_condStack.push(new CondCtx(g_lineNr,sectId,g_skip));
-  if (Config_getList("ENABLED_SECTIONS").find(sectId)!=-1)
+  if (!expResult) // not enabled
   {
-    //printf("*** Section is enabled!\n");
-  }
-  else
-  {
-    //printf("*** Section is disabled!\n");
     g_skip=TRUE;
   }
 }
@@ -193,6 +204,7 @@ static void endCondSection()
     CondCtx *ctx = g_condStack.pop();
     g_skip=ctx->skip;
   }
+  //printf("endCondSection: skip=%d stack=%d\n",g_skip,g_condStack.count());
 }
 
 /** copies string \a s with length \a len to the output, while 
@@ -237,9 +249,12 @@ void replaceComment(int offset);
 
 %%
 
-<Scan>[^"'!\/\n\\#\\-]*           { /* eat anything that is not " / or \n */ 
-                                     copyToOutput(yytext,(int)yyleng); 
-				   }
+<Scan>[^"'!\/\n\\#-,]*              { /* eat anything that is not " / , or \n */ 
+                                       copyToOutput(yytext,(int)yyleng);
+                                    }
+<Scan>[,]                           { /* eat , so we have a nice separator in long initialization lines */ 
+                                       copyToOutput(yytext,(int)yyleng);
+                                    }
 <Scan>"\"\"\""!                     { /* start of python long comment */
                                      if (g_lang!=SrcLangExt_Python)
 				     {
@@ -248,11 +263,50 @@ void replaceComment(int offset);
 				     else
 				     {
                                        g_pythonDocString = TRUE;
-                                       copyToOutput(yytext,(int)yyleng); 
+                                       g_nestingCount=0;
+                                       g_commentStack.clear(); /*  to be on the save side */
+                                       copyToOutput(yytext,(int)yyleng);
 				       BEGIN(CComment);
+                                       g_commentStack.push(new CommentCtx(g_lineNr));
 				     }
                                    }
-<Scan>"!>"			   {
+<Scan>![><!]/.*\n	   {
+                                     if (g_lang!=SrcLangExt_Fortran)
+				     {
+				       REJECT;
+				     }
+				     else
+				     {
+                                       copyToOutput(yytext,(int)yyleng); 
+                                       g_nestingCount=0;
+                                       g_commentStack.clear(); /*  to be on the save side */
+				       BEGIN(CComment);
+                                       g_commentStack.push(new CommentCtx(g_lineNr));
+				     }
+  				   }
+<Scan>[Cc\*][><!]/.*\n	   {
+                                     if (g_lang!=SrcLangExt_Fortran)
+				     {
+				       REJECT;
+				     }
+				     else
+				     {
+                                       /* check for fixed format; we might have some conditional as part of multilene if like C<5 .and. & */
+                                       if (isFixedForm && (g_col == 0))
+                                       {
+                                         copyToOutput(yytext,(int)yyleng); 
+                                         g_nestingCount=0;
+                                         g_commentStack.clear(); /*  to be on the save side */
+				         BEGIN(CComment);
+                                         g_commentStack.push(new CommentCtx(g_lineNr));
+				       }
+				       else
+				       {
+				         REJECT;
+				       }
+				     }
+  				   }
+<Scan>!.*\n		   {
   			             if (g_lang!=SrcLangExt_Fortran)
 				     {
 				       REJECT;
@@ -260,7 +314,23 @@ void replaceComment(int offset);
 				     else
 				     {
                                        copyToOutput(yytext,(int)yyleng); 
-				       BEGIN(CComment);
+				     }
+                                   }
+<Scan>[Cc\*].*\n		   {
+  			             if (g_lang!=SrcLangExt_Fortran)
+				     {
+				       REJECT;
+				     }
+				     else
+				     {
+                                       if (g_col == 0)
+                                       {
+                                         copyToOutput(yytext,(int)yyleng); 
+				       }
+				       else
+				       {
+				         REJECT;
+				       }
 				     }
                                    }
 <Scan>"\""                         { /* start of a string */ 
@@ -271,12 +341,16 @@ void replaceComment(int offset);
 <Scan>'				   {
                                      copyToOutput(yytext,(int)yyleng); 
 				     g_charContext = YY_START;
-				     BEGIN(SkipChar);
+                                     if (g_lang!=SrcLangExt_VHDL)
+                                     {
+				       BEGIN(SkipChar);
+                                     }
   				   }
 <Scan>\n                           { /* new line */ 
                                      copyToOutput(yytext,(int)yyleng); 
                                    }
-<Scan>("//!"|"///").*/\n[ \t]*"//"[\/!][^\/] { /* start C++ style special comment block */
+<Scan>"//!"/.*\n[ \t]*"//"[\/!][^\/] | /* start C++ style special comment block */
+<Scan>("///"[/]*)/[^/].*\n[ \t]*"//"[\/!][^\/] { /* start C++ style special comment block */
   				     if (g_mlBrief) 
 				     {
 				       REJECT; // bail out if we do not need to convert
@@ -292,7 +366,9 @@ void replaceComment(int offset);
 				       copyToOutput("/**",3); 
 				       replaceAliases(yytext+i);
 				       g_inSpecialComment=TRUE;
-				       BEGIN(SComment); 
+				       //BEGIN(SComment); 
+				       g_readLineCtx=SComment;
+				       BEGIN(ReadLine);
 				     }
                                    }
 <Scan>"//##Documentation".*/\n	   { /* Start of Rational Rose ANSI C++ comment block */
@@ -305,14 +381,21 @@ void replaceComment(int offset);
 				     BEGIN(SComment);
   				   }
 <Scan>"//"/.*\n	                   { /* one line C++ comment */ 
+				     g_inSpecialComment=yytext[2]=='/' || yytext[2]=='!';
   				     copyToOutput(yytext,(int)yyleng); 
 				     g_readLineCtx=YY_START;
 				     BEGIN(ReadLine);
 				   }
+<Scan>"/**/"                       { /* avoid matching next rule for empty C comment, see bug 711723 */
+                                     copyToOutput(yytext,(int)yyleng);
+                                   }
 <Scan>"/*"[*!]?			   { /* start of a C comment */
   			             g_specialComment=(int)yyleng==3;
+                                     g_nestingCount=0;
+                                     g_commentStack.clear(); /*  to be on the save side */
                                      copyToOutput(yytext,(int)yyleng); 
 				     BEGIN(CComment); 
+                                     g_commentStack.push(new CommentCtx(g_lineNr));
                                    }
 <Scan>"#"("#")?		           {
                                      if (g_lang!=SrcLangExt_Python)
@@ -322,7 +405,10 @@ void replaceComment(int offset);
 				     else
 				     {
                                        copyToOutput(yytext,(int)yyleng); 
+                                       g_nestingCount=0;
+                                       g_commentStack.clear(); /*  to be on the save side */
 				       BEGIN(CComment);
+                                       g_commentStack.push(new CommentCtx(g_lineNr));
 				     }
   				   }
 <Scan>"--!"		           {
@@ -333,10 +419,13 @@ void replaceComment(int offset);
 				     else
 				     {
                                        copyToOutput(yytext,(int)yyleng); 
+                                       g_nestingCount=0;
+                                       g_commentStack.clear(); /*  to be on the save side */
 				       BEGIN(CComment);
+                                       g_commentStack.push(new CommentCtx(g_lineNr));
 				     }
   				   }
-<Scan>"!>"			   {
+<Scan>![><!]		           {
                                      if (g_lang!=SrcLangExt_Fortran)
 				     {
 				       REJECT;
@@ -344,7 +433,10 @@ void replaceComment(int offset);
 				     else
 				     {
                                        copyToOutput(yytext,(int)yyleng); 
+                                       g_nestingCount=0;
+                                       g_commentStack.clear(); /*  to be on the save side */
 				       BEGIN(CComment);
+                                       g_commentStack.push(new CommentCtx(g_lineNr));
 				     }
   				   }
 <CComment>"{@code"/[ \t\n]	   {
@@ -354,7 +446,7 @@ void replaceComment(int offset);
 				     g_blockName=&yytext[1];
                                      BEGIN(VerbatimCode);
   				   }
-<CComment,ReadLine>[\\@]("dot"|"code"|"msc")/[^a-z_A-Z0-9] { /* start of a verbatim block */
+<CComment,ReadLine>[\\@]("dot"|"code"|"msc"|"startuml")/[^a-z_A-Z0-9] { /* start of a verbatim block */
                                      copyToOutput(yytext,(int)yyleng); 
 				     g_lastCommentContext = YY_START;
 				     g_javaBlock=0;
@@ -375,16 +467,16 @@ void replaceComment(int offset);
 				     g_lastCommentContext = YY_START;
 				     BEGIN(Verbatim);
   			           }
-<CComment,ReadLine>[\\@]("verbatim"|"latexonly"|"htmlonly"|"xmlonly"|"rtfonly"|"manonly")/[^a-z_A-Z0-9] { /* start of a verbatim block */
+<CComment,ReadLine>[\\@]("verbatim"|"latexonly"|"htmlonly"|"xmlonly"|"docbookonly"|"rtfonly"|"manonly")/[^a-z_A-Z0-9] { /* start of a verbatim block */
                                      copyToOutput(yytext,(int)yyleng); 
 				     g_blockName=&yytext[1];
 				     g_lastCommentContext = YY_START;
                                      BEGIN(Verbatim);
                                    }
-<Scan>.                            { /* any other character */
+<Scan>.                            { /* any ather character */
                                      copyToOutput(yytext,(int)yyleng); 
                                    }
-<Verbatim>[\\@]("endverbatim"|"endlatexonly"|"endhtmlonly"|"endxmlonly"|"endrtfonly"|"endmanonly"|"f$"|"f]"|"f}") { /* end of verbatim block */
+<Verbatim>[\\@]("endverbatim"|"endlatexonly"|"endhtmlonly"|"endxmlonly"|"docbookonly"|"endrtfonly"|"endmanonly"|"f$"|"f]"|"f}") { /* end of verbatim block */
                                      copyToOutput(yytext,(int)yyleng);
 				     if (yytext[1]=='f') // end of formula
 				     {
@@ -425,7 +517,7 @@ void replaceComment(int offset);
 				       }
 				     }
   				   }
-<VerbatimCode>[\\@]("enddot"|"endcode"|"endmsc") { /* end of verbatim block */
+<VerbatimCode>[\\@]("enddot"|"endcode"|"endmsc"|"enduml") { /* end of verbatim block */
                                      copyToOutput(yytext,(int)yyleng);
 				     if (&yytext[4]==g_blockName)
 				     {
@@ -437,6 +529,23 @@ void replaceComment(int offset);
 				     {
                                        copyToOutput(yytext,(int)yyleng); 
 				     }
+                                     else
+                                     {
+                                       int l=0;
+                                       while (yytext[l]==' ' || yytext[l]=='\t')
+                                       {
+                                         l++;
+                                       }
+                                       copyToOutput(yytext,l);
+                                       if (yyleng-l==3) // ends with //! or ///
+                                       {
+                                         copyToOutput(" * ",3);
+                                       }
+                                       else // ends with //
+                                       {
+                                         copyToOutput("//",2);
+                                       }
+                                     }
   				   }
 <Verbatim,VerbatimCode>[^@\/\\\n{}]* { /* any character not a backslash or new line or } */
                                      copyToOutput(yytext,(int)yyleng); 
@@ -444,10 +553,16 @@ void replaceComment(int offset);
 <Verbatim,VerbatimCode>\n	   { /* new line in verbatim block */
                                      copyToOutput(yytext,(int)yyleng); 
                                    }
-<Verbatim,VerbatimCode>^[ \t]*"///"  {
-  				     if (g_blockName=="dot" || g_blockName=="msc" || g_blockName.at(0)=='f')
+<Verbatim>^[ \t]*"///"             {
+  				     if (g_blockName=="dot" || g_blockName=="msc" || g_blockName=="startuml" || g_blockName.at(0)=='f')
 				     {
 				       // see bug 487871, strip /// from dot images and formulas.
+                                       int l=0;
+                                       while (yytext[l]==' ' || yytext[l]=='\t')
+                                       {
+                                         l++;
+                                       }
+                                       copyToOutput(yytext,l);
 				       copyToOutput("   ",3);
 				     }
 				     else // even slashes are verbatim (e.g. \verbatim, \code)
@@ -485,7 +600,7 @@ void replaceComment(int offset);
                                      copyToOutput(yytext,(int)yyleng); 
                                    }
 
-<CComment>[^\\!@*\n{\"]*           { /* anything that is not a '*' or command */ 
+<CComment>[^\\!@*\n{\"\/]*           { /* anything that is not a '*' or command */ 
                                      copyToOutput(yytext,(int)yyleng); 
                                    }
 <CComment>"*"+[^*/\\@\n{\"]*       { /* stars without slashes */
@@ -505,6 +620,16 @@ void replaceComment(int offset);
   				   }
 <CComment>\n                       { /* new line in comment */
                                      copyToOutput(yytext,(int)yyleng); 
+                                     /* in case of Fortran always end of comment */
+  				     if (g_lang==SrcLangExt_Fortran)
+				     {
+				       BEGIN(Scan);
+				     }
+                                   }
+<CComment>"/"+"*"                  { /* nested C comment */
+                                     g_nestingCount++;
+                                     g_commentStack.push(new CommentCtx(g_lineNr));
+                                     copyToOutput(yytext,(int)yyleng); 
                                    }
 <CComment>"*"+"/"                  { /* end of C comment */
                                      if (g_lang==SrcLangExt_Python)
@@ -514,7 +639,15 @@ void replaceComment(int offset);
 				     else
 				     {
 				       copyToOutput(yytext,(int)yyleng);
-				       BEGIN(Scan);
+                                       if (g_nestingCount<=0)
+                                       {
+				         BEGIN(Scan);
+                                       }
+                                       else
+                                       {
+                                         g_nestingCount--;
+                                         delete g_commentStack.pop();
+                                       }
 				     }
                                    }
 <CComment>"\n"/[ \t]*[^#]	   { /* end of Python comment */
@@ -530,17 +663,6 @@ void replaceComment(int offset);
   				   }
 <CComment>"\n"/[ \t]*[^\-]	   { /* end of VHDL comment */
                                      if (g_lang!=SrcLangExt_VHDL)
-				     {
-				       REJECT;
-				     }
-				     else
-				     {
-				       copyToOutput(yytext,(int)yyleng);
-				       BEGIN(Scan);
-				     }
-  				   }
-<CComment>"\n"/[ \t]*[^!]	   { /* end of Fortran comment */
-  				     if (g_lang!=SrcLangExt_Fortran)
 				     {
 				       REJECT;
 				     }
@@ -633,7 +755,7 @@ void replaceComment(int offset);
 <CComment,ReadLine>[\\@][\\@][~a-z_A-Z][a-z_A-Z0-9]*[ \t]* { // escaped command
 				     copyToOutput(yytext,(int)yyleng);
   				   }
-<CComment,ReadLine>[\\@]"cond"[ \t]+	   { // conditional section
+<CComment,ReadLine>[\\@]"cond"/[^a-z_A-Z0-9]	   { // conditional section
   				     g_condCtx = YY_START; 
   				     BEGIN(CondLine);
   				   }
@@ -656,12 +778,12 @@ void replaceComment(int offset);
 				       }
     				     }
 				    }
-<CondLine>[a-z_A-Z][a-z_A-Z0-9.\-]* {
+<CondLine>[!()&| \ta-z_A-Z0-9.\-]+ {
   				     bool oldSkip=g_skip;
                                      startCondSection(yytext);
-				     if (g_condCtx==CComment && !oldSkip && g_skip) 
+				     if ((g_condCtx==CComment || g_readLineCtx==SComment) && 
+                                         !oldSkip && g_skip) 
     			             {
-				       //printf("** Adding terminator for comment!\n");
 				       if (g_lang!=SrcLangExt_Python &&
 					   g_lang!=SrcLangExt_VHDL &&
 					   g_lang!=SrcLangExt_Fortran)
@@ -670,7 +792,14 @@ void replaceComment(int offset);
      				         ADDCHAR('/');
 				       }
     				     }
-  				     BEGIN(g_condCtx);
+                                     if (g_readLineCtx==SComment)
+                                     {
+                                       BEGIN(SComment);
+                                     }
+                                     else
+                                     {
+  				       BEGIN(g_condCtx);
+                                     }
   				   }
 <CondLine>[ \t]*
 <CComment,ReadLine>[\\@]"cond"[ \t\r]*/\n |
@@ -678,7 +807,8 @@ void replaceComment(int offset);
   				     if (YY_START!=CondLine) g_condCtx=YY_START;
   				     bool oldSkip=g_skip;
   				     startCondSection(" "); // fake section id causing the section to be hidden unconditionally
-				     if (g_condCtx==CComment && !oldSkip && g_skip) 
+				     if ((g_condCtx==CComment || g_readLineCtx==SComment) && 
+                                         !oldSkip && g_skip) 
     			             {
 				       //printf("** Adding terminator for comment!\n");
 				       if (g_lang!=SrcLangExt_Python &&
@@ -689,7 +819,14 @@ void replaceComment(int offset);
 				       }
     				     }
 				     if (*yytext=='\n') g_lineNr++;
-				     BEGIN(g_condCtx);
+                                     if (g_readLineCtx==SComment)
+                                     {
+                                       BEGIN(SComment);
+                                     }
+                                     else
+                                     {
+  				       BEGIN(g_condCtx);
+                                     }
   				   }
 <CComment,ReadLine>[\\@][a-z_A-Z][a-z_A-Z0-9]*  { // expand alias without arguments
 				     replaceAliases(yytext);
@@ -756,7 +893,7 @@ void replaceComment(int offset);
 
 void replaceComment(int offset)
 {
-  if (g_mlBrief)
+  if (g_mlBrief || g_skip)
   {
     copyToOutput(yytext,(int)yyleng);
   }
@@ -777,6 +914,45 @@ void replaceComment(int offset)
     }                                                         
   }
 }
+
+// simplified way to know if this is fixed form
+// duplicate in fortrancode.l
+static bool recognizeFixedForm(const char* contents)
+{
+  int column=0;
+  bool skipLine=FALSE;
+
+  for(int i=0;;i++) {
+    column++;
+
+    switch(contents[i]) {
+      case '\n':
+        column=0;
+        skipLine=FALSE;
+        break;
+      case ' ':
+        break;
+      case '\000':
+        return FALSE;
+      case 'C':
+      case 'c':
+      case '*':
+        if(column==1) return TRUE;
+        if(skipLine) break;
+        return FALSE;
+      case '!':
+        if(column>1 && column<7) return FALSE;
+        skipLine=TRUE;
+        break;
+      default:
+        if(skipLine) break;
+        if(column==7) return TRUE;
+        return FALSE;
+    }
+  }
+  return FALSE;
+}
+
 
 /*! This function does three things:
  *  -# It converts multi-line C++ style comment blocks (that are aligned)
@@ -799,9 +975,21 @@ void convertCppComments(BufStr *inBuf,BufStr *outBuf,const char *fileName)
   g_lineNr   = 1;
   g_condStack.clear();
   g_condStack.setAutoDelete(TRUE);
+  g_commentStack.clear();
+  g_commentStack.setAutoDelete(TRUE);
+
+  printlex(yy_flex_debug, TRUE, __FILE__, fileName);
+  isFixedForm = FALSE;
+  if (g_lang==SrcLangExt_Fortran)
+  {
+    isFixedForm = recognizeFixedForm(inBuf->data());
+  }
+
   if (g_lang==SrcLangExt_Markdown)
   {
+    g_nestingCount=0;
     BEGIN(CComment);
+    g_commentStack.push(new CommentCtx(g_lineNr));
   }
   else
   {
@@ -816,11 +1004,29 @@ void convertCppComments(BufStr *inBuf,BufStr *outBuf,const char *fileName)
     warn(g_fileName,ctx->lineNr,"Conditional section%sdoes not have "
 	"a corresponding \\endcond command within this file.",sectionInfo.data());
   }
+  if (g_nestingCount>0 || (YY_START==CComment && g_lang!=SrcLangExt_Markdown))
+  {
+    QCString tmp= "(probable line reference: ";
+    bool first = TRUE;
+    while (!g_commentStack.isEmpty())
+    {
+      CommentCtx *ctx = g_commentStack.pop();
+      if (!first) tmp += ", ";
+      tmp += QCString().setNum(ctx->lineNr);
+      first = FALSE;
+      delete ctx;
+    }
+    tmp += ")";
+    warn(g_fileName,g_lineNr,"Reached end of file while still inside a (nested) comment. "
+        "Nesting level %d %s",g_nestingCount+1,tmp.data()); // add one for "normal" expected end of comment
+  }
+  g_commentStack.clear();
   if (Debug::isFlagSet(Debug::CommentCnv))
   {
     g_outBuf->at(g_outBuf->curPos())='\0';
     msg("-------------\n%s\n-------------\n",g_outBuf->data());
   }
+  printlex(yy_flex_debug, FALSE, __FILE__, fileName);
 }
 
 

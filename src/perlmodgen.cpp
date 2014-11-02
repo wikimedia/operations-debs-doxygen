@@ -3,7 +3,7 @@
  *
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  * Authors: Dimitri van Heesch, Miguel Lobo.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -19,18 +19,30 @@
 
 #include <stdlib.h>
 
+#include <qdir.h>
+#include <qstack.h>
+#include <qdict.h>
+#include <qfile.h>
+
 #include "perlmodgen.h"
 #include "docparser.h"
 #include "message.h"
 #include "doxygen.h"
 #include "pagedef.h"
-
-#include <qdir.h>
-#include <qstack.h>
-#include <qdict.h>
-#include <qfile.h>
+#include "memberlist.h"
 #include "ftextstream.h"
 #include "arguments.h"
+#include "config.h"
+#include "groupdef.h"
+#include "classdef.h"
+#include "classlist.h"
+#include "filename.h"
+#include "membername.h"
+#include "namespacedef.h"
+#include "membergroup.h"
+#include "section.h"
+#include "util.h"
+#include "htmlentity.h"
 
 #define PERLOUTPUT_MAX_INDENTATION 40
 
@@ -354,6 +366,8 @@ public:
   void visitPost(DocDotFile *);
   void visitPre(DocMscFile *);
   void visitPost(DocMscFile *);
+  void visitPre(DocDiaFile *);
+  void visitPost(DocDiaFile *);
   void visitPre(DocLink *);
   void visitPost(DocLink *);
   void visitPre(DocRef *);
@@ -378,6 +392,10 @@ public:
   void visitPost(DocText *);
   void visitPre(DocHtmlBlockQuote *);
   void visitPost(DocHtmlBlockQuote *);
+  void visitPre(DocVhdlFlow *);
+  void visitPost(DocVhdlFlow *);
+  void visitPre(DocParBlock *);
+  void visitPost(DocParBlock *);
 
 private:
 
@@ -524,140 +542,71 @@ void PerlModDocVisitor::visit(DocWhiteSpace *)
 
 void PerlModDocVisitor::visit(DocSymbol *sy)
 {
-  char c = 0;
-  const char *s = 0;
-  const char *accent = 0;
-  const char *symbol = 0;
-  switch(sy->symbol())
+  const DocSymbol::PerlSymb *res = HtmlEntityMapper::instance()->perl(sy->symbol());
+  const char *accent=0;
+  if (res-> symb)
   {
-    case DocSymbol::At:      c = '@'; break;
-    case DocSymbol::Less:    c = '<'; break;
-    case DocSymbol::Greater: c = '>'; break;
-    case DocSymbol::Amp:     c = '&'; break;
-    case DocSymbol::Dollar:  c = '$'; break;
-    case DocSymbol::Hash:    c = '#'; break;
-    case DocSymbol::DoubleColon: s = "::"; break;
-    case DocSymbol::Percent: c = '%'; break;
-    case DocSymbol::Pipe:    c = '|'; break;
-    case DocSymbol::Quot:    c = '"'; break;
-    case DocSymbol::Lsquo:   s = "\\\'"; break;
-    case DocSymbol::Rsquo:   s = "\\\'"; break;
-    case DocSymbol::Ldquo:   c = '"'; break;
-    case DocSymbol::Rdquo:   c = '"'; break;
-    case DocSymbol::Ndash:   c = '-'; break;
-    case DocSymbol::Mdash:   s = "--"; break;
-    case DocSymbol::Nbsp:    c = ' '; break;
-    case DocSymbol::Uml:     accent = "umlaut"; break;
-    case DocSymbol::Acute:   accent = "acute"; break;
-    case DocSymbol::Grave:   accent = "grave"; break;
-    case DocSymbol::Circ:    accent = "circ"; break;
-    case DocSymbol::Slash:   accent = "slash"; break;
-    case DocSymbol::Tilde:   accent = "tilde"; break;
-    case DocSymbol::Cedil:   accent = "cedilla"; break;
-    case DocSymbol::Ring:    accent = "ring"; break;
-    case DocSymbol::BSlash:  s = "\\\\"; break;
-    case DocSymbol::Copy:    symbol = "copyright"; break;
-    case DocSymbol::Tm:      symbol = "trademark"; break;
-    case DocSymbol::Reg:     symbol = "registered"; break;
-    case DocSymbol::Szlig:   symbol = "szlig"; break;
-    case DocSymbol::Apos:    s = "\\\'"; break;
-    case DocSymbol::Aelig:   symbol = "aelig"; break;
-    case DocSymbol::AElig:   symbol = "AElig"; break;
-    case DocSymbol::GrkGamma:      symbol = "Gamma"; break;
-    case DocSymbol::GrkDelta:      symbol = "Delta"; break;
-    case DocSymbol::GrkTheta:      symbol = "Theta"; break;
-    case DocSymbol::GrkLambda:     symbol = "Lambda"; break;
-    case DocSymbol::GrkXi:         symbol = "Xi"; break;
-    case DocSymbol::GrkPi:         symbol = "Pi"; break;
-    case DocSymbol::GrkSigma:      symbol = "Sigma"; break;
-    case DocSymbol::GrkUpsilon:    symbol = "Upsilon"; break;
-    case DocSymbol::GrkPhi:        symbol = "Phi"; break;
-    case DocSymbol::GrkPsi:        symbol = "Psi"; break;
-    case DocSymbol::GrkOmega:      symbol = "Omega"; break;
-    case DocSymbol::Grkalpha:      symbol = "alpha"; break;
-    case DocSymbol::Grkbeta:       symbol = "beta"; break;
-    case DocSymbol::Grkgamma:      symbol = "gamma"; break;
-    case DocSymbol::Grkdelta:      symbol = "delta"; break;
-    case DocSymbol::Grkepsilon:    symbol = "epsilon"; break;
-    case DocSymbol::Grkzeta:       symbol = "zeta"; break;
-    case DocSymbol::Grketa:        symbol = "eta"; break;
-    case DocSymbol::Grktheta:      symbol = "theta"; break;
-    case DocSymbol::Grkiota:       symbol = "iota"; break;
-    case DocSymbol::Grkkappa:      symbol = "kappa"; break;
-    case DocSymbol::Grklambda:     symbol = "lambda"; break;
-    case DocSymbol::Grkmu:         symbol = "mu"; break;
-    case DocSymbol::Grknu:         symbol = "nu"; break;
-    case DocSymbol::Grkxi:         symbol = "xi"; break;
-    case DocSymbol::Grkpi:         symbol = "pi"; break;
-    case DocSymbol::Grkrho:        symbol = "rho"; break;
-    case DocSymbol::Grksigma:      symbol = "sigma"; break;
-    case DocSymbol::Grktau:        symbol = "tau"; break;
-    case DocSymbol::Grkupsilon:    symbol = "upsilon"; break;
-    case DocSymbol::Grkphi:        symbol = "phi"; break;
-    case DocSymbol::Grkchi:        symbol = "chi"; break;
-    case DocSymbol::Grkpsi:        symbol = "psi"; break;
-    case DocSymbol::Grkomega:      symbol = "omega"; break;
-    case DocSymbol::Grkvarsigma:   symbol = "sigma"; break;
-    case DocSymbol::Section:       symbol = "sect"; break;
-    case DocSymbol::Degree:        symbol = "deg"; break;
-    case DocSymbol::Prime:         s = "\\\'"; break;
-    case DocSymbol::DoublePrime:   c = '"'; break;
-    case DocSymbol::Infinity:      symbol = "inf"; break;
-    case DocSymbol::EmptySet:      symbol = "empty"; break;
-    case DocSymbol::PlusMinus:     s = "+/-"; break;
-    case DocSymbol::Times:         c = '*'; break;
-    case DocSymbol::Minus:         c = '-'; break;
-    case DocSymbol::CenterDot:     c = '.'; break;
-    case DocSymbol::Partial:       symbol = "partial"; break;
-    case DocSymbol::Nabla:         symbol = "nabla"; break;
-    case DocSymbol::SquareRoot:    symbol = "sqrt"; break;
-    case DocSymbol::Perpendicular: symbol = "perp"; break;
-    case DocSymbol::Sum:           symbol = "sum"; break;
-    case DocSymbol::Integral:      symbol = "int"; break;
-    case DocSymbol::Product:       symbol = "prod"; break;
-    case DocSymbol::Similar:       c = '~'; break;
-    case DocSymbol::Approx:        symbol = "approx"; break;
-    case DocSymbol::NotEqual:      s = "!="; break;
-    case DocSymbol::Equivalent:    symbol = "equiv"; break;
-    case DocSymbol::Proportional:  symbol = "propto"; break;
-    case DocSymbol::LessEqual:     s = "<="; break;
-    case DocSymbol::GreaterEqual:  s = ">="; break;
-    case DocSymbol::LeftArrow:     s = "<-"; break;
-    case DocSymbol::RightArrow:    s = "->"; break;
-    case DocSymbol::SetIn:         symbol = "in"; break;
-    case DocSymbol::SetNotIn:      symbol = "notin"; break;
-    case DocSymbol::LeftCeil:      symbol = "lceil"; break;
-    case DocSymbol::RightCeil:     symbol = "rceil"; break;
-    case DocSymbol::LeftFloor:     symbol = "lfloor"; break;
-    case DocSymbol::RightFloor:    symbol = "rfloor"; break;
-    case DocSymbol::Unknown: err("error: unknown symbol found\n");
-                             break;
+    switch (res->type)
+    {
+      case DocSymbol::Perl_string:
+        enterText();
+        m_output.add(res->symb);
+        break;
+      case DocSymbol::Perl_char:
+        enterText();
+        m_output.add(res->symb[0]);
+        break;
+      case DocSymbol::Perl_symbol:
+        leaveText();
+        openItem("symbol");
+        m_output.addFieldQuotedString("symbol", res->symb);
+        closeItem();
+        break;
+      default:
+        switch(res->type)
+        {
+          case DocSymbol::Perl_umlaut:
+            accent = "umlaut";
+            break;
+          case DocSymbol::Perl_acute:
+            accent = "acute";
+            break;
+          case DocSymbol::Perl_grave:
+            accent = "grave";
+            break;
+          case DocSymbol::Perl_circ:
+            accent = "circ";
+            break;
+          case DocSymbol::Perl_slash:
+            accent = "slash";
+            break;
+          case DocSymbol::Perl_tilde:
+            accent = "tilde";
+            break;
+          case DocSymbol::Perl_cedilla:
+            accent = "cedilla";
+            break;
+          case DocSymbol::Perl_ring:
+            accent = "ring";
+            break;
+          default:
+            break;
+        }
+        leaveText();
+        if (accent)
+        {
+          openItem("accent");
+          m_output
+            .addFieldQuotedString("accent", accent)
+            .addFieldQuotedChar("letter", res->symb[0]);
+          closeItem();
+        }
+        break;
+    }
   }
-  if (c != 0) 
+  else
   {
-    enterText();
-    m_output.add(c);
-  } 
-  else if (s != 0) 
-  {
-    enterText();
-    m_output.add(s);
-  } 
-  else if (symbol != 0) 
-  {
-    leaveText();
-    openItem("symbol");
-    m_output.addFieldQuotedString("symbol", symbol);
-    closeItem();
-  } 
-  else if (accent != 0) 
-  {
-    leaveText();
-    openItem("accent");
-    m_output
-      .addFieldQuotedString("accent", accent)
-      .addFieldQuotedChar("letter", sy->letter());
-    closeItem();
+    err("perl: non supported HTML-entity found: %s\n",HtmlEntityMapper::instance()->html(sy->symbol(),TRUE));
   }
 }
 
@@ -697,23 +646,25 @@ void PerlModDocVisitor::visit(DocStyleChange *s)
 void PerlModDocVisitor::visit(DocVerbatim *s)
 {
   const char *type = 0;
-  switch(s->type())
+  switch (s->type())
   {
-  case DocVerbatim::Code:
+    case DocVerbatim::Code:
 #if 0
-    m_output.add("<programlisting>");
-    parseCode(m_ci,s->context(),s->text(),FALSE,0);
-    m_output.add("</programlisting>");
+      m_output.add("<programlisting>");
+      parseCode(m_ci,s->context(),s->text(),FALSE,0);
+      m_output.add("</programlisting>");
 #endif
-    return;
-  case DocVerbatim::Verbatim:	type = "preformatted"; break;
-  case DocVerbatim::HtmlOnly:	type = "htmlonly"; break;
-  case DocVerbatim::RtfOnly:	type = "rtfonly"; break;
-  case DocVerbatim::ManOnly:	type = "manonly"; break;
-  case DocVerbatim::LatexOnly:	type = "latexonly"; break;
-  case DocVerbatim::XmlOnly:	type = "xmlonly"; break;
-  case DocVerbatim::Dot:	type = "dot"; break;
-  case DocVerbatim::Msc:	type = "msc"; break;
+      return;
+    case DocVerbatim::Verbatim:  type = "preformatted"; break;
+    case DocVerbatim::HtmlOnly:  type = "htmlonly";     break;
+    case DocVerbatim::RtfOnly:   type = "rtfonly";      break;
+    case DocVerbatim::ManOnly:   type = "manonly";      break;
+    case DocVerbatim::LatexOnly: type = "latexonly";    break;
+    case DocVerbatim::XmlOnly:   type = "xmlonly";      break;
+    case DocVerbatim::DocbookOnly: type = "docbookonly"; break;
+    case DocVerbatim::Dot:       type = "dot";          break;
+    case DocVerbatim::Msc:       type = "msc";          break;
+    case DocVerbatim::PlantUML:  type = "plantuml";     break;
   }
   openItem(type);
   m_output.addFieldQuotedString("content", s->text());
@@ -754,6 +705,7 @@ void PerlModDocVisitor::visit(DocInclude *inc)
     return;
   case DocInclude::DontInclude:	return;
   case DocInclude::HtmlInclude:	type = "htmlonly"; break;
+  case DocInclude::LatexInclude: type = "latexonly"; break;
   case DocInclude::VerbInclude:	type = "preformatted"; break;
   case DocInclude::Snippet: return;
   }
@@ -897,7 +849,7 @@ void PerlModDocVisitor::visitPre(DocSimpleSect *s)
   case DocSimpleSect::User:		type = "par"; break;
   case DocSimpleSect::Rcs:		type = "rcs"; break;
   case DocSimpleSect::Unknown:
-    err("error: unknown simple section found\n");
+    err("unknown simple section found\n");
     break;
   }
   leaveText();
@@ -1194,6 +1146,20 @@ void PerlModDocVisitor::visitPost(DocMscFile *)
 #endif
 }
 
+void PerlModDocVisitor::visitPre(DocDiaFile *)
+{
+#if 0
+  m_output.add("<diafile name=\""); m_output.add(df->file()); m_output.add("\">");
+#endif
+}
+
+void PerlModDocVisitor::visitPost(DocDiaFile *)
+{
+#if 0
+  m_output.add("</diafile>");
+#endif
+}
+
 
 void PerlModDocVisitor::visitPre(DocLink *lnk)
 {
@@ -1270,7 +1236,7 @@ void PerlModDocVisitor::visitPre(DocParamSect *s)
   case DocParamSect::Exception: type = "exceptions"; break;
   case DocParamSect::TemplateParam: type = "templateparam"; break;
   case DocParamSect::Unknown:
-    err("error: unknown parameter section found\n");
+    err("unknown parameter section found\n");
     break;
   }
   openOther();
@@ -1318,7 +1284,7 @@ void PerlModDocVisitor::visitPost(DocParamList *)
     .closeHash();
 }
 
-void PerlModDocVisitor::visitPre(DocXRefItem *)
+void PerlModDocVisitor::visitPre(DocXRefItem *x)
 {
 #if 0
   m_output.add("<xrefsect id=\"");
@@ -1329,12 +1295,14 @@ void PerlModDocVisitor::visitPre(DocXRefItem *)
   m_output.add("</xreftitle>");
   m_output.add("<xrefdescription>");
 #endif
+  if (x->title().isEmpty()) return;
   openItem("xrefitem");
   openSubBlock("content");
 }
 
-void PerlModDocVisitor::visitPost(DocXRefItem *)
+void PerlModDocVisitor::visitPost(DocXRefItem *x)
 {
+  if (x->title().isEmpty()) return;
   closeSubBlock();
   closeItem();
 #if 0
@@ -1383,6 +1351,23 @@ void PerlModDocVisitor::visitPost(DocHtmlBlockQuote *)
   closeSubBlock();
   closeItem();
 }
+
+void PerlModDocVisitor::visitPre(DocVhdlFlow *)
+{
+}
+
+void PerlModDocVisitor::visitPost(DocVhdlFlow *)
+{
+}
+
+void PerlModDocVisitor::visitPre(DocParBlock *)
+{
+}
+
+void PerlModDocVisitor::visitPost(DocParBlock *)
+{
+}
+
 
 static void addTemplateArgumentList(ArgumentList *al,PerlModOutput &output,const char *)
 {
@@ -1541,19 +1526,21 @@ void PerlModGenerator::generatePerlModForMember(MemberDef *md,Definition *)
   bool isFunc=FALSE;
   switch (md->memberType())
   {
-  case MemberDef::Define:      memType="define";    break;
-  case MemberDef::EnumValue:   memType="enumvalue"; break;
-  case MemberDef::Property:    memType="property";  break;
-  case MemberDef::Variable:    memType="variable";  break;
-  case MemberDef::Typedef:     memType="typedef";   break;
-  case MemberDef::Enumeration: memType="enum";      break;
-  case MemberDef::Function:    memType="function";  isFunc=TRUE; break;
-  case MemberDef::Signal:      memType="signal";    isFunc=TRUE; break;
-  //case MemberDef::Prototype:   memType="prototype"; isFunc=TRUE; break;
-  case MemberDef::Friend:      memType="friend";    isFunc=TRUE; break;
-  case MemberDef::DCOP:        memType="dcop";      isFunc=TRUE; break;
-  case MemberDef::Slot:        memType="slot";      isFunc=TRUE; break;
-  case MemberDef::Event:       memType="event";     break;
+  case MemberType_Define:      memType="define";    break;
+  case MemberType_EnumValue:   memType="enumvalue"; break;
+  case MemberType_Property:    memType="property";  break;
+  case MemberType_Variable:    memType="variable";  break;
+  case MemberType_Typedef:     memType="typedef";   break;
+  case MemberType_Enumeration: memType="enum";      break;
+  case MemberType_Function:    memType="function";  isFunc=TRUE; break;
+  case MemberType_Signal:      memType="signal";    isFunc=TRUE; break;
+  //case MemberType_Prototype:   memType="prototype"; isFunc=TRUE; break;
+  case MemberType_Friend:      memType="friend";    isFunc=TRUE; break;
+  case MemberType_DCOP:        memType="dcop";      isFunc=TRUE; break;
+  case MemberType_Slot:        memType="slot";      isFunc=TRUE; break;
+  case MemberType_Event:       memType="event";     break;
+  case MemberType_Interface:   memType="interface"; break;
+  case MemberType_Service:     memType="service";   break;
   }
 
   m_output.openHash()
@@ -1565,20 +1552,20 @@ void PerlModGenerator::generatePerlModForMember(MemberDef *md,Definition *)
   
   addPerlModDocBlock(m_output,"brief",md->getDefFileName(),md->getDefLine(),md->getOuterScope(),md,md->briefDescription());
   addPerlModDocBlock(m_output,"detailed",md->getDefFileName(),md->getDefLine(),md->getOuterScope(),md,md->documentation());
-  if (md->memberType()!=MemberDef::Define &&
-      md->memberType()!=MemberDef::Enumeration)
+  if (md->memberType()!=MemberType_Define &&
+      md->memberType()!=MemberType_Enumeration)
     m_output.addFieldQuotedString("type", md->typeString());
   
-  LockingPtr<ArgumentList> al = md->argumentList();
+  ArgumentList *al = md->argumentList();
   if (isFunc) //function
   {
     m_output.addFieldBoolean("const", al!=0 && al->constSpecifier)
       .addFieldBoolean("volatile", al!=0 && al->volatileSpecifier);
 
     m_output.openList("parameters");
-    LockingPtr<ArgumentList> declAl = md->declArgumentList();
-    LockingPtr<ArgumentList> defAl  = md->argumentList();
-    if (declAl!=0 && declAl->count()>0)
+    ArgumentList *declAl = md->declArgumentList();
+    ArgumentList *defAl  = md->argumentList();
+    if (declAl && declAl->count()>0)
     {
       ArgumentListIterator declAli(*declAl);
       ArgumentListIterator defAli(*defAl);
@@ -1612,7 +1599,7 @@ void PerlModGenerator::generatePerlModForMember(MemberDef *md,Definition *)
     }
     m_output.closeList();
   }
-  else if (md->memberType()==MemberDef::Define &&
+  else if (md->memberType()==MemberType_Define &&
 	   md->argsString()!=0) // define
   {
     m_output.openList("parameters");
@@ -1637,10 +1624,10 @@ void PerlModGenerator::generatePerlModForMember(MemberDef *md,Definition *)
   if (md->excpString())
     m_output.addFieldQuotedString("exceptions", md->excpString());
   
-  if (md->memberType()==MemberDef::Enumeration) // enum
+  if (md->memberType()==MemberType_Enumeration) // enum
   {
-    LockingPtr<MemberList> enumFields = md->enumFieldList();
-    if (enumFields!=0)
+    MemberList *enumFields = md->enumFieldList();
+    if (enumFields)
     {
       m_output.openList("values");
       MemberListIterator emli(*enumFields);
@@ -1669,8 +1656,8 @@ void PerlModGenerator::generatePerlModForMember(MemberDef *md,Definition *)
       .addFieldQuotedString("name", rmd->name())
       .closeHash();
 
-  LockingPtr<MemberList> rbml = md->reimplementedBy();
-  if (rbml!=0)
+  MemberList *rbml = md->reimplementedBy();
+  if (rbml)
   {
     MemberListIterator mli(*rbml);
     m_output.openList("reimplemented_by");
@@ -1833,29 +1820,29 @@ void PerlModGenerator::generatePerlModForClass(ClassDef *cd)
       generatePerlModSection(cd,mg->members(),"user_defined",mg->header());
   }
 
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubTypes),"public_typedefs");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubMethods),"public_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubAttribs),"public_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubSlots),"public_slots");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::signals),"signals");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::dcopMethods),"dcop_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::properties),"properties");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubStaticMethods),"public_static_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::pubStaticAttribs),"public_static_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proTypes),"protected_typedefs");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proMethods),"protected_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proAttribs),"protected_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proSlots),"protected_slots");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proStaticMethods),"protected_static_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::proStaticAttribs),"protected_static_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priTypes),"private_typedefs");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priMethods),"private_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priAttribs),"private_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priSlots),"private_slots");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priStaticMethods),"private_static_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::priStaticAttribs),"private_static_members");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::friends),"friend_methods");
-  generatePerlModSection(cd,cd->getMemberList(MemberList::related),"related_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubTypes),"public_typedefs");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubMethods),"public_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubAttribs),"public_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubSlots),"public_slots");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_signals),"signals");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_dcopMethods),"dcop_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_properties),"properties");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubStaticMethods),"public_static_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_pubStaticAttribs),"public_static_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proTypes),"protected_typedefs");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proMethods),"protected_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proAttribs),"protected_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proSlots),"protected_slots");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proStaticMethods),"protected_static_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_proStaticAttribs),"protected_static_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priTypes),"private_typedefs");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priMethods),"private_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priAttribs),"private_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priSlots),"private_slots");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priStaticMethods),"private_static_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_priStaticAttribs),"private_static_members");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_friends),"friend_methods");
+  generatePerlModSection(cd,cd->getMemberList(MemberListType_related),"related_methods");
 
   addPerlModDocBlock(m_output,"brief",cd->getDefFileName(),cd->getDefLine(),cd,0,cd->briefDescription());
   addPerlModDocBlock(m_output,"detailed",cd->getDefFileName(),cd->getDefLine(),cd,0,cd->documentation());
@@ -1939,12 +1926,12 @@ void PerlModGenerator::generatePerlModForNamespace(NamespaceDef *nd)
       generatePerlModSection(nd,mg->members(),"user-defined",mg->header());
   }
 
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decDefineMembers),"defines");
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decProtoMembers),"prototypes");
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decTypedefMembers),"typedefs");
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decEnumMembers),"enums");
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decFuncMembers),"functions");
-  generatePerlModSection(nd,nd->getMemberList(MemberList::decVarMembers),"variables");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decDefineMembers),"defines");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decProtoMembers),"prototypes");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decTypedefMembers),"typedefs");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decEnumMembers),"enums");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decFuncMembers),"functions");
+  generatePerlModSection(nd,nd->getMemberList(MemberListType_decVarMembers),"variables");
 
   addPerlModDocBlock(m_output,"brief",nd->getDefFileName(),nd->getDefLine(),0,0,nd->briefDescription());
   addPerlModDocBlock(m_output,"detailed",nd->getDefFileName(),nd->getDefLine(),0,0,nd->documentation());
@@ -2008,12 +1995,12 @@ void PerlModGenerator::generatePerlModForFile(FileDef *fd)
   }
   m_output.closeList();
   
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decDefineMembers),"defines");
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decProtoMembers),"prototypes");
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decTypedefMembers),"typedefs");
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decEnumMembers),"enums");
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decFuncMembers),"functions");
-  generatePerlModSection(fd,fd->getMemberList(MemberList::decVarMembers),"variables");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decDefineMembers),"defines");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decProtoMembers),"prototypes");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decTypedefMembers),"typedefs");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decEnumMembers),"enums");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decFuncMembers),"functions");
+  generatePerlModSection(fd,fd->getMemberList(MemberListType_decVarMembers),"variables");
 
   addPerlModDocBlock(m_output,"brief",fd->getDefFileName(),fd->getDefLine(),0,0,fd->briefDescription());
   addPerlModDocBlock(m_output,"detailed",fd->getDefFileName(),fd->getDefLine(),0,0,fd->documentation());
@@ -2046,7 +2033,7 @@ void PerlModGenerator::generatePerlModForGroup(GroupDef *gd)
   {
     m_output.openList("files");
     QListIterator<FileDef> fli(*fl);
-    FileDef *fd = fl->first();
+    FileDef *fd;
     for (fli.toFirst();(fd=fli.current());++fli)
       m_output.openHash()
 	.addFieldQuotedString("name", fd->name())
@@ -2114,12 +2101,12 @@ void PerlModGenerator::generatePerlModForGroup(GroupDef *gd)
       generatePerlModSection(gd,mg->members(),"user-defined",mg->header());
   }
 
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decDefineMembers),"defines");
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decProtoMembers),"prototypes");
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decTypedefMembers),"typedefs");
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decEnumMembers),"enums");
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decFuncMembers),"functions");
-  generatePerlModSection(gd,gd->getMemberList(MemberList::decVarMembers),"variables");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decDefineMembers),"defines");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decProtoMembers),"prototypes");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decTypedefMembers),"typedefs");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decEnumMembers),"enums");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decFuncMembers),"functions");
+  generatePerlModSection(gd,gd->getMemberList(MemberListType_decVarMembers),"variables");
 
   addPerlModDocBlock(m_output,"brief",gd->getDefFileName(),gd->getDefLine(),0,0,gd->briefDescription());
   addPerlModDocBlock(m_output,"detailed",gd->getDefFileName(),gd->getDefLine(),0,0,gd->documentation());
@@ -2138,9 +2125,9 @@ void PerlModGenerator::generatePerlModForPage(PageDef *pd)
   m_output.openHash()
     .addFieldQuotedString("name", pd->name());
     
-  SectionInfo *si = Doxygen::sectionDict.find(pd->name());
+  SectionInfo *si = Doxygen::sectionDict->find(pd->name());
   if (si)
-    m_output.addFieldQuotedString("title", si->title);
+    m_output.addFieldQuotedString("title4", filterTitle(si->title));
 
   addPerlModDocBlock(m_output,"detailed",pd->docFile(),pd->docLine(),0,0,pd->documentation());
   m_output.closeHash();
@@ -2235,13 +2222,13 @@ bool PerlModGenerator::createOutputDir(QDir &perlModDir)
       dir.setPath(QDir::currentDirPath());
       if (!dir.mkdir(outputDirectory))
       {
-	err("error: tag OUTPUT_DIRECTORY: Output directory `%s' does not "
+	err("tag OUTPUT_DIRECTORY: Output directory `%s' does not "
 	    "exist and cannot be created\n",outputDirectory.data());
 	exit(1);
       }
-      else if (!Config_getBool("QUIET"))
+      else
       {
-	err("notice: Output directory `%s' does not exist. "
+	msg("Notice: Output directory `%s' does not exist. "
 	    "I have created it for you.\n", outputDirectory.data());
       }
       dir.cd(outputDirectory);

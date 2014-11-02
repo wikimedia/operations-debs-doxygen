@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: outputgen.h,v 1.48 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,13 +18,11 @@
 #ifndef OUTPUTGEN_H
 #define OUTPUTGEN_H
 
-#include "qtbc.h"
-#include "ftextstream.h"
-#include <qbuffer.h>
-#include <qfile.h>
 #include <qstack.h>
+
 #include "index.h"
 #include "section.h"
+#include "ftextstream.h"
 
 class ClassDiagram;
 class DotClassGraph;
@@ -37,6 +35,24 @@ class DocNode;
 class MemberDef;
 class GroupDef;
 class Definition;
+class QFile;
+
+struct DocLinkInfo
+{
+  QCString name;
+  QCString ref;
+  QCString url;
+  QCString anchor;
+};
+
+struct SourceLinkInfo
+{
+  QCString file;
+  int line;
+  QCString ref;
+  QCString url;
+  QCString anchor;
+};
 
 /** Output interface for code parser. 
  */
@@ -44,7 +60,8 @@ class CodeOutputInterface
 {
   public:
     virtual ~CodeOutputInterface() {}
-    /*! Writes an ASCII string to the output. This function should keep 
+
+    /*! Writes an code fragment to the output. This function should keep 
      *  spaces visible, should break lines at a newline and should convert 
      *  tabs to the right number of spaces.
      */
@@ -63,17 +80,52 @@ class CodeOutputInterface
                                const char *anchor,const char *name,
                                const char *tooltip) = 0;
 
+    /*! Writes the line number of a source listing
+     *  \param ref        External reference (when imported from a tag file)
+     *  \param file       The file part of the URL pointing to the docs.
+     *  \param anchor     The anchor part of the URL pointing to the docs.
+     *  \param lineNumber The line number to write
+     */
     virtual void writeLineNumber(const char *ref,const char *file,
                                  const char *anchor,int lineNumber) = 0;
+
+    /*! Writes a tool tip definition 
+     *  \param id       unique identifier for the tooltip
+     *  \param docInfo  Info about the symbol's documentation.
+     *  \param decl     full declaration of the symbol (for functions)
+     *  \param desc     brief description for the symbol
+     *  \param defInfo  Info about the symbol's definition in the source code
+     *  \param declInfo Info about the symbol's declaration in the source code
+     */
+    virtual void writeTooltip(const char *id, 
+                              const DocLinkInfo &docInfo,
+                              const char *decl,
+                              const char *desc,
+                              const SourceLinkInfo &defInfo,
+                              const SourceLinkInfo &declInfo
+                             ) = 0;
+                              
     virtual void startCodeLine(bool hasLineNumbers) = 0;
+
+    /*! Ends a line of code started with startCodeLine() */
     virtual void endCodeLine() = 0;
-    virtual void startCodeAnchor(const char *label) = 0;
-    virtual void endCodeAnchor() = 0;
-    virtual void startFontClass(const char *) = 0;
+
+    /*! Starts a block with a certain meaning. Used for syntax highlighting,
+     *  which elements of the same type are rendered using the same 'font class'.
+     *  \param clsName The category name.
+     */
+    virtual void startFontClass(const char *clsName) = 0;
+
+    /*! Ends a block started with startFontClass() */
     virtual void endFontClass() = 0;
+
+    /*! Write an anchor to a source listing.
+     *  \param name The name of the anchor.
+     */
     virtual void writeCodeAnchor(const char *name) = 0;
-    virtual void linkableSymbol(int line,const char *symName,
-                 Definition *symDef,Definition *context) = 0;
+
+    virtual void setCurrentDoc(Definition *context,const char *anchor,bool isSourceFile) = 0;
+    virtual void addWord(const char *word,bool hiPriority) = 0;
 };
 
 /** Base Interface used for generating output outside of the
@@ -97,9 +149,7 @@ class BaseOutputDocInterface : public CodeOutputInterface
                         Examples 
                       };
 
-    virtual void parseDoc(const char *,int, const char *,MemberDef *,
-                          const QCString &,bool)  {} 
-    virtual void parseText(const QCString &)  {}
+    virtual bool parseText(const QCString &s)  { return s.isEmpty(); }
     
     /*! Start of a bullet list: e.g. \c \<ul\> in html. startItemListItem() is
      *  Used for the bullet items.
@@ -247,7 +297,7 @@ class BaseOutputDocInterface : public CodeOutputInterface
     virtual void addIndexItem(const char *s1,const char *s2) = 0;
 
     virtual void writeNonBreakableSpace(int) = 0;
-    virtual void startDescTable() = 0;
+    virtual void startDescTable(const char *title) = 0;
     virtual void endDescTable() = 0;
     virtual void startDescTableTitle() = 0;
     virtual void endDescTableTitle() = 0;
@@ -294,7 +344,7 @@ class OutputGenerator : public BaseOutputDocInterface
     //void setEncoding(const QCString &enc) { encoding = enc; }
     //virtual void postProcess(QByteArray &) { }
 
-    virtual void printDoc(DocNode *,const char *langExt) = 0;
+    virtual void writeDoc(DocNode *,Definition *ctx,MemberDef *md) = 0;
 
     ///////////////////////////////////////////////////////////////
     // structural output interface
@@ -343,7 +393,7 @@ class OutputGenerator : public BaseOutputDocInterface
     virtual void startMemberItem(const char *,int,const char *) = 0;
     virtual void endMemberItem() = 0;
     virtual void startMemberTemplateParams() = 0;
-    virtual void endMemberTemplateParams(const char *) = 0;
+    virtual void endMemberTemplateParams(const char *,const char *) = 0;
     virtual void startMemberGroupHeader(bool) = 0;
     virtual void endMemberGroupHeader() = 0;
     virtual void startMemberGroupDocs() = 0;
@@ -364,6 +414,8 @@ class OutputGenerator : public BaseOutputDocInterface
     virtual void writeEndAnnoItem(const char *name) = 0;
     virtual void startMemberDescription(const char *anchor,const char *inheritId) = 0;
     virtual void endMemberDescription() = 0;
+    virtual void startMemberDeclaration() = 0;
+    virtual void endMemberDeclaration(const char *anchor,const char *inheritId) = 0;
     virtual void writeInheritedSectionTitle(const char *id,const char *ref,
                                             const char *file,const char *anchor,
                                             const char *title,const char *name) = 0;
@@ -405,6 +457,7 @@ class OutputGenerator : public BaseOutputDocInterface
     virtual void endParameterName(bool,bool,bool) = 0;
     virtual void startParameterList(bool) = 0;
     virtual void endParameterList() = 0;
+    virtual void exceptionEntry(const char*,bool) = 0;
 
     virtual void startConstraintList(const char *) = 0;
     virtual void startConstraintParam() = 0;
@@ -478,7 +531,7 @@ class OutputDocInterface : public BaseOutputDocInterface
     /*! Enables a specific output format (useful for OutputList only) */
     virtual void enable(OutputGenerator::OutputType o) = 0;
 
-    /*! Check whether a specific output format is currenly enabled 
+    /*! Check whether a specific output format is currently enabled 
      *  (useful for OutputList only) 
      */
     virtual bool isEnabled(OutputGenerator::OutputType o) = 0;

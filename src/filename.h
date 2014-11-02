@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: filename.h,v 1.10 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,22 +18,22 @@
 #ifndef FILENAME_H
 #define FILENAME_H
 
-#include "qtbc.h"
 #include <qdict.h>
+#include <qlist.h>
 #include "filedef.h"
 
 /** Class representing all files with a certain base name */
 class FileName : public FileList
-{ 
+{
   public:
     FileName(const char *fn,const char *name);
    ~FileName();
     const char *fileName() const { return name; }
     const char *fullName() const { return fName; }
     void generateDiskNames();
-    int compareItems(GCI item1,GCI item2);
 
   private:
+    int compareValues(const FileDef *item1,const FileDef *item2) const;
     QCString name;
     QCString fName;
 };
@@ -52,7 +52,8 @@ class FileNameList : public QList<FileName>
     FileNameList();
    ~FileNameList();
     void generateDiskNames();
-    int compareItems(GCI item1,GCI item2);
+  private:
+    int compareValues(const FileName *item1,const FileName *item2) const;
 };
 
 /** Iterator for FileName objects in a FileNameList. */
@@ -66,8 +67,7 @@ class FileNameListIterator : public QListIterator<FileName>
 class FileNameDict : public QDict<FileName>
 {
   public:
-    FileNameDict(uint size) : 
-       QDict<FileName>(size,Config_getBool("CASE_SENSE_NAMES")) {}
+    FileNameDict(uint size);
    ~FileNameDict() {}
 };
 

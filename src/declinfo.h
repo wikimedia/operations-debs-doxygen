@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: declinfo.h,v 1.8 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,8 +18,8 @@
 #ifndef DECLINFO_H
 #define DECLINFO_H
 
-#include "qtbc.h"
 #include <stdio.h>
+#include <qcstring.h>
 
 extern void parseFuncDecl(const QCString &decl,
                           bool objC,

@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -19,18 +19,15 @@
  * 15 Dec 2001 : Translation to greek by
  *               Harry Kalogirou <no email>
  *
- * 01 Jan 2009 : Greek maintainance by
+ * 01 Jan 2009 : Greek maintenance by
  *               Paul Gessos <gessos.paul@yahoo.gr>
  */
 
 #ifndef TRANSLATOR_GR_H
 #define TRANSLATOR_GR_H
 
-class TranslatorGreek : public TranslatorAdapter_1_8_0
+class TranslatorGreek : public TranslatorAdapter_1_8_4
 {
-  protected:
-    friend class TranslatorAdapterBase;
-
   public:
 
     // --- Language control methods -------------------
@@ -48,12 +45,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
     {
       //return "\\usepackage[greek,english]{babel}\n\\usepackage[iso-8859-7]{inputenc}\n";
       return "\\usepackage[greek,english]{babel}\n";
-    }
-
-    /*! return the language charset. This will be used for the HTML output */
-    virtual QCString idLanguageCharset()
-    {
-        return "utf-8";
     }
 
     // --- Language translation methods -------------------
@@ -398,12 +389,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
     { return "Ορισμοί"; }
 
     /*! This is used in the documentation of a file as a header before the
-     *  list of function prototypes
-     */
-    virtual QCString trFuncProtos()
-    { return "Πρωτοτυπήσεις Συναρτήσεων"; }
-
-    /*! This is used in the documentation of a file as a header before the
      *  list of typedefs
      */
     virtual QCString trTypedefs()
@@ -438,12 +423,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
      */
     virtual QCString trDefineDocumentation()
     { return "Τεκμηρίωση Ορισμών"; }
-
-    /*! This is used in the documentation of a file/namespace before the list
-     *  of documentation blocks for function prototypes
-     */
-    virtual QCString trFunctionPrototypeDocumentation()
-    { return "Τεκμηρίωση Πρωτοτυπήσεων των Συναρτήσεων"; }
 
     /*! This is used in the documentation of a file/namespace before the list
      *  of documentation blocks for typedefs
@@ -493,12 +472,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
       if (projName) result+=(QCString)" για "+projName;
       result+=(QCString)" από";
       return result;
-    }
-    /*! This is part of the sentence used in the standard footer of each page.
-     */
-    virtual QCString trWrittenBy()
-    {
-      return "γραμμένο από τον ";
     }
 
     /*! this text is put before a class diagram */
@@ -589,15 +562,16 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
       if (isTemplate) result+=" Προτύπου";
       switch(compType)
       {
-        case ClassDef::Class:      result+=" Κλάσης"; break;
-        case ClassDef::Struct:     result+=" Δομής"; break;
-        case ClassDef::Union:      result+=" Ένωσης"; break;
-        case ClassDef::Interface:  result+=" Διαπροσωπίας"; break;
-        case ClassDef::Protocol:   result+=" Πρωτοκόλλου"; break;
-        case ClassDef::Category:   result+=" Κατηγορίας"; break;
-        case ClassDef::Exception:  result+=" Εξαίρεσης"; break;
+        case ClassDef::Class:      result+=" Κλάσης "; break;
+        case ClassDef::Struct:     result+=" Δομής "; break;
+        case ClassDef::Union:      result+=" Ένωσης "; break;
+        case ClassDef::Interface:  result+=" Διασύνδεσης "; break;
+        case ClassDef::Protocol:   result+=" Πρωτοκόλλου "; break;
+        case ClassDef::Category:   result+=" Κατηγορίας "; break;
+        case ClassDef::Exception:  result+=" Εξαίρεσης "; break;
+        default: break;
       }
-	  result+=clName;
+      result+=clName;
       return result;
     }
 
@@ -748,23 +722,18 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
       switch(compType)
       {
         case ClassDef::Class:      result+="αυτή την κλάση"; break;
-        case ClassDef::Struct:     result+="αυτή η δομή"; break;
-        case ClassDef::Union:      result+="αυτή η ένωση"; break;
-        case ClassDef::Interface:  result+="αυτή η διαπροσωπία"; break;
-        case ClassDef::Protocol:   result+="Πρωτόκολλο"; break;
-        case ClassDef::Category:   result+="Κατηγορία"; break;
-        case ClassDef::Exception:  result+="αυτή η εξαίρεση"; break;
+        case ClassDef::Struct:     result+="αυτή τη δομή"; break;
+        case ClassDef::Union:      result+="αυτή την ένωση"; break;
+        case ClassDef::Interface:  result+="αυτή τη διασύνδεση"; break;
+        case ClassDef::Protocol:   result+="αυτό το πρωτόκολλο"; break;
+        case ClassDef::Category:   result+="αυτή την κατηγορία"; break;
+        case ClassDef::Exception:  result+="αυτή την εξαίρεση"; break;
+        default: break;
       }
       result+=" δημιουργήθηκε απο τ";
       if (single) result+="ο ακόλουθο αρχείο:"; else result+="α ακόλουθα αρχεία:";
       return result;
     }
-
-    /*! This is in the (quick) index as a link to the alphabetical compound
-     * list.
-     */
-    virtual QCString trAlphabeticalList()
-    { return "Αλφαβητική Λίστα"; }
 
 //////////////////////////////////////////////////////////////////////////
 // new since 0.49-990901
@@ -1069,16 +1038,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
     }
 
 //////////////////////////////////////////////////////////////////////////
-// new since 1.2.1
-//////////////////////////////////////////////////////////////////////////
-
-    /*! Used as a section header for KDE-2 IDL methods */
-    virtual QCString trDCOPMethods()
-    {
-      return "Μέδοδοι DCOP";
-    }
-
-//////////////////////////////////////////////////////////////////////////
 // new since 1.2.2
 //////////////////////////////////////////////////////////////////////////
 
@@ -1186,11 +1145,10 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
 
 
     /*! Used as ansicpg for RTF fcharset
-     *  \see trRTFansicp() for a table of possible values.
      */
     virtual QCString trRTFCharSet()
     {
-      return "0";
+      return "161";
     }
 
     /*! Used as header RTF general index */
@@ -1421,14 +1379,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
 // new since 1.3.3
 //////////////////////////////////////////////////////////////////////////
 
-    /*! When the search engine is enabled this text is put in the header
-     *  of each page before the field where one can enter the text to search
-     *  for.
-     */
-    virtual QCString trSearchForIndex()
-    {
-      return "Αναζήτηση για";
-    }
     /*! This string is used as the title for the page listing the search
      *  results.
      */
@@ -1549,7 +1499,7 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
       return "Το διάγραμμα δείχνει από ποιές συναρτήσεις καλείται αυτή η συνάρτηση:";
     }
 
-    /*! This is used in the documentation of a file/namespace before the list 
+    /*! This is used in the documentation of a file/namespace before the list
      *  of documentation blocks for enumeration values
      */
     virtual QCString trEnumerationValueDocumentation()
@@ -1654,6 +1604,7 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
         case ClassDef::Protocol:   result+=" Πρωτόκολλο"; break;
         case ClassDef::Category:   result+=" Κατηγορία"; break;
         case ClassDef::Exception:  result+=" Εξαίρεση"; break;
+        default: break;
       }
       if (isTemplate) result+=" Πρότυπο";
       result+=" Δήλωση";
@@ -1721,6 +1672,7 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
         case ClassDef::Protocol:   result+="αυτό το πρωτόκολλο"; break;
         case ClassDef::Category:   result+="αυτή την κατηγορία"; break;
         case ClassDef::Exception:  result+="αυτή την εξαίρεση"; break;
+        default: break;
       }
       result+=" δημιουργήθηκε από ";
       if (single) result+="το παρακάτω αρχείο:"; else result+="τα παρακάτω αρχεία:";
@@ -1792,12 +1744,6 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
 // new since 1.6.3 (missing items for the directory pages)
 //////////////////////////////////////////////////////////////////////////
 
-    /*! introduction text for the directory dependency graph */
-    virtual QCString trDirDependency(const char *name)
-    {
-      return (QCString)"Διάγραμμα εξάρτησης φακέλου για το "+name;
-    }
-
     /*! when clicking a directory dependency label, a page with a
      *  table is shown. The heading for the first column mentions the
      *  source file that has a relation to another file.
@@ -1816,7 +1762,7 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
       return (QCString)"Εσωκλείει το αρχείο στο "+name;
     }
 
-    /** Compiles a date string. 
+    /** Compiles a date string.
      *  @param year Year in 4 digits
      *  @param month Month of the year: 1=January
      *  @param day Day of the Month: 1..31
@@ -1858,6 +1804,118 @@ class TranslatorGreek : public TranslatorAdapter_1_8_0
     /*! Header for the graph showing the directory dependencies */
     virtual QCString trDirDepGraph(const char *name)
     { return QCString("Διάγραμμα εξάρτησης φακέλων για ")+name+":"; }
+
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.0
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Detail level selector shown for hierarchical indices */
+    virtual QCString trDetailLevel()
+    { return "Επίπεδο λεπτομέρειας"; }
+
+    /*! Section header for list of template parameters */
+    virtual QCString trTemplateParameters()
+    { return "Παράμετροι Προτύπου"; }
+
+    /*! Used in dot graph when UML_LOOK is enabled and there are many fields */
+    virtual QCString trAndMore(const QCString &number)
+    { return "και "+number+" ακόμη..."; }
+
+    /*! Used file list for a Java enum */
+    virtual QCString trEnumGeneratedFromFiles(bool single)
+    { QCString result = "Η τεκμηρίωση αυτής της απαρίθμησης δημιουργήθηκε από ";
+      if (single) result += "τo αρχείo"; else result += "τα αρχεία";
+      result+=":";
+      return result;
+    }
+
+    /*! Header of a Java enum page (Java enums are represented as classes). */
+    virtual QCString trEnumReference(const char *name)
+    { return QCString("Αναφορά Απαρίθμησης ") + QCString(name); }
+
+    /*! Used for a section containing inherited members */
+    virtual QCString trInheritedFrom(const char *members,const char *what)
+    { return QCString(members)+" κληρονόμησαν από "+what; }
+
+    /*! Header of the sections with inherited members specific for the
+     *  base class(es)
+     */
+    virtual QCString trAdditionalInheritedMembers()
+    { return "Επιπρόσθετες Κληρονομημένες Μέθοδοι"; }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.2
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Used as a tooltip for the toggle button that appears in the
+     *  navigation tree in the HTML output when GENERATE_TREEVIEW is
+     *  enabled. This tooltip explains the meaning of the button.
+     */
+    virtual QCString trPanelSynchronisationTooltip(bool enable)
+    {
+      QCString opt = enable ? "ενεργοποιήσετε" : "απενεργοποιήσετε";
+      return "Κάντε κλικ για να "+opt+" το συγχρονισμό του παραθύρου";
+    }
+
+    /*! Used in a method of an Objective-C class that is declared in a
+     *  a category. Note that the @1 marker is required and is replaced
+     *  by a link.
+     */
+    virtual QCString trProvidedByCategory()
+    {
+      return "Παρέχεται από την κατηγορία @1.";
+    }
+
+    /*! Used in a method of an Objective-C category that extends a class.
+     *  Note that the @1 marker is required and is replaced by a link to
+     *  the class method.
+     */
+    virtual QCString trExtendsClass()
+    {
+      return "Κληρονομει την κλάση @1.";
+    }
+
+    /*! Used as the header of a list of class methods in Objective-C.
+     *  These are similar to static public member functions in C++.
+     */
+    virtual QCString trClassMethods()
+    {
+      return "Μέθοδοι Κλάσης";
+    }
+
+    /*! Used as the header of a list of instance methods in Objective-C.
+     *  These are similar to public member functions in C++.
+     */
+    virtual QCString trInstanceMethods()
+    {
+      return "Μέθοδοι Αντικειμένου";
+    }
+
+    /*! Used as the header of the member functions of an Objective-C class.
+     */
+    virtual QCString trMethodDocumentation()
+    {
+      return "Τεκμηρίωση Μεθόδου";
+    }
+
+    /*! Used as the title of the design overview picture created for the
+     *  VHDL output.
+     */
+    virtual QCString trDesignOverview()
+    {
+      return "Επισκόπηση σχεδίασης";
+    }
+
+
+/* Future strategy of changes
+	Many words have more clear meaning in English and not in Greek:
+	template -> πρότυπο
+	instance -> αντικείμενο? (μπορεί να μιλάμε για template instantiation ή class instantiation)
+	interface -> διασύνδεση
+*/
+
+//////////////////////////////////////////////////////////////////////////
 
 };
 

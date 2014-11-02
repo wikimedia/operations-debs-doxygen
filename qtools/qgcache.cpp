@@ -36,7 +36,7 @@
 **********************************************************************/
 
 #include "qgcache.h"
-#include "qlist.h"
+#include "qinternallist.h"
 #include "qdict.h"
 #include "qstring.h"
 
@@ -73,7 +73,7 @@ struct QCacheItem
   QCList class (internal list of cache items)
  *****************************************************************************/
 
-class QCList : private QList<QCacheItem>
+class QCList : private QInternalList<QCacheItem>
 {
 friend class QGCacheIterator;
 friend class QCListIt;
@@ -88,13 +88,13 @@ public:
 
     void	setAutoDelete( bool del ) { QCollection::setAutoDelete(del); }
 
-    bool	removeFirst()	{ return QList<QCacheItem>::removeFirst(); }
-    bool	removeLast()	{ return QList<QCacheItem>::removeLast(); }
+    bool	removeFirst()	{ return QInternalList<QCacheItem>::removeFirst(); }
+    bool	removeLast()	{ return QInternalList<QCacheItem>::removeLast(); }
 
-    QCacheItem *first()		{ return QList<QCacheItem>::first(); }
-    QCacheItem *last()		{ return QList<QCacheItem>::last(); }
-    QCacheItem *prev()		{ return QList<QCacheItem>::prev(); }
-    QCacheItem *next()		{ return QList<QCacheItem>::next(); }
+    QCacheItem *first()		{ return QInternalList<QCacheItem>::first(); }
+    QCacheItem *last()		{ return QInternalList<QCacheItem>::last(); }
+    QCacheItem *prev()		{ return QInternalList<QCacheItem>::prev(); }
+    QCacheItem *next()		{ return QInternalList<QCacheItem>::next(); }
 
 #if defined(DEBUG)
     int		inserts;			// variables for statistics
@@ -125,7 +125,7 @@ void QCList::insert( QCacheItem *ci )
 	item = next();
     }
     if ( item )
-	QList<QCacheItem>::insert( at(), ci );
+	QInternalList<QCacheItem>::insert( at(), ci );
     else
 	append( ci );
 #if defined(DEBUG)
@@ -136,7 +136,7 @@ void QCList::insert( QCacheItem *ci )
 
 inline void QCList::insert( int i, QCacheItem *ci )
 {
-    QList<QCacheItem>::insert( i, ci );
+    QInternalList<QCacheItem>::insert( i, ci );
 #if defined(DEBUG)
     ASSERT( ci->node == 0 );
 #endif
@@ -166,11 +166,11 @@ inline void QCList::reference( QCacheItem *ci )
 }
 
 
-class QCListIt: public QListIterator<QCacheItem>
+class QCListIt: public QInternalListIterator<QCacheItem>
 {
 public:
-    QCListIt( const QCList *p ): QListIterator<QCacheItem>( *p ) {}
-    QCListIt( const QCListIt *p ): QListIterator<QCacheItem>( *p ) {}
+    QCListIt( const QCList *p ): QInternalListIterator<QCacheItem>( *p ) {}
+    QCListIt( const QCListIt *p ): QInternalListIterator<QCacheItem>( *p ) {}
 };
 
 
@@ -216,7 +216,7 @@ public:
     bool  remove_ascii( QCacheItem *item )
 	{ return QGDict::remove_ascii((const char *)item->key,item); }
     bool  remove_int( QCacheItem *item )
-	{ return QGDict::remove_int((long)item->key,item);}
+	{ return QGDict::remove_int((intptr_t)item->key,item);}
 
     void  statistics()			{ QGDict::statistics(); }
 };
@@ -406,7 +406,7 @@ bool QGCache::insert_other( const char *key, QCollection::Item data,
     if ( keytype == AsciiKey )
 	dict->insert_ascii( key, ci );
     else
-	dict->insert_int( (long)key, ci );
+	dict->insert_int( (intptr_t)key, ci );
     tCost += cost;
     return TRUE;
 }
@@ -469,7 +469,7 @@ QCollection::Item QGCache::take_other( const char *key )
     if ( keytype == AsciiKey )
 	ci = dict->take_ascii( key );
     else
-	ci = dict->take_int( (long)key );
+	ci = dict->take_int( (intptr_t)key );
     Item d;
     if ( ci ) {
 	d = ci->data;
@@ -549,7 +549,7 @@ QCollection::Item QGCache::find_string( const QString &key, bool ref ) const
 QCollection::Item QGCache::find_other( const char *key, bool ref ) const
 {
     QCacheItem *ci = keytype == AsciiKey ? dict->find_ascii(key)
-					 : dict->find_int((long)key);
+					 : dict->find_int((intptr_t)key);
 #if defined(DEBUG)
     lruList->finds++;
 #endif
@@ -816,10 +816,10 @@ const char *QGCacheIterator::getKeyAscii() const
   Returns the key of the current item, as a long.
 */
 
-long QGCacheIterator::getKeyInt() const
+intptr_t QGCacheIterator::getKeyInt() const
 {
     QCacheItem *item = it->current();
-    return item ? (long)item->key : 0;
+    return item ? (intptr_t)item->key : 0;
 }
 
 /*!

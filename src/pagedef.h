@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id:$
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -14,6 +14,9 @@
  * input used in their production; they are not affected by this license.
  *
  */
+
+#ifndef PAGEDEF_H
+#define PAGEDEF_H
 
 #include "definition.h"
 #include "sortdict.h"
@@ -29,7 +32,7 @@ class PageDef : public Definition
    ~PageDef();
 
     // setters
-    void setFileName(const char *name) { m_fileName = name; }
+    void setFileName(const char *name,bool dontEscape);
     void setShowToc(bool b);
 
     // getters
@@ -67,7 +70,6 @@ class PageDef : public Definition
     void writePageDocumentation(OutputList &ol);
     QCString m_fileName;
     QCString m_title;
-    GroupDef *m_inGroup;
     PageSDict *m_subPageDict;                 // list of pages in the group
     Definition *m_pageScope;
     int m_nestingLevel;
@@ -79,9 +81,12 @@ class PageSDict : public SDict<PageDef>
   public:
     PageSDict(int size) : SDict<PageDef>(size) {}
     virtual ~PageSDict() {}
-    int compareItems(GCI i1,GCI i2)
+  private:
+    int compareValues(const PageDef *i1,const PageDef *i2) const
     {
-      return stricmp(((PageDef *)i1)->name(),((PageDef *)i2)->name());
+      return qstricmp(i1->name(),i2->name());
     }
 };
+
+#endif
 

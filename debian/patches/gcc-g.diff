@@ -4,7 +4,7 @@ Index: b/tmake/lib/linux-64/tmake.conf
 +++ b/tmake/lib/linux-64/tmake.conf
 @@ -11,7 +11,7 @@
  TMAKE_CFLAGS		= -pipe
- TMAKE_CFLAGS_WARN_ON	= -Wall -W -fno-exceptions
+ TMAKE_CFLAGS_WARN_ON	= -Wall -W 
  TMAKE_CFLAGS_WARN_OFF	=
 -TMAKE_CFLAGS_RELEASE	= -O2
 +TMAKE_CFLAGS_RELEASE	= -g -O2
@@ -17,7 +17,7 @@ Index: b/tmake/lib/linux-g++/tmake.conf
 +++ b/tmake/lib/linux-g++/tmake.conf
 @@ -11,7 +11,7 @@
  TMAKE_CFLAGS		= -pipe 
- TMAKE_CFLAGS_WARN_ON	= -Wall -W -fno-exceptions
+ TMAKE_CFLAGS_WARN_ON	= -Wall -W 
  TMAKE_CFLAGS_WARN_OFF	=
 -TMAKE_CFLAGS_RELEASE	= -O2
 +TMAKE_CFLAGS_RELEASE	= -g -O2

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -24,8 +24,6 @@
 #ifndef FTVHELP_H
 #define FTVHELP_H
 
-#include "qtbc.h"
-#include <qtextstream.h>
 #include <qlist.h>
 #include "index.h"
 
@@ -53,7 +51,7 @@ class FTVHelp : public IndexIntf
                          bool separateIndex,
                          bool addToNavIndex,
                          Definition *def);
-    void addIndexItem(Definition *,MemberDef *,const char *) {}
+    void addIndexItem(Definition *,MemberDef *,const char *,const char *) {}
     void addIndexFile(const char *) {}
     void addImageFile(const char *) {}
     void addStyleSheetFile(const char *) {}
@@ -66,7 +64,7 @@ class FTVHelp : public IndexIntf
     //bool generateJSTree(FTextStream &tidx,FTextStream &t,const QList<FTVNode> &nl,int level,bool &first);
     //bool generateJSTreeTopLevel(FTextStream &tidx,FTextStream &t,const QList<FTVNode> &nl,int level,bool &first);
     QCString generateIndentLabel(FTVNode *n,int level);
-    void generateIndent(FTextStream &t,FTVNode *n,int level,bool opened);
+    void generateIndent(FTextStream &t,FTVNode *n,bool opened);
     void generateLink(FTextStream &t,FTVNode *n);
     //void generateJSLink(FTextStream &t,FTVNode *n);
     QList<FTVNode> *m_indentNodes;

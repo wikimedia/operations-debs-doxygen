@@ -1,9 +1,9 @@
-Index: b/doc/doxygen.1
+Index: doxygen/doc/doxygen.1
 ===================================================================
---- a/doc/doxygen.1
-+++ b/doc/doxygen.1
-@@ -44,3 +44,6 @@
- Doxygen version VERSION, Copyright Dimitri van Heesch 1997-2012
+--- doxygen.orig/doc/doxygen.1	2014-05-16 19:41:59.000000000 +0200
++++ doxygen/doc/doxygen.1	2014-05-16 19:41:59.000000000 +0200
+@@ -48,3 +48,6 @@
+ Doxygen version VERSION, Copyright Dimitri van Heesch 1997-2014
  .SH SEE ALSO
  doxywizard(1).
 +.PP

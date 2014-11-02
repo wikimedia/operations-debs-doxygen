@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  * Copyright (C) 2010-2011 by Rene Zaumseil
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -29,13 +29,18 @@ class TclLanguageScanner : public ParserInterface
 {
   public:
     virtual ~TclLanguageScanner() {}
+    void startTranslationUnit(const char *) {}
+    void finishTranslationUnit() {}
     void parseInput(const char *fileName,
                     const char *fileBuf,
-                    Entry *root);
+                    Entry *root,
+                    bool sameTranslationUnit,
+                    QStrList &filesInSameTranslationUnit);
     bool needsPreprocessing(const QCString &extension);
     void parseCode(CodeOutputInterface &codeOutIntf,
                    const char *scopeName,
                    const QCString &input,
+                   SrcLangExt lang,
                    bool isExampleBlock,
                    const char *exampleName=0,
                    FileDef *fileDef=0,
@@ -43,7 +48,9 @@ class TclLanguageScanner : public ParserInterface
                    int endLine=-1,
                    bool inlineFragment=FALSE,
                    MemberDef *memberDef=0,
-                   bool showLineNumbers=TRUE
+                   bool showLineNumbers=TRUE,
+                   Definition *searchCtx=0,
+                   bool collectXRefs=TRUE
                   );
     void resetCodeParserState();
     void parsePrototype(const char *text);

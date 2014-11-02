@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: membergroup.cpp,v 1.19 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -15,7 +15,6 @@
  *
  */
 
-#include "qtbc.h"
 #include "membergroup.h"
 #include "memberlist.h"
 #include "outputlist.h"
@@ -46,7 +45,7 @@ MemberGroup::MemberGroup(Definition *parent,
       int id,const char *hdr,const char *d,const char *docFile) 
 {
   //printf("New member group id=%d header=%s desc=%s\n",id,hdr,d);
-  memberList      = new MemberList(MemberList::memberGroup);
+  memberList      = new MemberList(MemberListType_memberGroup);
   grpId           = id;
   grpHeader       = hdr;
   doc             = d;
@@ -76,7 +75,7 @@ void MemberGroup::insertMember(MemberDef *md)
   //       md->getSectionList(m_parent),
   //       md,md->name().data());
 
-  MemberDef *firstMd = memberList->first();
+  MemberDef *firstMd = memberList->getFirst();
   if (inSameSection && memberList->count()>0 && 
       firstMd->getSectionList(m_parent)!=md->getSectionList(m_parent))
   {
@@ -101,9 +100,9 @@ void MemberGroup::insertMember(MemberDef *md)
 }
 
 
-void MemberGroup::setAnchors(ClassDef *context)
+void MemberGroup::setAnchors()
 {
-  ::setAnchors(context,'z',memberList,grpId);
+  ::setAnchors(memberList);
 }
 
 void MemberGroup::writeDeclarations(OutputList &ol,
@@ -113,7 +112,7 @@ void MemberGroup::writeDeclarations(OutputList &ol,
   //printf("MemberGroup::writeDeclarations() %s\n",grpHeader.data());
   QCString ldoc = doc;
   if (!ldoc.isEmpty()) ldoc.prepend("<a name=\""+anchor()+"\" id=\""+anchor()+"\"></a>");
-  memberList->writeDeclarations(ol,cd,nd,fd,gd,grpHeader,ldoc,FALSE,showInline);
+  memberList->writeDeclarations(ol,cd,nd,fd,gd,grpHeader,ldoc,DefinitionIntf::TypeGroup,FALSE,showInline);
 }
 
 void MemberGroup::writePlainDeclarations(OutputList &ol,
@@ -122,7 +121,7 @@ void MemberGroup::writePlainDeclarations(OutputList &ol,
               )
 {
   //printf("MemberGroup::writePlainDeclarations() memberList->count()=%d\n",memberList->count());
-  memberList->writePlainDeclarations(ol,cd,nd,fd,gd,inheritedFrom,inheritId);
+  memberList->writePlainDeclarations(ol,cd,nd,fd,gd,DefinitionIntf::TypeGroup,inheritedFrom,inheritId);
 }
 
 void MemberGroup::writeDocumentation(OutputList &ol,const char *scopeName,
@@ -138,7 +137,7 @@ void MemberGroup::writeDocumentationPage(OutputList &ol,const char *scopeName,
 }
 
 void MemberGroup::addGroupedInheritedMembers(OutputList &ol,ClassDef *cd,
-               MemberList::ListType lt,
+               MemberListType lt,
                ClassDef *inheritedFrom,const QCString &inheritId)
 {
   //printf("** addGroupedInheritedMembers()\n");
@@ -151,12 +150,12 @@ void MemberGroup::addGroupedInheritedMembers(OutputList &ol,ClassDef *cd,
     {
       MemberList ml(lt);
       ml.append(md);
-      ml.writePlainDeclarations(ol,cd,0,0,0,inheritedFrom,inheritId);
+      ml.writePlainDeclarations(ol,cd,0,0,0,DefinitionIntf::TypeGroup,inheritedFrom,inheritId);
     }
   }
 }
 
-int MemberGroup::countGroupedInheritedMembers(MemberList::ListType lt)
+int MemberGroup::countGroupedInheritedMembers(MemberListType lt)
 {
   //printf("** countGroupedInheritedMembers()\n");
   int count=0;
@@ -216,8 +215,9 @@ int MemberGroup::countInheritableMembers(ClassDef *inheritedFrom) const
 void MemberGroup::distributeMemberGroupDocumentation()
 {
   //printf("MemberGroup::distributeMemberGroupDocumentation() %s\n",grpHeader.data());
-  MemberDef *md=memberList->first();
-  while (md)
+  MemberListIterator li(*memberList);
+  MemberDef *md;
+  for (li.toFirst();(md=li.current());++li)
   {
     //printf("checking md=%s\n",md->name().data());
     // find the first member of the group with documentation
@@ -229,16 +229,15 @@ void MemberGroup::distributeMemberGroupDocumentation()
       //printf("found it!\n");
       break;
     }
-    md=memberList->next();
   }
   if (md) // distribute docs of md to other members of the list
   {
     //printf("Member %s has documentation!\n",md->name().data());
-    MemberDef *omd=memberList->first();
-    while (omd)
+    MemberDef *omd;
+    for (li.toFirst();(omd=li.current());++li)
     {
-      if (md!=omd && omd->documentation().isEmpty() && 
-                     omd->briefDescription().isEmpty() && 
+      if (md!=omd && omd->documentation().isEmpty() &&
+                     omd->briefDescription().isEmpty() &&
                      omd->inbodyDocumentation().isEmpty()
          )
       {
@@ -247,7 +246,6 @@ void MemberGroup::distributeMemberGroupDocumentation()
         omd->setDocumentation(md->documentation(),md->docFile(),md->docLine());
         omd->setInbodyDocumentation(md->inbodyDocumentation(),md->inbodyFile(),md->inbodyLine());
       }
-      omd=memberList->next();
     }
   }
 }

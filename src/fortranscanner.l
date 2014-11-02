@@ -45,7 +45,6 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "qtbc.h"
 #include <qarray.h>
 #include <qstack.h>
 #include <qregexp.h>
@@ -66,9 +65,12 @@
 #include "pre.h"
 #include "arguments.h"
 
-#define YY_NEVER_INTERACTIVE 1
+// Toggle for some debugging info
+//#define DBG_CTX(x) fprintf x
+#define DBG_CTX(x) do { } while(0)
 
-class Arguments;
+#define YY_NEVER_INTERACTIVE 1
+#define YY_NO_INPUT 1
 
 enum ScanVar { V_IGNORE, V_VARIABLE, V_PARAMETER};
 enum InterfaceType { IF_NONE, IF_SPECIFIC, IF_GENERIC, IF_ABSTRACT };
@@ -84,6 +86,7 @@ struct SymbolModifiers {
   Protection protection;
   Direction direction;
   bool optional;
+  bool protect;
   QCString dimension;
   bool allocatable;
   bool external;
@@ -99,7 +102,7 @@ struct SymbolModifiers {
   QCString passVar;
 
   SymbolModifiers() : type(), returnName(), protection(NONE_P), direction(NONE_D),
-    optional(FALSE), dimension(), allocatable(FALSE),
+    optional(FALSE), protect(FALSE), dimension(), allocatable(FALSE),
     external(FALSE), intrinsic(FALSE), parameter(FALSE),
     pointer(FALSE), target(FALSE), save(FALSE), deferred(FALSE), nonoverridable(FALSE),
     nopass(FALSE), pass(FALSE), passVar() {}
@@ -143,9 +146,9 @@ struct CommentInPrepass {
 };
 static QList<CommentInPrepass>  comments;
 
-#define MAX_INCLUDE_DEPTH 10
-YY_BUFFER_STATE include_stack[MAX_INCLUDE_DEPTH];
+YY_BUFFER_STATE *include_stack = NULL;
 int include_stack_ptr = 0;
+int include_stack_cnt = 0;
 
 static QFile            inputFile;
 static QCString		yyFileName;
@@ -161,7 +164,7 @@ static QList<Entry>     moduleProcedures; // list of all interfaces which contai
                                           // module procedures
 static QCString         docBlock;
 static QCString         docBlockName;
-static bool             docBlockInBody;
+static bool             docBlockInBody = FALSE;
 static bool             docBlockJavaStyle;
 
 static MethodTypes 	mtype;
@@ -184,6 +187,7 @@ static InterfaceType     ifType = IF_NONE;
 static bool              functionLine = FALSE;
 
 static char              stringStartSymbol; // single or double quote
+static bool              parsingPrototype = FALSE; // see parsePrototype()
 
 //! Accumulated modifiers of current statement, eg variable declaration.
 static SymbolModifiers currentModifiers;
@@ -205,7 +209,6 @@ static void scanner_abort();
 
 static void startScope(Entry *scope);
 static bool endScope(Entry *scope, bool isGlobalRoot=FALSE);
-static QCString getFullName(Entry *e);
 //static bool isTypeName(QCString name);
 static void resolveModuleProcedures(QList<Entry> &moduleProcedures, Entry *current_root);
 static int getAmpersandAtTheStart(const char *buf, int length);
@@ -222,7 +225,7 @@ static void newLine();
 //-----------------------------------------------------------------------------
 #undef	YY_INPUT
 #define	YY_INPUT(buf,result,max_size) result=yyread(buf,max_size);
-#define YY_USER_ACTION yyColNr+=yyleng;
+#define YY_USER_ACTION yyColNr+=(int)yyleng;
 //-----------------------------------------------------------------------------
 
 %}
@@ -252,17 +255,18 @@ NUM_TYPE  (complex|integer|logical|real)
 LOG_OPER  (\.and\.|\.eq\.|\.eqv\.|\.ge\.|\.gt\.|\.le\.|\.lt\.|\.ne\.|\.neqv\.|\.or\.|\.not\.)
 KIND      {ARGS}
 CHAR      (CHARACTER{ARGS}?|CHARACTER{BS}"*"({BS}[0-9]+|{ARGS}))
-TYPE_SPEC (({NUM_TYPE}({BS}"*"{BS}[0-9]+)?)|({NUM_TYPE}{KIND})|DOUBLE{BS_}COMPLEX|DOUBLE{BS_}PRECISION|{CHAR}|TYPE{ARGS}|CLASS{ARGS}|PROCEDURE{ARGS}?)
+TYPE_SPEC (({NUM_TYPE}({BS}"*"{BS}[0-9]+)?)|({NUM_TYPE}{KIND})|DOUBLE{BS}COMPLEX|DOUBLE{BS}PRECISION|{CHAR}|TYPE{ARGS}|CLASS{ARGS}|PROCEDURE{ARGS}?)
 
 INTENT_SPEC intent{BS}"("{BS}(in|out|in{BS}out){BS}")"
-ATTR_SPEC (ALLOCATABLE|DIMENSION{ARGS}|EXTERNAL|{INTENT_SPEC}|INTRINSIC|OPTIONAL|PARAMETER|POINTER|PRIVATE|PUBLIC|SAVE|TARGET|NOPASS|PASS{ARGS}?|DEFERRED|NON_OVERRIDABLE)
+ATTR_SPEC (ALLOCATABLE|DIMENSION{ARGS}|EXTERNAL|{INTENT_SPEC}|INTRINSIC|OPTIONAL|PARAMETER|POINTER|PROTECTED|PRIVATE|PUBLIC|SAVE|TARGET|NOPASS|PASS{ARGS}?|DEFERRED|NON_OVERRIDABLE)
 ACCESS_SPEC (PRIVATE|PUBLIC)
 LANGUAGE_BIND_SPEC BIND{BS}"("{BS}C{BS}(,{BS}NAME{BS}"="{BS}"\""(.*)"\""{BS})?")"
 /* Assume that attribute statements are almost the same as attributes. */
 ATTR_STMT {ATTR_SPEC}|DIMENSION|{ACCESS_SPEC}
 
 CONTAINS  CONTAINS
-PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTAL)?
+PREFIX    (RECURSIVE{BS_}|IMPURE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,3}(RECURSIVE|IMPURE|PURE|ELEMENTAL)?
+SCOPENAME ({ID}{BS}"::"{BS})*
 
 %option noyywrap
 %option stack
@@ -305,6 +309,12 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 %x	EndDoc
 
 %x      BlockData
+
+/** prototype parsing */
+%x  	Prototype
+%x  	PrototypeSubprog
+%x	PrototypeArgs
+
 %%
 
  /*-----------------------------------------------------------------------------------*/
@@ -312,10 +322,10 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 <*>^.*\n                                { // prepass: look for line continuations
   					  functionLine = FALSE;
 
-                                          //fprintf(stderr, "---%s", yytext);
+                                          DBG_CTX((stderr, "---%s", yytext));
 
-                                            int indexStart = getAmpersandAtTheStart(yytext, yyleng);                              
-                                            int indexEnd = getAmpOrExclAtTheEnd(yytext, yyleng);
+                                            int indexStart = getAmpersandAtTheStart(yytext, (int)yyleng);
+                                            int indexEnd = getAmpOrExclAtTheEnd(yytext, (int)yyleng);
 					    if (indexEnd>=0 && yytext[indexEnd]!='&') //we are only interested in amp
 					      indexEnd=-1;
 
@@ -364,7 +374,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 					    initializer+=yytext;
 					}
 <String>\"|\'                           { // string ends with next quote without previous backspace
-                                          if (yytext[0]!=stringStartSymbol) { yyColNr -= yyleng; REJECT; } // single vs double quote
+                                          if (yytext[0]!=stringStartSymbol) { yyColNr -= (int)yyleng; REJECT; } // single vs double quote
 					  if (yy_top_state() == Initialization
 					      || yy_top_state() == ArrayInitializer)
 					    initializer+=yytext;
@@ -375,7 +385,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 					    initializer+=yytext;
 					} 
 <*>\"|\'                                { /* string starts */
-					  if (YY_START == StrIgnore) { yyColNr -= yyleng; REJECT; }; // ignore in simple comments
+					  if (YY_START == StrIgnore) { yyColNr -= (int)yyleng; REJECT; }; // ignore in simple comments
                                           yy_push_state(YY_START);
                                           if (yy_top_state() == Initialization
 					      || yy_top_state() == ArrayInitializer)
@@ -386,7 +396,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 
  /*------ ignore simple comment (not documentation comments) */
 
-<*>"!"/[^<>\n]                         {  if (YY_START == String) { yyColNr -= yyleng; REJECT; } // "!" is ignored in strings
+<*>"!"/[^<>\n]                         {  if (YY_START == String) { yyColNr -= (int)yyleng; REJECT; } // "!" is ignored in strings
                                           // skip comment line (without docu comments "!>" "!<" ) 
                                           /* ignore further "!" and ignore comments in Strings */
                                           if ((YY_START != StrIgnore) && (YY_START != String)) 
@@ -394,11 +404,11 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
                                             yy_push_state(YY_START);
                                             BEGIN(StrIgnore); 
                                             debugStr="*!";
-                                            //fprintf(stderr,"start comment %d\n",yyLineNr);
+                                            DBG_CTX((stderr,"start comment %d\n",yyLineNr));
                                            }      
                                         }
 <StrIgnore>.?/\n                        { yy_pop_state(); // comment ends with endline character
-                                          //fprintf(stderr,"end comment %d %s\n",yyLineNr,debugStr.data());
+                                          DBG_CTX((stderr,"end comment %d %s\n",yyLineNr,debugStr.data()));
                                         } // comment line ends
 <StrIgnore>.                            { debugStr+=yytext; } 
 
@@ -414,7 +424,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
                                           yy_push_state(Use);
                                         }
 <Use>{ID}                               { 
-                                          //fprintf(stderr,"using dir %s\n",yytext);
+                                          DBG_CTX((stderr,"using dir %s\n",yytext));
                                           current->name=yytext;
                                           current->fileName = yyFileName; 
   					  current->section=Entry::USINGDIR_SEC;
@@ -557,7 +567,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 
  /*------- type definition  -------------------------------------------------------------------------------*/
 
-<Start,ModuleBody>^{BS}type             {
+<Start,ModuleBody>^{BS}type/[^a-z0-9_]   {
                                           if(YY_START == Start)
                                           {
                                             addModule(NULL); 
@@ -711,7 +721,7 @@ private                                 {
 					  } 
 					  else 
 					  {
-					    yyColNr -= yyleng;
+					    yyColNr -= (int)yyleng;
 					    REJECT;
 					  }
 					}
@@ -719,7 +729,7 @@ private                                 {
 {ATTR_STMT}/{BS_}{ID}		       |
 {ATTR_STMT}/{BS}"::"                   { 
                                           /* attribute statement starts */
-                                          //fprintf(stderr,"5=========> Attribute statement: %s\n", yytext); 
+                                          DBG_CTX((stderr,"5=========> Attribute statement: %s\n", yytext)); 
                                           QCString tmp = yytext;
                                           currentModifiers |= tmp.stripWhiteSpace();
 					  argType="";
@@ -728,17 +738,18 @@ private                                 {
   				       }
 {ID}	                               {
                                        }  
-^{BS}"type"{BS_}"is"                    { }
+^{BS}"type"{BS_}"is"/{BS_}             { }
+^{BS}"type"{BS}"="                     { }
 }
 <AttributeList>{
 {COMMA}					{}
 {BS}					{}
 {ATTR_SPEC}.				{ /* update current modifierswhen it is an ATTR_SPEC and not a variable name */
             				  /* bug_625519 */
-                                          QChar chr = yytext[yyleng-1];
+                                          QChar chr = yytext[(int)yyleng-1];
                                           if (chr.isLetter() || chr.isDigit() || (chr == '_'))
                                           {
-					    yyColNr -= yyleng;
+					    yyColNr -= (int)yyleng;
                                             REJECT;
                                           }
                                           else
@@ -746,7 +757,7 @@ private                                 {
                                             QCString tmp = yytext;
                                             tmp = tmp.left(tmp.length() - 1);
 					    yyColNr -= 1;
-                                            unput(yytext[yyleng-1]);
+                                            unput(yytext[(int)yyleng-1]);
                                             currentModifiers |= (tmp);
                                           }
 					}
@@ -855,12 +866,12 @@ private                                 {
 					  attr += yytext;
 					  modifiers[current_root][name.lower()] |= attr;
 					}
-<Variable>{COMMA}	                { //printf("COMMA: %d<=..<=%d\n", yyColNr-yyleng, yyColNr);
+<Variable>{COMMA}	                { //printf("COMMA: %d<=..<=%d\n", yyColNr-(int)yyleng, yyColNr);
 					  // locate !< comment
-					  updateVariablePrepassComment(yyColNr-yyleng, yyColNr);
+					  updateVariablePrepassComment(yyColNr-(int)yyleng, yyColNr);
 					}
 <Variable>{BS}"="                       { yy_push_state(YY_START);
-                                          initializer="";
+                                          initializer="=";
                                           initializerScope = initializerArrayScope = 0;
 					  BEGIN(Initialization);
                                         }
@@ -885,11 +896,13 @@ private                                 {
                                           pushBuffer(inputStringSemi);
                                         }
 
+<Initialization,ArrayInitializer>"["    |
 <Initialization,ArrayInitializer>"(/"   { initializer+=yytext;
                                            initializerArrayScope++;
                                            BEGIN(ArrayInitializer); // initializer may contain comma
                                         }
-<ArrayInitializer>"/)"                   { initializer+=yytext;
+<ArrayInitializer>"]"                   |
+<ArrayInitializer>"/)"                  { initializer+=yytext;
                                            initializerArrayScope--;
                                            if(initializerArrayScope<=0)
                                            {
@@ -906,7 +919,7 @@ private                                 {
 					}
 <Initialization>{COMMA}                 { if (initializerScope == 0)
 					  {
-					    updateVariablePrepassComment(yyColNr-yyleng, yyColNr);
+					    updateVariablePrepassComment(yyColNr-(int)yyleng, yyColNr);
 					    yy_pop_state(); // end initialization
                                             if (v_type == V_VARIABLE) last_entry->initializer= initializer;
 					  }
@@ -932,7 +945,7 @@ private                                 {
                                          }
 
                                          // TYPE_SPEC is for old function style function result
-                                         result = QCString(yytext).stripWhiteSpace();
+                                         result = QCString(yytext).stripWhiteSpace().lower();
                                          current->type = result;
                                          yy_push_state(SubprogPrefix);
                                        }
@@ -981,7 +994,7 @@ private                                 {
 					 BEGIN(SubprogBody);
 				       }
 <Parameterlist>{COMMA}|{BS}            { current->args += yytext;
-					 CommentInPrepass *c = locatePrepassComment(yyColNr-yyleng, yyColNr);
+					 CommentInPrepass *c = locatePrepassComment(yyColNr-(int)yyleng, yyColNr);
 					 if (c!=NULL) {
                                            if(current->argList->count()>0) {
 					     current->argList->at(current->argList->count()-1)->docs = c->str;
@@ -1019,7 +1032,7 @@ private                                 {
 
  /*---- documentation comments --------------------------------------------------------------------*/
 
-<Variable,SubprogBody,ModuleBody,TypedefBody>"!<"  { /* backward docu comment */
+<Variable,SubprogBody,ModuleBody,TypedefBody,TypedefBodyContains>"!<"  { /* backward docu comment */
                                           if (v_type != V_IGNORE) {
 					   current->docLine  = yyLineNr;
  					   docBlockJavaStyle = FALSE;
@@ -1031,7 +1044,7 @@ private                                 {
                                           else
                                           {
                                             /* handle out of place !< comment as a normal comment */
-                                            if (YY_START == String) { yyColNr -= yyleng; REJECT; } // "!" is ignored in strings
+                                            if (YY_START == String) { yyColNr -= (int)yyleng; REJECT; } // "!" is ignored in strings
                                             // skip comment line (without docu comments "!>" "!<" ) 
                                             /* ignore further "!" and ignore comments in Strings */
                                             if ((YY_START != StrIgnore) && (YY_START != String)) 
@@ -1073,6 +1086,7 @@ private                                 {
                                           yy_push_state(YY_START);
 					  current->docLine  = yyLineNr;
  					  docBlockJavaStyle = FALSE;
+					  if (YY_START==SubprogBody) docBlockInBody = TRUE;
 					  docBlock.resize(0);
 					  docBlockJavaStyle = Config_getBool("JAVADOC_AUTOBRIEF");
 					  startCommentBlock(TRUE);
@@ -1095,6 +1109,24 @@ private                                 {
                                           yy_pop_state();                                          
   					}
 
+ /*-----Prototype parsing -------------------------------------------------------------------------*/
+<Prototype>{BS}{SUBPROG}{BS_}		{
+					  BEGIN(PrototypeSubprog);
+					}
+<Prototype,PrototypeSubprog>{BS}{SCOPENAME}?{BS}{ID} { 
+					  current->name = QCString(yytext).lower();
+					  current->name.stripWhiteSpace();
+					  BEGIN(PrototypeArgs);
+					}
+<PrototypeArgs>{
+"("|")"|","|{BS_}			{ current->args += yytext; }
+{ID}					{ current->args += yytext; 
+					  Argument *a = new Argument;
+					  a->name = QCString(yytext).lower();
+					  current->argList->append(a);
+					}
+}
+
  /*------------------------------------------------------------------------------------------------*/
 
 <*>"\n"                                 {
@@ -1107,9 +1139,12 @@ private                                 {
  /*---- error: EOF in wrong state --------------------------------------------------------------------*/
 
 <*><<EOF>>                              {
-                                          if ( include_stack_ptr <= 0 ) {
+					  if (parsingPrototype) {
+					    yyterminate();
+
+					  } else if ( include_stack_ptr <= 0 ) {
                                             if (YY_START!=INITIAL && YY_START!=Start) {
-                                              //fprintf(stderr,"==== Error: EOF reached in wrong state (end missing)");
+                                              DBG_CTX((stderr,"==== Error: EOF reached in wrong state (end missing)"));
                                               scanner_abort();
                                             }
                                             yyterminate();
@@ -1136,11 +1171,11 @@ static void extractPrefix(QCString &text)
   int prefixIndex = 0;
   int curIndex = 0;
   bool cont = TRUE;
-  const char* pre[] = {"RECURSIVE","PURE","ELEMENTAL"};
+  const char* pre[] = {"RECURSIVE","IMPURE","PURE","ELEMENTAL"};
   while(cont)
   {
     cont = FALSE;
-    for(unsigned int i=0; i<3; i++)
+    for(unsigned int i=0; i<4; i++)
     {
       if((prefixIndex=text.find(pre[i], curIndex, FALSE))==0)
       {
@@ -1279,10 +1314,13 @@ void truncatePrepass(int index)
 
 // simplified way to know if this is fixed form
 // duplicate in fortrancode.l
-static bool recognizeFixedForm(const char* contents)
+static bool recognizeFixedForm(const char* contents, FortranFormat format)
 {
   int column=0;
   bool skipLine=FALSE;
+
+  if (format == FortranFormat_Fixed) return TRUE;
+  if (format == FortranFormat_Free)  return FALSE;
 
   for(int i=0;;i++) {
     column++;
@@ -1296,6 +1334,9 @@ static bool recognizeFixedForm(const char* contents)
         break;
       case '\000':
         return FALSE;
+      case '#':
+        skipLine=TRUE;
+        break;
       case 'C':
       case 'c':
       case '*':
@@ -1332,7 +1373,7 @@ static const char* prepassFixedForm(const char* contents)
   int prevLineLength=0;
   int prevLineAmpOrExclIndex=-1;
   bool emptyLabel=TRUE;
-  int newContentsSize = strlen(contents)+2; // \000 and one spare character (to avoid reallocation)
+  int newContentsSize = strlen(contents)+3; // \000, \n (when necessary) and one spare character (to avoid reallocation)
   char* newContents = (char*)malloc(newContentsSize);
 
   for(int i=0, j=0;;i++,j++) {
@@ -1356,6 +1397,14 @@ static const char* prepassFixedForm(const char* contents)
         break;
       case '\000':
         newContents[j]='\000';
+        newContentsSize = strlen(newContents);
+        if (newContents[newContentsSize - 1] != '\n')
+        {
+          // to be on the safe side
+          newContents = (char*)realloc(newContents, newContentsSize+2);
+          newContents[newContentsSize] = '\n';
+          newContents[newContentsSize + 1] = '\000';
+        }
         return newContents;
       case 'C':
       case 'c':
@@ -1391,25 +1440,34 @@ static const char* prepassFixedForm(const char* contents)
         break;
     }
   }
+
+  newContentsSize = strlen(newContents);
+  if (newContents[newContentsSize - 1] != '\n')
+  {
+    // to be on the safe side
+    newContents = (char*)realloc(newContents, newContentsSize+2);
+    newContents[newContentsSize] = '\n';
+    newContents[newContentsSize + 1] = '\000';
+  }
   return newContents;
 }
 
 static void pushBuffer(QCString& buffer)
 {
-  if ( include_stack_ptr >= MAX_INCLUDE_DEPTH )
+  if (include_stack_cnt <= include_stack_ptr)
   {
-    fprintf( stderr, "Stack buffers nested too deeply" );
-    exit( 1 );
+     include_stack_cnt++;
+     include_stack = (YY_BUFFER_STATE *)realloc(include_stack, include_stack_cnt * sizeof(YY_BUFFER_STATE));
   }
   include_stack[include_stack_ptr++] = YY_CURRENT_BUFFER;
   yy_switch_to_buffer(yy_scan_string(buffer));
 
-  //fprintf(stderr, "--PUSH--%s", (const char *)buffer);
+  DBG_CTX((stderr, "--PUSH--%s", (const char *)buffer));
   buffer = NULL;
 }
 
 static void popBuffer() {
-  //fprintf(stderr, "--POP--");
+  DBG_CTX((stderr, "--POP--"));
   include_stack_ptr --;
   yy_delete_buffer( YY_CURRENT_BUFFER );
   yy_switch_to_buffer( include_stack[include_stack_ptr] );
@@ -1491,6 +1549,7 @@ SymbolModifiers& SymbolModifiers::operator|=(const SymbolModifiers &mdfs)
   allocatable |= mdfs.allocatable;
   external |= mdfs.external;
   intrinsic |= mdfs.intrinsic;
+  protect |= mdfs.protect;
   parameter |= mdfs.parameter;
   pointer |= mdfs.pointer;
   target |= mdfs.target;
@@ -1529,6 +1588,10 @@ SymbolModifiers& SymbolModifiers::operator|=(QCString mdfString)
   else if (mdfString=="private") 
   {
     newMdf.protection = SymbolModifiers::PRIVATE;
+  }
+  else if (mdfString=="protected") 
+  {
+    newMdf.protect = TRUE;
   }
   else if (mdfString=="optional") 
   {
@@ -1640,85 +1703,90 @@ static QCString applyModifiers(QCString typeName, SymbolModifiers& mdfs)
 {
   if (!mdfs.dimension.isNull()) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += mdfs.dimension;
   }
   if (mdfs.direction!=SymbolModifiers::NONE_D) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += directionStrs[mdfs.direction];
   }
   if (mdfs.optional) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "optional";
   }
   if (mdfs.allocatable) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "allocatable";
   }
   if (mdfs.external) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "external";
   }
   if (mdfs.intrinsic) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "intrinsic";
   }
   if (mdfs.parameter) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "parameter";
   }
   if (mdfs.pointer) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "pointer";
   }
   if (mdfs.target) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "target";
   }
   if (mdfs.save) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "save";
   }
   if (mdfs.deferred) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "deferred";
   }
   if (mdfs.nonoverridable) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "non_overridable";
   }
   if (mdfs.nopass) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "nopass";
   }
   if (mdfs.pass) 
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "pass";
     if (!mdfs.passVar.isEmpty())
       typeName += "(" + mdfs.passVar + ")";
   }
   if (mdfs.protection == SymbolModifiers::PUBLIC)
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "public";
   }
   else if (mdfs.protection == SymbolModifiers::PRIVATE)
   {
-    typeName += ", ";
+    if (!typeName.isEmpty()) typeName += ", ";
     typeName += "private";
+  }
+  if (mdfs.protect)
+  {
+    if (!typeName.isEmpty()) typeName += ", ";
+    typeName += "protected";
   }
 
   return typeName;
@@ -1856,6 +1924,7 @@ static bool endScope(Entry *scope, bool isGlobalRoot)
   return TRUE;
 }
 
+#if 0
 //! Return full name of the entry. Sometimes we must combine several names recursively.
 static QCString getFullName(Entry *e) 
 {
@@ -1866,6 +1935,7 @@ static QCString getFullName(Entry *e)
 
   return getFullName(e->parent())+"::"+name;
 }
+#endif
 
 static int yyread(char *buf,int max_size)
 {
@@ -1918,7 +1988,7 @@ static int max(int a, int b) {return a>b?a:b;}
 
 static void addModule(const char *name, bool isModule)
 {
-  //fprintf(stderr, "0=========> got module %s\n", name);
+  DBG_CTX((stderr, "0=========> got module %s\n", name));
 
   if (isModule)
     current->section = Entry::CLASS_SEC;
@@ -1948,11 +2018,11 @@ static void addModule(const char *name, bool isModule)
 
 static void addSubprogram(const char *text)
 {
-  //fprintf(stderr,"1=========> got subprog, type: %s\n",text); 
+  DBG_CTX((stderr,"1=========> got subprog, type: %s\n",text)); 
   subrCurrent.prepend(current);
   current->section = Entry::FUNCTION_SEC ;
   QCString subtype = text; subtype=subtype.lower().stripWhiteSpace();
-  functionLine = subtype=="function";
+  functionLine = (subtype.find("function") != -1);
   current->type += " " + subtype;
   current->type = current->type.stripWhiteSpace();
   current->fileName  = yyFileName;
@@ -2051,16 +2121,19 @@ static void startCommentBlock(bool brief)
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
-  docBlockInBody = FALSE;
   bool needsEntry = FALSE;
   static bool hideInBodyDocs = Config_getBool("HIDE_IN_BODY_DOCS");
   int position=0;
-  if (docBlockInBody && hideInBodyDocs) return;
-  //fprintf(stderr,"call parseCommentBlock [%s]\n",doc.data());
+  if (docBlockInBody && hideInBodyDocs)
+  {
+    docBlockInBody = FALSE;
+    return;
+  }
+  DBG_CTX((stderr,"call parseCommentBlock [%s]\n",doc.data()));
   int lineNr = brief ? current->briefLine : current->docLine;
   while (parseCommentBlock(
 	g_thisParser,
-	docBlockInBody ? last_entry : current,
+	docBlockInBody ? subrCurrent.getFirst() : current,
 	doc,        // text
 	yyFileName, // file
 	lineNr,
@@ -2072,20 +2145,26 @@ static void handleCommentBlock(const QCString &doc,bool brief)
         needsEntry
         )) 
   {
-	   //fprintf(stderr,"parseCommentBlock position=%d [%s]  needsEntry=%d\n",position,doc.data()+position,needsEntry);
+	   DBG_CTX((stderr,"parseCommentBlock position=%d [%s]  needsEntry=%d\n",position,doc.data()+position,needsEntry));
    if (needsEntry) addCurrentEntry(0);
   }
-  //fprintf(stderr,"parseCommentBlock position=%d [%s]  needsEntry=%d\n",position,doc.data()+position,needsEntry);
+  DBG_CTX((stderr,"parseCommentBlock position=%d [%s]  needsEntry=%d\n",position,doc.data()+position,needsEntry));
 
   if (needsEntry) addCurrentEntry(0);
+  docBlockInBody = FALSE;
 }
 
 //----------------------------------------------------------------------------
 
 static void subrHandleCommentBlock(const QCString &doc,bool brief)
 {
+  QCString loc_doc;
   Entry *tmp_entry = current; 
-  current = subrCurrent.first(); // temporarily switch to the entry of the subroutine / function
+  current = subrCurrent.getFirst(); // temporarily switch to the entry of the subroutine / function
+
+  // Still in the specification section so no inbodyDocs yet, but parameter documentation
+  current->inbodyDocs = "";
+
   if (docBlock.stripWhiteSpace().find("\\param") == 0)
   {
     handleCommentBlock("\n\n"+doc,brief);
@@ -2097,14 +2176,65 @@ static void subrHandleCommentBlock(const QCString &doc,bool brief)
   else 
   {
     int dir1 = modifiers[current_root][argName.lower()].direction;
-    handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
-	               argName + " " + doc,brief);
+    loc_doc = doc.stripWhiteSpace();
+    if (loc_doc.lower().find(directionParam[SymbolModifiers::IN]) == 0)
+    {
+      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+          (directionParam[dir1] == directionParam[SymbolModifiers::IN]))
+      {
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::IN] + " " + 
+	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::IN])),brief);
+      }
+      else
+      {
+        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+	                   argName + " " + doc,brief);
+      }
+    }
+    else if (loc_doc.lower().find(directionParam[SymbolModifiers::OUT]) == 0)
+    {
+      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+          (directionParam[dir1] == directionParam[SymbolModifiers::OUT]))
+      {
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::OUT] + " " + 
+	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::OUT])),brief);
+      }
+      else
+      {
+        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+	                   argName + " " + doc,brief);
+      }
+    }
+    else if (loc_doc.lower().find(directionParam[SymbolModifiers::INOUT]) == 0)
+    {
+      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+          (directionParam[dir1] == directionParam[SymbolModifiers::INOUT]))
+      {
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::INOUT] + " " + 
+	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::INOUT])),brief);
+      }
+      else
+      {
+        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
+        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+	                   argName + " " + doc,brief);
+      }
+    }
+    else
+    {
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+	                 argName + " " + doc,brief);
+    }
   }
   current=tmp_entry;
 }
 
 //----------------------------------------------------------------------------
+#if 0
 static int level=0;
+
 static void debugCompounds(Entry *rt)  // print Entry structure (for debugging)
 {
  level++;
@@ -2117,10 +2247,12 @@ static void debugCompounds(Entry *rt)  // print Entry structure (for debugging)
   } 
 level--;
 }
+#endif
 
 
-static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
+static void parseMain(const char *fileName,const char *fileBuf,Entry *rt, FortranFormat format)
 {
+  char *tmpBuf = NULL;
   initParser();
 
   defaultProtection = Public;
@@ -2138,7 +2270,7 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
   inputFile.setName(fileName);
   if (inputFile.open(IO_ReadOnly))
   {
-    isFixedForm = recognizeFixedForm(fileBuf);
+    isFixedForm = recognizeFixedForm(fileBuf,format);
 
     if (isFixedForm) 
     {
@@ -2150,6 +2282,14 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
 
       //clock_t end=clock();
       //printf("CPU time used=%f\n", ((double) (end-start))/CLOCKS_PER_SEC);
+    }
+    else if (inputString[strlen(fileBuf)-1] != '\n')
+    {
+      tmpBuf = (char *)malloc(strlen(fileBuf)+2);
+      strcpy(tmpBuf,fileBuf);
+      tmpBuf[strlen(fileBuf)]= '\n';
+      tmpBuf[strlen(fileBuf)+1]= '\000';
+      inputString = tmpBuf;
     }
 
     yyLineNr= 1 ; 
@@ -2169,12 +2309,12 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     current          = new Entry;
     current->lang    = SrcLangExt_Fortran; 
 
-    fscanYYrestart( fscanYYin );
+    fortranscannerYYrestart( fortranscannerYYin );
     {
       BEGIN( Start );
     }
 
-    fscanYYlex();
+    fortranscannerYYlex();
     groupLeaveFile(yyFileName,yyLineNr);
 
     endScope(current_root, TRUE); // TRUE - global root
@@ -2184,6 +2324,10 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     rt->program.resize(0);
     delete current; current=0;
     moduleProcedures.clear();
+    if (tmpBuf) {
+      free((char*)tmpBuf);
+      inputString=NULL;
+    }
     if (isFixedForm) {
       free((char*)inputString);
       inputString=NULL;
@@ -2195,15 +2339,25 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
 
 //----------------------------------------------------------------------------
 
-void FortranLanguageScanner::parseInput(const char *fileName,const char *fileBuf,Entry *root)
+void FortranLanguageScanner::parseInput(const char *fileName,
+                                        const char *fileBuf,
+                                        Entry *root,
+                                        bool /*sameTranslationUnit*/,
+                                        QStrList & /*filesInSameTranslationUnit*/)
 {
   g_thisParser = this;
-  ::parseMain(fileName,fileBuf,root);
+
+  printlex(yy_flex_debug, TRUE, __FILE__, fileName);
+
+  ::parseMain(fileName,fileBuf,root,m_format);
+
+  printlex(yy_flex_debug, FALSE, __FILE__, fileName);
 }
 
 void FortranLanguageScanner::parseCode(CodeOutputInterface & codeOutIntf,
                    const char * scopeName,
                    const QCString & input,
+                   SrcLangExt /*lang*/,
                    bool isExampleBlock,
                    const char * exampleName,
                    FileDef * fileDef,
@@ -2211,12 +2365,14 @@ void FortranLanguageScanner::parseCode(CodeOutputInterface & codeOutIntf,
                    int endLine,
                    bool inlineFragment,
 		   MemberDef *memberDef,
-                   bool showLineNumbers
+                   bool showLineNumbers,
+                   Definition *searchCtx,
+                   bool collectXRefs
                   )
 {
   ::parseFortranCode(codeOutIntf,scopeName,input,isExampleBlock,exampleName,
                      fileDef,startLine,endLine,inlineFragment,memberDef,
-                     showLineNumbers);
+                     showLineNumbers,searchCtx,collectXRefs,m_format);
 }
 
 bool FortranLanguageScanner::needsPreprocessing(const QCString &extension)
@@ -2230,7 +2386,13 @@ void FortranLanguageScanner::resetCodeParserState()
 
 void FortranLanguageScanner::parsePrototype(const char *text)
 {
-  (void)text;
+  QCString buffer = QCString(text);
+  pushBuffer(buffer);
+  parsingPrototype = TRUE;
+  BEGIN(Prototype);
+  fortranscannerYYlex();
+  parsingPrototype = FALSE;
+  popBuffer();
 }
 
 static void scanner_abort() 
@@ -2261,7 +2423,7 @@ static void scanner_abort()
 #if !defined(YY_FLEX_SUBMINOR_VERSION) 
 //----------------------------------------------------------------------------
 extern "C" { // some bogus code to keep the compiler happy
-  void fscannerYYdummy() { yy_flex_realloc(0,0); } 
+  void fortranscannernerYYdummy() { yy_flex_realloc(0,0); } 
 }
 #endif
 

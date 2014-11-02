@@ -372,7 +372,7 @@ static bool matchcharclass( uint *rxd, char c )
     if ( clcode != CCL && clcode != CCN)
 	qWarning("QRegExp: Internal error, please report to qt-bugs@trolltech.com");
     uint numFields = *d & MVL;
-    uint cval = (uint)c; //(((uint)(c.row())) << 8) | ((uint)c.cell());
+    uint cval = (unsigned char)c; //(((uint)(c.row())) << 8) | ((uint)c.cell());
     bool found = FALSE;
     for ( int i = 0; i < (int)numFields; i++ ) {
 	d++;
@@ -525,7 +525,7 @@ static int matchstring( uint *rxd, const char *str, uint strlength,
 		while ( p >= first_p ) {	// go backwards
 		    int end = matchstring( d, p, pl, bol, cs );
 		    if ( end >= 0 )
-			return ( p - start ) + end;
+			return ( (int)(p - start) ) + end;
 		    if ( !p )
 			return -1;
 		    --p;
@@ -587,7 +587,7 @@ static int matchstring( uint *rxd, const char *str, uint strlength,
 		while ( p >= first_p ) {	// go backwards
 		    int end = matchstring( d, p, pl, bol, cs );
 		    if ( end >= 0 )
-			return ( p - start ) + end;
+			return ( (int)(p - start) ) + end;
 		    if ( !p )
 			return -1;
 		    --p;
@@ -600,7 +600,7 @@ static int matchstring( uint *rxd, const char *str, uint strlength,
 		return -1;
 	}
     }
-    return p - start;
+    return (int)(p - start);
 }
 
 
@@ -826,7 +826,7 @@ static uint char_val( const char **str, uint *strlength )   // get char value
 }
 
 
-#if defined(DEBUG)
+#if 0 //defined(DEBUG)
 static uint *dump( uint *p )
 {
     while ( *p != END ) {
@@ -1043,7 +1043,7 @@ void QRegExp::compile()
 			error = PatSyntax;
 			return;
 		}
-		int ddiff = d - prev_d;
+		int ddiff = (int)(d - prev_d);
 		if ( *p == '+' ) {		// convert to Kleene closure
 		    if ( d + ddiff >= rxarray + maxlen ) {
 			error = PatOverflow;	// pattern too long
@@ -1082,7 +1082,7 @@ void QRegExp::compile()
 	}
     }
     GEN( END );
-    int len = d - rxarray;
+    int len = (int)(d - rxarray);
     rxdata = new uint[ len ];			// copy from rxarray to rxdata
     CHECK_PTR( rxdata );
     memcpy( rxdata, rxarray, len*sizeof(uint) );

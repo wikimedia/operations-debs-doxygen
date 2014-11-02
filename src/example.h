@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: example.h,v 1.10 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,8 +18,8 @@
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 
-#include "qtbc.h"
-#include <qdict.h>
+#include <qcstring.h>
+#include "sortdict.h"
 
 class ClassDef;
 class MemberName;
@@ -38,9 +38,10 @@ class ExampleSDict : public SDict<Example>
   public:
     ExampleSDict(int size=17) : SDict<Example>(size) {}
    ~ExampleSDict() {}
-    int compareItems(GCI item1,GCI item2)
+  private:
+    int compareValues(const Example *item1,const Example *item2) const
     {
-      return stricmp(((Example *)item1)->name,((Example *)item2)->name);
+      return qstricmp(item1->name,item2->name);
     }
 };
 

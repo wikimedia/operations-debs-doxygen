@@ -1,7 +1,7 @@
 /******************************************************************************
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "qtbc.h"
 #include <qfile.h>
 #include <qfileinfo.h>
 #include <qtextstream.h>
@@ -54,8 +53,8 @@ void FormulaList::generateBitmaps(const char *path)
   int x1,y1,x2,y2;
   QDir d(path);
   // store the original directory
-  if (!d.exists()) { err("error: Output dir %s does not exist!\n",path); exit(1); }
-  QCString oldDir = convertToQCString(QDir::currentDirPath());
+  if (!d.exists()) { err("Output dir %s does not exist!\n",path); exit(1); }
+  QCString oldDir = QDir::currentDirPath().utf8();
   // go to the html output directory (i.e. path)
   QDir::setCurrent(d.absPath());
   QDir thisDir;
@@ -94,7 +93,7 @@ void FormulaList::generateBitmaps(const char *path)
         t << formula->getFormulaText() << endl << "\\pagebreak\n\n";
         pagesToGenerate.append(new int(page));
       }
-      Doxygen::indexList.addImageFile(resultName);
+      Doxygen::indexList->addImageFile(resultName);
       page++;
     }
     t << "\\end{document}" << endl;
@@ -150,7 +149,7 @@ void FormulaList::generateBitmaps(const char *path)
         }
         else
         {
-          err("error: Couldn't extract bounding box!\n");
+          err("Couldn't extract bounding box!\n");
         }
       } 
       // next we generate a postscript file which contains the eps
@@ -208,7 +207,7 @@ void FormulaList::generateBitmaps(const char *path)
         if (!t.eof())
           s=t.readLine().utf8();
         if (s.length()<2 || s.left(2)!="P6")
-          err("error: ghostscript produced an illegal image format!");
+          err("ghostscript produced an illegal image format!");
         else
         {
           // assume the size is after the first line that does not start with

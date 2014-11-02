@@ -2,7 +2,12 @@ manpages.diff
 dot-config.diff
 #doxygen_direct_dot_run.diff
 #qt4.diff
-gcc-g.diff
+#gcc-g.diff
 doxygen-jquery.patch
 #dot_num_threads.diff
 fix_676423_segfault.patch
+system_tmake.patch
+clang-configure.diff
+sqlite3-configure.diff
+fix-760700.diff
+fix-762272.diff

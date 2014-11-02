@@ -1,3 +1,20 @@
+/******************************************************************************
+ *
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ *
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation under the terms of the GNU General Public License is hereby 
+ * granted. No representations are made about the suitability of this software 
+ * for any purpose. It is provided "as is" without express or implied warranty.
+ * See the GNU General Public License for more details.
+ *
+ * Documents produced by Doxygen are derivative works derived from the
+ * input used in their production; they are not affected by this license.
+ *
+ */
+
+#include <qregexp.h>
+
 #include "pagedef.h"
 #include "groupdef.h"
 #include "docparser.h"
@@ -6,12 +23,12 @@
 #include "outputlist.h"
 #include "doxygen.h"
 #include "language.h"
-#include <qregexp.h>
-
+#include "namespacedef.h"
+#include "reflist.h"
 
 PageDef::PageDef(const char *f,int l,const char *n,
                  const char *d,const char *t)
- : Definition(f,l,n), m_title(t)
+ : Definition(f,l,1,n), m_title(t)
 {
   setDocumentation(d,f,l);
   m_subPageDict = new PageSDict(7);
@@ -32,7 +49,7 @@ void PageDef::findSectionsInDocumentation()
 
 GroupDef *PageDef::getGroupDef() const 
 { 
-  LockingPtr<GroupList> groups = partOfGroups();
+  GroupList *groups = partOfGroups();
   return groups!=0 ? groups->getFirst() : 0; 
 }
 
@@ -43,6 +60,20 @@ QCString PageDef::getOutputFileBase() const
   else 
     return m_fileName; 
 }
+
+void PageDef::setFileName(const char *name,bool dontEscape) 
+{ 
+  static bool shortNames = Config_getBool("SHORT_NAMES");
+  if (shortNames && !dontEscape)
+  {
+    m_fileName = convertNameToFile(name);
+  }
+  else
+  {
+    m_fileName = name; 
+  }
+}
+
 
 void PageDef::addInnerCompound(Definition *def)
 {
@@ -73,8 +104,9 @@ void PageDef::writeDocumentation(OutputList &ol)
   static bool generateTreeView = Config_getBool("GENERATE_TREEVIEW");
 
   //outputList->disable(OutputGenerator::Man);
-  QCString pageName;
-  pageName=escapeCharsInString(name(),FALSE,TRUE);
+  QCString pageName,manPageName;
+  pageName    = escapeCharsInString(name(),FALSE,TRUE);
+  manPageName = escapeCharsInString(name(),TRUE,TRUE);
 
   //printf("PageDef::writeDocumentation: %s\n",getOutputFileBase().data());
 
@@ -93,7 +125,15 @@ void PageDef::writeDocumentation(OutputList &ol)
     ol.enable(OutputGenerator::Html);
   }
 
+  ol.pushGeneratorState();
+  //2.{ 
+  ol.disableAllBut(OutputGenerator::Man);
+  startFile(ol,getOutputFileBase(),manPageName,title(),HLI_Pages,!generateTreeView);
+  ol.enableAll();
+  ol.disable(OutputGenerator::Man);
   startFile(ol,getOutputFileBase(),pageName,title(),HLI_Pages,!generateTreeView);
+  ol.popGeneratorState();
+  //2.} 
 
   if (!generateTreeView)
   {
@@ -103,17 +143,17 @@ void PageDef::writeDocumentation(OutputList &ol)
     }
     ol.endQuickIndices();
   }
-  SectionInfo *si=Doxygen::sectionDict.find(name());
+  SectionInfo *si=Doxygen::sectionDict->find(name());
 
   // save old generator state and write title only to Man generator
   ol.pushGeneratorState();
   //2.{
   ol.disableAllBut(OutputGenerator::Man);
-  ol.startTitleHead(pageName);
-  ol.endTitleHead(pageName, pageName);
+  ol.startTitleHead(manPageName);
+  ol.endTitleHead(manPageName, manPageName);
   if (si)
   {
-    ol.parseDoc(docFile(),docLine(),this,0,si->title,TRUE,FALSE,0,TRUE,FALSE);
+    ol.generateDoc(docFile(),docLine(),this,0,si->title,TRUE,FALSE,0,TRUE,FALSE);
     ol.endSection(si->label,si->type);
   }
   ol.popGeneratorState();
@@ -129,7 +169,7 @@ void PageDef::writeDocumentation(OutputList &ol)
   {
     //ol.startSection(si->label,si->title,si->type);
     startTitle(ol,getOutputFileBase(),this);
-    ol.parseDoc(docFile(),docLine(),this,0,si->title,TRUE,FALSE,0,TRUE,FALSE);
+    ol.generateDoc(docFile(),docLine(),this,0,si->title,TRUE,FALSE,0,TRUE,FALSE);
     //stringToSearchIndex(getOutputFileBase(),
     //                    theTranslator->trPage(TRUE,TRUE)+" "+si->title,
     //                    si->title);
@@ -162,10 +202,10 @@ void PageDef::writeDocumentation(OutputList &ol)
 
   if (!Config_getString("GENERATE_TAGFILE").isEmpty())
   {
-    bool found=FALSE;
+    bool found = name()=="citelist";
     QDictIterator<RefList> rli(*Doxygen::xrefLists);
     RefList *rl;
-    for (rli.toFirst();(rl=rli.current());++rli)
+    for (rli.toFirst();(rl=rli.current()) && !found;++rli)
     {
       if (rl->listName()==name())
       {
@@ -184,7 +224,7 @@ void PageDef::writeDocumentation(OutputList &ol)
     }
   }
 
-  Doxygen::indexList.addIndexItem(this,0,filterTitle(title()));
+  Doxygen::indexList->addIndexItem(this,0,0,filterTitle(title()));
 }
 
 void PageDef::writePageDocumentation(OutputList &ol)
@@ -197,7 +237,7 @@ void PageDef::writePageDocumentation(OutputList &ol)
   }
 
   ol.startTextBlock();
-  ol.parseDoc(
+  ol.generateDoc(
       docFile(),           // fileName
       docLine(),           // startLine
       this,                // context
@@ -248,16 +288,11 @@ void PageDef::writePageDocumentation(OutputList &ol)
 
 bool PageDef::visibleInIndex() const
 {
-  static bool allExternals = Config_getBool("ALLEXTERNALS");
+  static bool externalPages = Config_getBool("EXTERNAL_PAGES");
   return // not part of a group
          !getGroupDef() && 
          // not an externally defined page
-         (!isReference() || allExternals) 
-         // &&
-         // not a subpage
-         //(getOuterScope()==0 || 
-         // getOuterScope()->definitionType()!=Definition::TypePage
-         //)
+         (!isReference() || externalPages) 
          ;
 }
 
