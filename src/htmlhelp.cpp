@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -134,7 +134,8 @@ static QCString field2URL(const IndexField *f,bool checkReversed)
   QCString result = f->url + Doxygen::htmlFileExtension;
   if (!f->anchor.isEmpty() && (!checkReversed || f->reversed)) 
   {
-    result+="#"+f->anchor;  
+    // HTML Help needs colons in link anchors to be escaped in the .hhk file.
+    result+="#"+substitute(f->anchor,":","%3A");
   }
   return result;
 }
@@ -190,7 +191,7 @@ void HtmlHelpIndex::writeFields(FTextStream &t)
     { // finish old list at level 2
       if (level2Started) t << "  </UL>" << endl;
       level2Started=FALSE;
-    
+
       // <Antony>
       // Added this code so that an item with only one subitem is written
       // without any subitem.
@@ -214,7 +215,7 @@ void HtmlHelpIndex::writeFields(FTextStream &t)
       if (level2.isEmpty())
       {
         t << "  <LI><OBJECT type=\"text/sitemap\">";
-        t << "<param name=\"Local\" value=\"" << field2URL(f,TRUE);
+        t << "<param name=\"Local\" value=\"" << field2URL(f,FALSE);
         t << "\">";
         t << "<param name=\"Name\" value=\"" << m_help->recode(level1) << "\">"
            "</OBJECT>\n";
@@ -281,6 +282,7 @@ HtmlHelp::HtmlHelp() : indexFileDict(1009)
 HtmlHelp::~HtmlHelp()
 {
   if (m_fromUtf8!=(void *)(-1))   portable_iconv_close(m_fromUtf8);
+  delete index;
 }
 #if 0
 /*! return a reference to the one and only instance of this class. 
@@ -301,7 +303,7 @@ static QDict<QCString> s_languageDict;
  */
 void HtmlHelp::initialize()
 {
-  const char *str = Config_getString("CHM_INDEX_ENCODING");
+  const char *str = Config_getString(CHM_INDEX_ENCODING);
   if (!str) str = "CP1250"; // use safe and likely default
   m_fromUtf8 = portable_iconv_open(str,"UTF-8"); 
   if (m_fromUtf8==(void *)(-1))
@@ -311,7 +313,7 @@ void HtmlHelp::initialize()
   }
 
   /* open the contents file */
-  QCString fName = Config_getString("HTML_OUTPUT") + "/index.hhc";
+  QCString fName = Config_getString(HTML_OUTPUT) + "/index.hhc";
   cf = new QFile(fName);
   if (!cf->open(IO_WriteOnly))
   {
@@ -328,7 +330,7 @@ void HtmlHelp::initialize()
          "<UL>\n";
   
   /* open the contents file */
-  fName = Config_getString("HTML_OUTPUT") + "/index.hhk";
+  fName = Config_getString(HTML_OUTPUT) + "/index.hhk";
   kf = new QFile(fName);
   if (!kf->open(IO_WriteOnly))
   {
@@ -445,7 +447,7 @@ void HtmlHelp::initialize()
 }
 
 
-static QCString getLanguageString()
+QCString HtmlHelp::getLanguageString()
 {
   if (!theTranslator->idLanguage().isEmpty())
   {
@@ -464,7 +466,7 @@ static QCString getLanguageString()
 void HtmlHelp::createProjectFile()
 {
   /* Write the project file */
-  QCString fName = Config_getString("HTML_OUTPUT") + "/index.hhp";
+  QCString fName = Config_getString(HTML_OUTPUT) + "/index.hhp";
   QFile f(fName);
   if (f.open(IO_WriteOnly))
   {
@@ -472,9 +474,9 @@ void HtmlHelp::createProjectFile()
     
     QCString indexName="index"+Doxygen::htmlFileExtension;
     t << "[OPTIONS]\n";
-    if (!Config_getString("CHM_FILE").isEmpty())
+    if (!Config_getString(CHM_FILE).isEmpty())
     {
-      t << "Compiled file=" << Config_getString("CHM_FILE") << "\n";
+      t << "Compiled file=" << Config_getString(CHM_FILE) << "\n";
     }
     t << "Compatibility=1.1\n"
          "Full-text search=Yes\n"
@@ -483,9 +485,9 @@ void HtmlHelp::createProjectFile()
          "Default topic=" << indexName << "\n"
          "Index file=index.hhk\n"
          "Language=" << getLanguageString() << endl;
-    if (Config_getBool("BINARY_TOC")) t << "Binary TOC=YES\n";
-    if (Config_getBool("GENERATE_CHI")) t << "Create CHI file=YES\n";
-    t << "Title=" << recode(Config_getString("PROJECT_NAME")) << endl << endl;
+    if (Config_getBool(BINARY_TOC)) t << "Binary TOC=YES\n";
+    if (Config_getBool(GENERATE_CHI)) t << "Create CHI file=YES\n";
+    t << "Title=" << recode(Config_getString(PROJECT_NAME)) << endl << endl;
     
     t << "[WINDOWS]" << endl;
 
@@ -499,15 +501,15 @@ void HtmlHelp::createProjectFile()
     //       are shown. They can only be shown in case of a binary toc.
     //          dee http://www.mif2go.com/xhtml/htmlhelp_0016_943addingtabsandtoolbarbuttonstohtmlhelp.htm#Rz108x95873
     //       Value has been taken from htmlhelp.h file of the HTML Help Workshop
-    if (Config_getBool("BINARY_TOC"))
+    if (Config_getBool(BINARY_TOC))
     {
-      t << "main=\"" << recode(Config_getString("PROJECT_NAME")) << "\",\"index.hhc\","
+      t << "main=\"" << recode(Config_getString(PROJECT_NAME)) << "\",\"index.hhc\","
          "\"index.hhk\",\"" << indexName << "\",\"" << 
          indexName << "\",,,,,0x23520,,0x70387e,,,,,,,,0" << endl << endl;
     }
     else
     {
-      t << "main=\"" << recode(Config_getString("PROJECT_NAME")) << "\",\"index.hhc\","
+      t << "main=\"" << recode(Config_getString(PROJECT_NAME)) << "\",\"index.hhc\","
          "\"index.hhk\",\"" << indexName << "\",\"" << 
          indexName << "\",,,,,0x23520,,0x10387e,,,,,,,,0" << endl << endl;
     }
@@ -598,8 +600,8 @@ QCString HtmlHelp::recode(const QCString &s)
   QCString output(oSize);
   size_t iLeft     = iSize;
   size_t oLeft     = oSize;
-  char *iPtr       = s.data();
-  char *oPtr       = output.data();
+  char *iPtr       = s.rawData();
+  char *oPtr       = output.rawData();
   if (!portable_iconv(m_fromUtf8,&iPtr,&iLeft,&oPtr,&oLeft))
   {
     oSize -= (int)oLeft;
@@ -636,7 +638,7 @@ void HtmlHelp::addContentsItem(bool isDir,
   // Tried this and I didn't see any problems, when not using
   // the resetting of file and anchor the TOC works better
   // (prev / next button)
-  //if(Config_getBool("BINARY_TOC") && isDir) 
+  //if(Config_getBool(BINARY_TOC) && isDir) 
   //{
     //file = 0;
     //anchor = 0;
@@ -680,7 +682,7 @@ void HtmlHelp::addIndexItem(Definition *context,MemberDef *md,
 {
   if (md)
   {
-    static bool separateMemberPages = Config_getBool("SEPARATE_MEMBER_PAGES");
+    static bool separateMemberPages = Config_getBool(SEPARATE_MEMBER_PAGES);
     if (context==0) // global member
     {
       if (md->getGroupDef())

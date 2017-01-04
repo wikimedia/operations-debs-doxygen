@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -34,6 +34,7 @@ struct ListItemInfo;
 struct SectionInfo;
 class Definition;
 class DefinitionImpl;
+class FTextStream;
   
 /** Data associated with a detailed description. */
 struct DocInfo
@@ -91,7 +92,11 @@ class DefinitionIntf
 class Definition : public DefinitionIntf
 {
   public:
-    
+    struct Cookie
+    {
+      virtual ~Cookie() {}
+    };
+
     /*! Create a new definition */
     Definition(
         const char *defFileName,int defLine,int defColumn,
@@ -230,6 +235,9 @@ class Definition : public DefinitionIntf
     /*! Returns TRUE if this definition is imported via a tag file. */
     virtual bool isReference() const;
 
+    /*! Convenience method to return a resolved external link */
+    QCString externalReference(const QCString &relPath) const;
+
     /*! Returns the first line of the body of this item (applicable to classes and 
      *  functions).
      */
@@ -249,6 +257,7 @@ class Definition : public DefinitionIntf
     SrcLangExt getLanguage() const;
 
     GroupList *partOfGroups() const;
+    bool isLinkableViaGroup() const;
 
     QList<ListItemInfo> *xrefListItems() const;
 
@@ -318,7 +327,6 @@ class Definition : public DefinitionIntf
     // --- actions ----
     //-----------------------------------------------------------------------------------
 
-    QCString convertNameToFile(const char *name,bool allowDots=FALSE) const;
     void writeSourceDef(OutputList &ol,const char *scopeName);
     void writeInlineCode(OutputList &ol,const char *scopeName);
     void writeSourceRefs(OutputList &ol,const char *scopeName);
@@ -334,11 +342,14 @@ class Definition : public DefinitionIntf
     /*! Writes the documentation anchors of the definition to 
      *  the Doxygen::tagFile stream.
      */
-    void writeDocAnchorsToTagFile();
+    void writeDocAnchorsToTagFile(FTextStream &);
     void setLocalName(const QCString name);
 
     void addSectionsToIndex();
     void writeToc(OutputList &ol);
+
+    void setCookie(Cookie *cookie) { delete m_cookie; m_cookie = cookie; }
+    Cookie *cookie() const { return m_cookie; }
 
   protected:
 
@@ -363,6 +374,7 @@ class Definition : public DefinitionIntf
     QCString m_symbolName;
     int m_defLine;
     int m_defColumn;
+    Cookie *m_cookie;
 };
 
 /** A list of Definition objects. */

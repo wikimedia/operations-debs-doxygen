@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -34,41 +34,86 @@
 #include "htmlentity.h"
 #include "plantuml.h"
 
-static QCString escapeLabelName(const char *s)
-{
-  QCString result;
-  const char *p=s;
-  char c;
-  if (p)
-  {
-    while ((c=*p++))
-    {
-      switch (c)
-      {
-        case '%': result+="\\%"; break;
-        case '|': result+="\\texttt{\"|}"; break;
-        case '!': result+="\"!"; break;
-        case '{': result+="\\lcurly{}"; break;
-        case '}': result+="\\rcurly{}"; break;
-        case '~': result+="````~"; break; // to get it a bit better in index together with other special characters
-        default: result+=c;
-      }
-    }
-  }
-  return result;
-}
-
 const int maxLevels=5;
 static const char *secLabels[maxLevels] = 
    { "section","subsection","subsubsection","paragraph","subparagraph" };
 
 static const char *getSectionName(int level)
 {
-  static bool compactLatex = Config_getBool("COMPACT_LATEX");
+  static bool compactLatex = Config_getBool(COMPACT_LATEX);
   int l = level;
   if (compactLatex) l++;
   if (Doxygen::insideMainPage) l--;
   return secLabels[QMIN(maxLevels-1,l)];
+}
+
+static void visitPreStart(FTextStream &t, const bool hasCaption, QCString name,  QCString width,  QCString height)
+{
+    if (hasCaption)
+    {
+      t << "\n\\begin{DoxyImage}\n";
+    }
+    else
+    {
+      t << "\n\\begin{DoxyImageNoCaption}\n"
+             "  \\mbox{";
+    }
+
+    t << "\\includegraphics";
+    if (!width.isEmpty() || !height.isEmpty())
+    {
+      t << "[";
+    }
+    if (!width.isEmpty())
+    {
+      t << "width=" << width;
+    }
+    if (!width.isEmpty() && !height.isEmpty())
+    {
+      t << ",";
+    }
+    if (!height.isEmpty())
+    {
+      t << "height=" << height;
+    }
+    if (width.isEmpty() && height.isEmpty())
+    {
+      /* default setting */
+      t << "[width=\\textwidth,height=\\textheight/2,keepaspectratio=true]";
+    }
+    else
+    {
+      t << "]";
+    }
+
+    t << "{" << name << "}";
+
+    if (hasCaption)
+    {
+      t << "\n\\doxyfigcaption{";
+    }
+}
+
+
+
+static void visitPostEnd(FTextStream &t, const bool hasCaption)
+{
+    t << "}\n"; // end mbox or caption
+    if (hasCaption)
+    {
+      t << "\\end{DoxyImage}\n";
+    }
+    else{
+      t << "\\end{DoxyImageNoCaption}\n";
+    }
+}
+
+
+static void visitCaption(LatexDocVisitor *parent, QList<DocNode> children)
+{
+  QListIterator<DocNode> cli(children);
+  DocNode *n;
+  for (cli.toFirst();(n=cli.current());++cli) n->accept(parent);
 }
 
 QCString LatexDocVisitor::escapeMakeIndexChars(const char *s)
@@ -102,11 +147,10 @@ QCString LatexDocVisitor::escapeMakeIndexChars(const char *s)
 LatexDocVisitor::LatexDocVisitor(FTextStream &t,CodeOutputInterface &ci,
                                  const char *langExt,bool insideTabbing) 
   : DocVisitor(DocVisitor_Latex), m_t(t), m_ci(ci), m_insidePre(FALSE), 
-    m_insideItem(FALSE), m_hide(FALSE), m_insideTabbing(insideTabbing),
-    m_insideTable(FALSE), m_langExt(langExt), m_currentColumn(0), 
-    m_inRowspan(FALSE), m_inColspan(FALSE)
+    m_insideItem(FALSE), m_hide(FALSE), m_hideCaption(FALSE), m_insideTabbing(insideTabbing),
+    m_langExt(langExt)
 {
-  m_rowSpans.setAutoDelete(TRUE);
+  m_tableStateStack.setAutoDelete(TRUE);
 }
 
   //--------------------------------------
@@ -168,7 +212,7 @@ void LatexDocVisitor::visit(DocSymbol *s)
 void LatexDocVisitor::visit(DocURL *u)
 {
   if (m_hide) return;
-  if (Config_getBool("PDF_HYPERLINKS"))
+  if (Config_getBool(PDF_HYPERLINKS))
   {
     m_t << "\\href{";
     if (u->isEmail()) m_t << "mailto:";
@@ -275,7 +319,7 @@ void LatexDocVisitor::visit(DocVerbatim *s)
         QCString fileName(4096);
 
         fileName.sprintf("%s%d%s", 
-            (Config_getString("LATEX_OUTPUT")+"/inline_dotgraph_").data(), 
+            (Config_getString(LATEX_OUTPUT)+"/inline_dotgraph_").data(), 
             dotindex++,
             ".dot"
            );
@@ -284,15 +328,17 @@ void LatexDocVisitor::visit(DocVerbatim *s)
         {
           err("Could not open file %s for writing\n",fileName.data());
         }
-        file.writeBlock( s->text(), s->text().length() );
-        file.close();
+        else
+        {
+          file.writeBlock( s->text(), s->text().length() );
+          file.close();
 
-        m_t << "\\begin{center}\n";
-        startDotFile(fileName,"","",FALSE);
-        endDotFile(FALSE);
-        m_t << "\\end{center}\n";
+          startDotFile(fileName,s->width(),s->height(),s->hasCaption());
+          visitCaption(this, s->children());
+          endDotFile(s->hasCaption());
 
-        if (Config_getBool("DOT_CLEANUP")) file.remove();
+          if (Config_getBool(DOT_CLEANUP)) file.remove();
+        }
       }
       break;
     case DocVerbatim::Msc: 
@@ -301,7 +347,7 @@ void LatexDocVisitor::visit(DocVerbatim *s)
         QCString baseName(4096);
 
         baseName.sprintf("%s%d", 
-            (Config_getString("LATEX_OUTPUT")+"/inline_mscgraph_").data(), 
+            (Config_getString(LATEX_OUTPUT)+"/inline_mscgraph_").data(), 
             mscindex++
            );
         QFile file(baseName+".msc");
@@ -309,27 +355,26 @@ void LatexDocVisitor::visit(DocVerbatim *s)
         {
           err("Could not open file %s.msc for writing\n",baseName.data());
         }
-        QCString text = "msc {";
-        text+=s->text();
-        text+="}";
-        file.writeBlock( text, text.length() );
-        file.close();
+        else
+        {
+          QCString text = "msc {";
+          text+=s->text();
+          text+="}";
+          file.writeBlock( text, text.length() );
+          file.close();
 
-        m_t << "\\begin{center}\n";
-        writeMscFile(baseName);
-        m_t << "\\end{center}\n";
+          writeMscFile(baseName, s);
 
-        if (Config_getBool("DOT_CLEANUP")) file.remove();
+          if (Config_getBool(DOT_CLEANUP)) file.remove();
+        }
       }
       break;
     case DocVerbatim::PlantUML: 
       {
-        QCString latexOutput = Config_getString("LATEX_OUTPUT");
+        QCString latexOutput = Config_getString(LATEX_OUTPUT);
         QCString baseName = writePlantUMLSource(latexOutput,s->exampleFile(),s->text());
 
-        m_t << "\\begin{center}\n";
-        writePlantUMLFile(baseName);
-        m_t << "\\end{center}\n";
+        writePlantUMLFile(baseName, s);
       }
       break;
   }
@@ -339,10 +384,10 @@ void LatexDocVisitor::visit(DocAnchor *anc)
 {
   if (m_hide) return;
   m_t << "\\label{" << stripPath(anc->file()) << "_" << anc->anchor() << "}%" << endl;
-  if (!anc->file().isEmpty() && Config_getBool("PDF_HYPERLINKS")) 
+  if (!anc->file().isEmpty() && Config_getBool(PDF_HYPERLINKS)) 
   {
-    m_t << "\\hypertarget{" << stripPath(anc->file()) << "_" << anc->anchor() 
-      << "}{}%" << endl;
+    m_t << "\\Hypertarget{" << stripPath(anc->file()) << "_" << anc->anchor() 
+      << "}%" << endl;
   }    
 }
 
@@ -362,7 +407,14 @@ void LatexDocVisitor::visit(DocInclude *inc)
                                            inc->text(),
                                            langExt,
                                            inc->isExample(),
-                                           inc->exampleFile(), &fd);
+                                           inc->exampleFile(),
+                                           &fd,   // fileDef,
+                                           -1,    // start line
+                                           -1,    // end line
+                                           FALSE, // inline fragment
+                                           0,     // memberDef
+                                           TRUE   // show line numbers
+					  );
          m_t << "\\end{DoxyCodeInclude}" << endl;
       }
       break;    
@@ -371,7 +423,14 @@ void LatexDocVisitor::visit(DocInclude *inc)
       Doxygen::parserManager->getParser(inc->extension())
                             ->parseCode(m_ci,inc->context(),
                                         inc->text(),langExt,inc->isExample(),
-                                        inc->exampleFile());
+                                        inc->exampleFile(),
+                                        0,     // fileDef
+                                        -1,    // startLine
+                                        -1,    // endLine
+                                        TRUE,  // inlineFragment
+                                        0,     // memberDef
+                                        FALSE
+			  		);
       m_t << "\\end{DoxyCodeInclude}\n";
       break;
     case DocInclude::DontInclude: 
@@ -399,6 +458,33 @@ void LatexDocVisitor::visit(DocInclude *inc)
                                           );
          m_t << "\\end{DoxyCodeInclude}" << endl;
       }
+      break;
+    case DocInclude::SnipWithLines:
+      {
+         QFileInfo cfi( inc->file() );
+         FileDef fd( cfi.dirPath().utf8(), cfi.fileName().utf8() );
+         m_t << "\n\\begin{DoxyCodeInclude}\n";
+         Doxygen::parserManager->getParser(inc->extension())
+                               ->parseCode(m_ci,
+                                           inc->context(),
+                                           extractBlock(inc->text(),inc->blockId()),
+                                           langExt,
+                                           inc->isExample(),
+                                           inc->exampleFile(), 
+                                           &fd,
+                                           lineBlock(inc->text(),inc->blockId()),
+                                           -1,    // endLine
+                                           FALSE, // inlineFragment
+                                           0,     // memberDef
+                                           TRUE   // show line number
+                                          );
+         m_t << "\\end{DoxyCodeInclude}" << endl;
+      }
+      break;
+    case DocInclude::SnippetDoc: 
+    case DocInclude::IncludeDoc: 
+      err("Internal inconsistency: found switch SnippetDoc / IncludeDoc in file: %s"
+          "Please create a bug report\n",__FILE__);
       break;
   }
 }
@@ -446,8 +532,10 @@ void LatexDocVisitor::visit(DocFormula *f)
 void LatexDocVisitor::visit(DocIndexEntry *i)
 {
   if (m_hide) return;
-  m_t << "\\index{" << escapeLabelName(i->entry()) << "@{";
-  escapeMakeIndexChars(i->entry());
+  m_t << "\\index{";
+  m_t << latexEscapeLabelName(i->entry(),false);
+  m_t << "@{";
+  m_t << latexEscapeIndexChars(i->entry(),false);
   m_t << "}}";
 }
 
@@ -717,7 +805,7 @@ void LatexDocVisitor::visitPost(DocSimpleListItem *)
 void LatexDocVisitor::visitPre(DocSection *s)
 {
   if (m_hide) return;
-  if (Config_getBool("PDF_HYPERLINKS"))
+  if (Config_getBool(PDF_HYPERLINKS))
   {
     m_t << "\\hypertarget{" << stripPath(s->file()) << "_" << s->anchor() << "}{}";
   }
@@ -820,76 +908,123 @@ void LatexDocVisitor::visitPost(DocHtmlDescData *)
 {
 }
 
-static const char *getTableName(const DocNode *n)
+static bool tableIsNested(const DocNode *n)
 {
   bool isNested=FALSE;
   while (n && !isNested)
   {
-    isNested = n->kind()==DocNode::Kind_HtmlTable;
+    isNested = n->kind()==DocNode::Kind_HtmlTable || n->kind()==DocNode::Kind_ParamSect;
     n  = n->parent();
   }
-  return isNested ? "TabularNC" : "TabularC";
+  return isNested;
+}
+
+static void writeStartTableCommand(FTextStream &t,const DocNode *n,int cols)
+{
+  if (tableIsNested(n))
+  {
+    t << "\\begin{tabularx}{\\linewidth}{|*{" << cols << "}{>{\\raggedright\\arraybackslash}X|}}";
+  }
+  else
+  {
+    t << "\\tabulinesep=1mm\n\\begin{longtabu} spread 0pt [c]{*{" << cols << "}{|X[-1]}|}\n";
+  }
+  //return isNested ? "TabularNC" : "TabularC";
+}
+
+static void writeEndTableCommand(FTextStream &t,const DocNode *n)
+{
+  if (tableIsNested(n))
+  {
+    t << "\\end{tabularx}\n";
+  }
+  else
+  {
+    t << "\\end{longtabu}\n";
+  }
+  //return isNested ? "TabularNC" : "TabularC";
 }
 
 void LatexDocVisitor::visitPre(DocHtmlTable *t)
 {
-  m_rowSpans.clear();
-  m_insideTable=TRUE;
   if (m_hide) return;
+  pushTableState();
   if (t->hasCaption())
   {
-    m_t << "\\begin{table}[h]";
+    DocHtmlCaption *c = t->caption();
+    static bool pdfHyperLinks = Config_getBool(PDF_HYPERLINKS);
+    if (!c->file().isEmpty() && pdfHyperLinks)
+    {
+      m_t << "\\hypertarget{" << stripPath(c->file()) << "_" << c->anchor()
+        << "}{}";
+    }
+    m_t << endl;
   }
-  m_t << "\\begin{" << getTableName(t->parent()) << "}{" << t->numColumns() << "}\n";
-  m_numCols = t->numColumns();
+
+  writeStartTableCommand(m_t,t->parent(),t->numColumns());
+
+  if (t->hasCaption())
+  {
+    DocHtmlCaption *c = t->caption();
+    m_t << "\\caption{";
+    visitCaption(this, c->children());
+    m_t << "}";
+    m_t << "\\label{" << stripPath(c->file()) << "_" << c->anchor() << "}";
+    m_t << "\\\\\n";
+  }
+
+  setNumCols(t->numColumns());
   m_t << "\\hline\n";
+
+  // check if first row is a heading and then render the row already here
+  // and end it with \endfirsthead (triggered via m_firstRow==TRUE)
+  // then repeat the row as normal and end it with \endhead (m_firstRow==FALSE)
+  DocHtmlRow *firstRow = t->firstRow();
+  if (firstRow && firstRow->isHeading())
+  {
+    setFirstRow(TRUE);
+    firstRow->accept(this);
+    setFirstRow(FALSE);
+  }
 }
 
 void LatexDocVisitor::visitPost(DocHtmlTable *t)
 {
-  m_insideTable=FALSE;
   if (m_hide) return;
-  if (t->hasCaption())
-  {
-    m_t << "\\end{table}\n";
-  }
-  else
-  {
-    m_t << "\\end{" << getTableName(t->parent()) << "}\n";
-  }
+  writeEndTableCommand(m_t,t->parent());
+  popTableState();
 }
 
 void LatexDocVisitor::visitPre(DocHtmlCaption *c)
 {
-  if (m_hide) return;
-  m_t << "\\end{" << getTableName(c->parent()) << "}\n\\centering\n\\caption{";
+  m_hideCaption = m_hide;
+  m_hide        = TRUE;
 }
 
-void LatexDocVisitor::visitPost(DocHtmlCaption *) 
+void LatexDocVisitor::visitPost(DocHtmlCaption *c)
 {
-  if (m_hide) return;
-  m_t << "}\n";
+  m_hide        = m_hideCaption;
 }
 
 void LatexDocVisitor::visitPre(DocHtmlRow *r)
 {
-  m_currentColumn = 0;
-  if (r->isHeading()) m_t << "\\rowcolor{lightgray}";
+  setCurrentColumn(0);
+  if (r->isHeading()) m_t << "\\rowcolor{\\tableheadbgcolor}";
 }
 
 void LatexDocVisitor::visitPost(DocHtmlRow *row) 
 {
   if (m_hide) return;
 
-  int c=m_currentColumn;
-  while (c<=m_numCols) // end of row while inside a row span?
+  int c=currentColumn();
+  while (c<=numCols()) // end of row while inside a row span?
   {
     uint i;
-    for (i=0;i<m_rowSpans.count();i++)
+    for (i=0;i<rowSpans().count();i++)
     {
-      ActiveRowSpan *span = m_rowSpans.at(i);
-      //printf("  founc row span: column=%d rs=%d cs=%d rowIdx=%d cell->rowIdx=%d\n",
-      //    span->column, span->rowSpan,span->colSpan,row->rowIndex(),span->cell->rowIndex());
+      ActiveRowSpan *span = rowSpans().at(i);
+      //printf("  found row span: column=%d rs=%d cs=%d rowIdx=%d cell->rowIdx=%d i=%d c=%d\n",
+      //    span->column, span->rowSpan,span->colSpan,row->rowIndex(),span->cell->rowIndex(),i,c);
       if (span->rowSpan>0 && span->column==c &&  // we are at a cell in a row span
           row->rowIndex()>span->cell->rowIndex() // but not the row that started the span
          )
@@ -899,9 +1034,9 @@ void LatexDocVisitor::visitPost(DocHtmlRow *row)
         {
           m_t << "\\multicolumn{" << span->colSpan << "}{";
           m_t << "p{(\\linewidth-\\tabcolsep*" 
-            << m_numCols << "-\\arrayrulewidth*"
+            << numCols() << "-\\arrayrulewidth*"
             << row->visibleCells() << ")*" 
-            << span->colSpan <<"/"<< m_numCols << "}|}{}";
+            << span->colSpan <<"/"<< numCols() << "}|}{}";
         }
         else // solitary row span
         {
@@ -916,9 +1051,9 @@ void LatexDocVisitor::visitPost(DocHtmlRow *row)
   
   int col = 1;
   uint i;
-  for (i=0;i<m_rowSpans.count();i++)
+  for (i=0;i<rowSpans().count();i++)
   {
-    ActiveRowSpan *span = m_rowSpans.at(i);
+    ActiveRowSpan *span = rowSpans().at(i);
     if (span->rowSpan>0) span->rowSpan--;
     if (span->rowSpan<=0)
     {
@@ -935,12 +1070,27 @@ void LatexDocVisitor::visitPost(DocHtmlRow *row)
     }
   }
 
-  if (col <= m_numCols)
+  if (col <= numCols())
   {
-    m_t << "\\cline{" << col << "-" << m_numCols << "}";
+    m_t << "\\cline{" << col << "-" << numCols() << "}";
   }
 
   m_t << "\n";
+
+  if (row->isHeading() && row->rowIndex()==1)
+  {
+    if (firstRow())
+    {
+      m_t << "\\endfirsthead" << endl;
+      m_t << "\\hline" << endl;
+      m_t << "\\endfoot" << endl;
+      m_t << "\\hline" << endl;
+    }
+    else
+    {
+      m_t << "\\endhead" << endl;
+    }
+  }
 }
 
 void LatexDocVisitor::visitPre(DocHtmlCell *c)
@@ -952,68 +1102,60 @@ void LatexDocVisitor::visitPre(DocHtmlCell *c)
   {
     row = (DocHtmlRow*)c->parent();
   }
-  
-  m_currentColumn++;
+
+  setCurrentColumn(currentColumn()+1);
 
   //Skip columns that span from above.
   uint i;
-  for (i=0;i<m_rowSpans.count();i++)
+  for (i=0;i<rowSpans().count();i++)
   {
-    ActiveRowSpan *span = m_rowSpans.at(i);
-    if (span->rowSpan>0 && span->column==m_currentColumn)
+    ActiveRowSpan *span = rowSpans().at(i);
+    if (span->rowSpan>0 && span->column==currentColumn())
     {
       if (row && span->colSpan>1)
       {
         m_t << "\\multicolumn{" << span->colSpan << "}{";
-        if (m_currentColumn /*c->columnIndex()*/==1) // add extra | for first column
+        if (currentColumn() /*c->columnIndex()*/==1) // add extra | for first column
         {
           m_t << "|";
         }
         m_t << "p{(\\linewidth-\\tabcolsep*" 
-            << m_numCols << "-\\arrayrulewidth*"
+            << numCols() << "-\\arrayrulewidth*"
             << row->visibleCells() << ")*" 
-            << span->colSpan <<"/"<< m_numCols << "}|}{}";
-        m_currentColumn+=span->colSpan;
+            << span->colSpan <<"/"<< numCols() << "}|}{}";
+        setCurrentColumn(currentColumn()+span->colSpan);
       }
       else
       {
-        m_currentColumn++;
+        setCurrentColumn(currentColumn()+1);
       }
       m_t << "&";
     }
   }
 
-#if 0
-  QMap<int, int>::Iterator it = m_rowspanIndices.find(m_currentColumn);
-  if (it!=m_rowspanIndices.end() && it.data()>0)
-  {
-    m_t << "&";
-    m_currentColumn++;
-    it++;
-  }
-#endif
-
   int cs = c->colSpan();
   if (cs>1 && row)
   {
-    m_inColspan = TRUE;
+    setInColSpan(TRUE);
     m_t << "\\multicolumn{" << cs << "}{";
     if (c->columnIndex()==1) // add extra | for first column
     {
       m_t << "|";
     }
     m_t << "p{(\\linewidth-\\tabcolsep*" 
-        << m_numCols << "-\\arrayrulewidth*"
+        << numCols() << "-\\arrayrulewidth*"
         << row->visibleCells() << ")*" 
-        << cs <<"/"<< m_numCols << "}|}{";
-    if (c->isHeading()) m_t << "\\cellcolor{lightgray}";
+        << cs <<"/"<< numCols() << "}|}{";
+    if (c->isHeading()) m_t << "\\cellcolor{\\tableheadbgcolor}";
   }
   int rs = c->rowSpan();
   if (rs>0)
   {
-    m_inRowspan = TRUE;
-    //m_rowspanIndices[m_currentColumn] = rs;
-    m_rowSpans.append(new ActiveRowSpan(c,rs,cs,m_currentColumn));
+    setInRowSpan(TRUE);
+    //printf("adding row span: cell={r=%d c=%d rs=%d cs=%d} curCol=%d\n",
+    //                       c->rowIndex(),c->columnIndex(),c->rowSpan(),c->colSpan(),
+    //                       currentColumn());
+    addRowSpan(new ActiveRowSpan(c,rs,cs,currentColumn()));
     m_t << "\\multirow{" << rs << "}{\\linewidth}{";
   }
   int a = c->alignment();
@@ -1027,11 +1169,11 @@ void LatexDocVisitor::visitPre(DocHtmlCell *c)
   }
   if (c->isHeading())
   {
-    m_t << "{\\bf ";
+    m_t << "\\textbf{ ";
   }
   if (cs>1)
   {
-    m_currentColumn+=cs-1;
+    setCurrentColumn(currentColumn()+cs-1);
   }
 }
 
@@ -1042,14 +1184,14 @@ void LatexDocVisitor::visitPost(DocHtmlCell *c)
   {
     m_t << "}";
   }
-  if (m_inRowspan)
+  if (inRowSpan())
   {
-    m_inRowspan = FALSE;
+    setInRowSpan(FALSE);
     m_t << "}";
   }
-  if (m_inColspan)
+  if (inColSpan())
   {
-    m_inColspan = FALSE;
+    setInColSpan(FALSE);
     m_t << "}";
   }
   if (!c->isLast()) m_t << "&";
@@ -1072,7 +1214,7 @@ void LatexDocVisitor::visitPost(DocInternal *)
 void LatexDocVisitor::visitPre(DocHRef *href)
 {
   if (m_hide) return;
-  if (Config_getBool("PDF_HYPERLINKS"))
+  if (Config_getBool(PDF_HYPERLINKS))
   {
     m_t << "\\href{";
     m_t << href->url();
@@ -1098,40 +1240,18 @@ void LatexDocVisitor::visitPost(DocHtmlHeader *)
   if (m_hide) return;
   m_t << "}";
 }
-
 void LatexDocVisitor::visitPre(DocImage *img)
 {
   if (img->type()==DocImage::Latex)
   {
     if (m_hide) return;
-    if (img->hasCaption())
-    {
-      m_t << "\n\\begin{DoxyImage}\n";
-    }
-    else
-    {
-      m_t << "\n\\begin{DoxyImageNoCaption}\n"
-             "  \\mbox{";
-    }
     QCString gfxName = img->name();
     if (gfxName.right(4)==".eps" || gfxName.right(4)==".pdf")
     {
       gfxName=gfxName.left(gfxName.length()-4);
     }
-    m_t << "\\includegraphics";
-    if (!img->width().isEmpty())
-    {
-      m_t << "[width=" << img->width() << "]";
-    }
-    else if (!img->height().isEmpty())
-    {
-      m_t << "[height=" << img->height() << "]";
-    }
-    m_t << "{" << gfxName << "}";
-    if (img->hasCaption())
-    {
-      m_t << "\n\\caption{";
-    }
+
+    visitPreStart(m_t,img->hasCaption(), gfxName, img->width(),  img->height());
   }
   else // other format -> skip
   {
@@ -1145,14 +1265,7 @@ void LatexDocVisitor::visitPost(DocImage *img)
   if (img->type()==DocImage::Latex)
   {
     if (m_hide) return;
-    m_t << "}\n"; // end mbox or caption
-    if (img->hasCaption())
-    {
-      m_t << "\\end{DoxyImage}\n";
-    }
-    else{
-      m_t << "\\end{DoxyImageNoCaption}\n";
-    }
+    visitPostEnd(m_t,img->hasCaption());
   }
   else // other format
   {
@@ -1217,7 +1330,7 @@ void LatexDocVisitor::visitPre(DocRef *ref)
   }
   else
   {
-    if (!ref->file().isEmpty()) startLink(ref->ref(),ref->file(),ref->anchor());
+    if (!ref->file().isEmpty()) startLink(ref->ref(),ref->file(),ref->anchor(),ref->refToTable());
   }
   if (!ref->hasLinkText()) filter(ref->targetTitle());
 }
@@ -1239,7 +1352,7 @@ void LatexDocVisitor::visitPre(DocSecRefItem *ref)
 {
   if (m_hide) return;
   m_t << "\\item \\contentsline{section}{";
-  static bool pdfHyperlinks = Config_getBool("PDF_HYPERLINKS");
+  static bool pdfHyperlinks = Config_getBool(PDF_HYPERLINKS);
   if (pdfHyperlinks)
   {
     m_t << "\\hyperlink{" << ref->file() << "_" << ref->anchor() << "}{" ;
@@ -1249,7 +1362,7 @@ void LatexDocVisitor::visitPre(DocSecRefItem *ref)
 void LatexDocVisitor::visitPost(DocSecRefItem *ref) 
 {
   if (m_hide) return;
-  static bool pdfHyperlinks = Config_getBool("PDF_HYPERLINKS");
+  static bool pdfHyperlinks = Config_getBool(PDF_HYPERLINKS);
   if (pdfHyperlinks)
   {
     m_t << "}";
@@ -1447,13 +1560,13 @@ void LatexDocVisitor::visitPre(DocXRefItem *x)
   m_t << "}" << endl;
   bool anonymousEnum = x->file()=="@";
   m_t << "\\item[";
-  if (Config_getBool("PDF_HYPERLINKS") && !anonymousEnum)
+  if (Config_getBool(PDF_HYPERLINKS) && !anonymousEnum)
   {
     m_t << "\\hyperlink{" << stripPath(x->file()) << "_" << x->anchor() << "}{";
   }
   else
   {
-    m_t << "{\\bf ";
+    m_t << "\\textbf{ ";
   }
   m_insideItem=TRUE;
   filter(x->title());
@@ -1533,43 +1646,45 @@ void LatexDocVisitor::filter(const char *str)
   filterLatexString(m_t,str,m_insideTabbing,m_insidePre,m_insideItem);
 }
 
-void LatexDocVisitor::startLink(const QCString &ref,const QCString &file,const QCString &anchor)
+void LatexDocVisitor::startLink(const QCString &ref,const QCString &file,const QCString &anchor,bool refToTable)
 {
-  if (ref.isEmpty() && Config_getBool("PDF_HYPERLINKS")) // internal PDF link 
+  static bool pdfHyperLinks = Config_getBool(PDF_HYPERLINKS);
+  if (ref.isEmpty() && pdfHyperLinks) // internal PDF link
   {
-    if (ref.isEmpty()) {
-      m_t << "\\hyperlink{";
-      if (!file.isEmpty()) m_t << stripPath(file);
-      if (!file.isEmpty() && !anchor.isEmpty()) m_t << "_";
-      if (!anchor.isEmpty()) m_t << anchor;
-      m_t << "}{";
+    if (refToTable)
+    {
+      m_t << "\\doxytablelink{";
     }
     else
     {
-      QCString *dest;
-      m_t << "\\href{";
-      if ((dest=Doxygen::tagDestinationDict[ref])) m_t << *dest << "/";
-      if (!file.isEmpty()) m_t << file << Doxygen::htmlFileExtension;
-      if (!anchor.isEmpty()) m_t << "#" << anchor;
-      m_t << "}{";
+      m_t << "\\hyperlink{";
     }
+    if (!file.isEmpty()) m_t << stripPath(file);
+    if (!file.isEmpty() && !anchor.isEmpty()) m_t << "_";
+    if (!anchor.isEmpty()) m_t << anchor;
+    m_t << "}{";
+  }
+  else if (ref.isEmpty() && refToTable)
+  {
+    m_t << "\\doxytableref{";
   }
   else if (ref.isEmpty()) // internal non-PDF link
   {
     m_t << "\\doxyref{";
   }
   else // external link
-  { 
-    m_t << "{\\bf ";
+  {
+    m_t << "\\textbf{ ";
   }
 }
 
 void LatexDocVisitor::endLink(const QCString &ref,const QCString &file,const QCString &anchor)
 {
   m_t << "}";
-  if (ref.isEmpty() && !Config_getBool("PDF_HYPERLINKS"))
+  static bool pdfHyperLinks = Config_getBool(PDF_HYPERLINKS);
+  if (ref.isEmpty() && !pdfHyperLinks)
   {
-    m_t << "{"; 
+    m_t << "{";
     filter(theTranslator->trPageAbbreviation());
     m_t << "}{" << file;
     if (!file.isEmpty() && !anchor.isEmpty()) m_t << "_";
@@ -1607,60 +1722,16 @@ void LatexDocVisitor::startDotFile(const QCString &fileName,
     baseName=baseName.left(i);
   }
   baseName.prepend("dot_");
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   QCString name = fileName;
   writeDotGraphFromFile(name,outDir,baseName,GOF_EPS);
-  if (hasCaption)
-  {
-    m_t << "\n\\begin{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\n\\begin{DoxyImageNoCaption}\n"
-           "  \\mbox{";
-  }
-  m_t << "\\includegraphics";
-  if (!width.isEmpty())
-  {
-    m_t << "[width=" << width << "]";
-  }
-  else if (!height.isEmpty())
-  {
-    m_t << "[height=" << height << "]";
-  }
-  else
-  {
-    m_t << "[width=\\textwidth,height=\\textheight/2,keepaspectratio=true]";
-  }
-  m_t << "{" << baseName;
-  //if (Config_getBool("USE_PDFLATEX"))
-  //{
-  //  m_t << ".pdf";
-  //}
-  //else
-  //{
-  //  m_t << ".eps";
-  //}
-  m_t << "}";
-
-  if (hasCaption)
-  {
-    m_t << "\n\\caption{";
-  }
+  visitPreStart(m_t,hasCaption, baseName, width, height);
 }
 
 void LatexDocVisitor::endDotFile(bool hasCaption)
 {
   if (m_hide) return;
-  m_t << "}\n"; // end caption or mbox
-  if (hasCaption)
-  {
-    m_t << "\\end{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\\end{DoxyImageNoCaption}\n";
-  }
+  visitPostEnd(m_t,hasCaption);
 }
 
 void LatexDocVisitor::startMscFile(const QCString &fileName,
@@ -1681,63 +1752,19 @@ void LatexDocVisitor::startMscFile(const QCString &fileName,
   }
   baseName.prepend("msc_");
 
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   writeMscGraphFromFile(fileName,outDir,baseName,MSC_EPS); 
-  if (hasCaption)
-  {
-    m_t << "\n\\begin{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\n\\begin{DoxyImageNoCaption}\n"
-           "  \\mbox{";
-  }
-  m_t << "\\includegraphics";
-  if (!width.isEmpty())
-  {
-    m_t << "[width=" << width << "]";
-  }
-  else if (!height.isEmpty())
-  {
-    m_t << "[height=" << height << "]";
-  }
-  else
-  {
-    m_t << "[width=\\textwidth,height=\\textheight/2,keepaspectratio=true]";
-  }
-  m_t << "{" << baseName;
-  //if (Config_getBool("USE_PDFLATEX"))
-  //{
-  //  m_t << ".pdf";
-  //}
-  //else
-  //{
-  //  m_t << ".eps";
-  //}
-  m_t << "}";
-
-  if (hasCaption)
-  {
-    m_t << "\n\\caption{";
-  }
+  visitPreStart(m_t,hasCaption, baseName, width, height);
 }
 
 void LatexDocVisitor::endMscFile(bool hasCaption)
 {
   if (m_hide) return;
-  m_t << "}\n"; // end caption or mbox
-  if (hasCaption)
-  {
-    m_t << "\\end{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\\end{DoxyImageNoCaption}\n";
-  }
+  visitPostEnd(m_t,hasCaption);
 }
 
 
-void LatexDocVisitor::writeMscFile(const QCString &baseName)
+void LatexDocVisitor::writeMscFile(const QCString &baseName, DocVerbatim *s)
 {
   QCString shortName = baseName;
   int i;
@@ -1745,13 +1772,11 @@ void LatexDocVisitor::writeMscFile(const QCString &baseName)
   {
     shortName=shortName.right(shortName.length()-i-1);
   } 
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   writeMscGraphFromFile(baseName+".msc",outDir,shortName,MSC_EPS);
-  m_t << "\n\\begin{DoxyImageNoCaption}"
-         "  \\mbox{\\includegraphics";
-  m_t << "{" << shortName << "}";
-  m_t << "}\n"; // end mbox
-  m_t << "\\end{DoxyImageNoCaption}\n";
+  visitPreStart(m_t, s->hasCaption(), shortName, s->width(),s->height());
+  visitCaption(this, s->children());
+  visitPostEnd(m_t, s->hasCaption());
 }
 
 
@@ -1773,63 +1798,19 @@ void LatexDocVisitor::startDiaFile(const QCString &fileName,
   }
   baseName.prepend("dia_");
 
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   writeDiaGraphFromFile(fileName,outDir,baseName,DIA_EPS);
-  if (hasCaption)
-  {
-    m_t << "\n\\begin{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\n\\begin{DoxyImageNoCaption}\n"
-           "  \\mbox{";
-  }
-  m_t << "\\includegraphics";
-  if (!width.isEmpty())
-  {
-    m_t << "[width=" << width << "]";
-  }
-  else if (!height.isEmpty())
-  {
-    m_t << "[height=" << height << "]";
-  }
-  else
-  {
-    m_t << "[width=\\textwidth,height=\\textheight/2,keepaspectratio=true]";
-  }
-  m_t << "{" << baseName;
-  //if (Config_getBool("USE_PDFLATEX"))
-  //{
-  //  m_t << ".pdf";
-  //}
-  //else
-  //{
-  //  m_t << ".eps";
-  //}
-  m_t << "}";
-
-  if (hasCaption)
-  {
-    m_t << "\n\\caption{";
-  }
+  visitPreStart(m_t,hasCaption, baseName, width, height);
 }
 
 void LatexDocVisitor::endDiaFile(bool hasCaption)
 {
   if (m_hide) return;
-  m_t << "}\n"; // end caption or mbox
-  if (hasCaption)
-  {
-    m_t << "\\end{DoxyImage}\n";
-  }
-  else
-  {
-    m_t << "\\end{DoxyImageNoCaption}\n";
-  }
+  visitPostEnd(m_t,hasCaption);
 }
 
 
-void LatexDocVisitor::writeDiaFile(const QCString &baseName)
+void LatexDocVisitor::writeDiaFile(const QCString &baseName, DocVerbatim *s)
 {
   QCString shortName = baseName;
   int i;
@@ -1837,16 +1818,14 @@ void LatexDocVisitor::writeDiaFile(const QCString &baseName)
   {
     shortName=shortName.right(shortName.length()-i-1);
   }
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   writeDiaGraphFromFile(baseName+".dia",outDir,shortName,DIA_EPS);
-  m_t << "\n\\begin{DoxyImageNoCaption}"
-         "  \\mbox{\\includegraphics";
-  m_t << "{" << shortName << "}";
-  m_t << "}\n"; // end mbox
-  m_t << "\\end{DoxyImageNoCaption}\n";
+  visitPreStart(m_t, s->hasCaption(), shortName, s->width(), s->height());
+  visitCaption(this, s->children());
+  visitPostEnd(m_t, s->hasCaption());
 }
 
-void LatexDocVisitor::writePlantUMLFile(const QCString &baseName)
+void LatexDocVisitor::writePlantUMLFile(const QCString &baseName, DocVerbatim *s)
 {
   QCString shortName = baseName;
   int i;
@@ -1854,12 +1833,10 @@ void LatexDocVisitor::writePlantUMLFile(const QCString &baseName)
   {
     shortName=shortName.right(shortName.length()-i-1);
   }
-  QCString outDir = Config_getString("LATEX_OUTPUT");
+  QCString outDir = Config_getString(LATEX_OUTPUT);
   generatePlantUMLOutput(baseName,outDir,PUML_EPS);
-  m_t << "\n\\begin{DoxyImageNoCaption}"
-         "  \\mbox{\\includegraphics";
-  m_t << "{" << shortName << "}";
-  m_t << "}\n"; // end mbox
-  m_t << "\\end{DoxyImageNoCaption}\n";
+  visitPreStart(m_t, s->hasCaption(), shortName, s->width(), s->height());
+  visitCaption(this, s->children());
+  visitPostEnd(m_t, s->hasCaption());
 }
 

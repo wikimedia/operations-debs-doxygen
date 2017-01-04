@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -33,16 +33,35 @@
 #include "config.h"
 #include "docparser.h"
 
-MemberList::MemberList()
+MemberList::MemberList() : m_listType(MemberListType_pubMethods)
 {
   memberGroupList=0;
+  m_varCnt=0;
+  m_funcCnt=0;
+  m_enumCnt=0;
+  m_enumValCnt=0;
+  m_typeCnt=0;
+  m_protoCnt=0;
+  m_defCnt=0;
+  m_friendCnt=0;
   m_numDecMembers=-1; // special value indicating that value needs to be computed
   m_numDocMembers=-1; // special value indicating that value needs to be computed
+  m_inGroup=FALSE;
+  m_inFile=FALSE;
+  m_needsSorting=FALSE;
 }
 
 MemberList::MemberList(MemberListType lt) : m_listType(lt)
 {
   memberGroupList=0;
+  m_varCnt=0;
+  m_funcCnt=0;
+  m_enumCnt=0;
+  m_enumValCnt=0;
+  m_typeCnt=0;
+  m_protoCnt=0;
+  m_defCnt=0;
+  m_friendCnt=0;
   m_numDecMembers=-1; // special value indicating that value needs to be computed
   m_numDocMembers=-1; // special value indicating that value needs to be computed
   m_inGroup=FALSE;
@@ -57,7 +76,7 @@ MemberList::~MemberList()
 
 int MemberList::compareValues(const MemberDef *c1, const MemberDef *c2) const
 {
-  static bool sortConstructorsFirst = Config_getBool("SORT_MEMBERS_CTORS_1ST");
+  static bool sortConstructorsFirst = Config_getBool(SORT_MEMBERS_CTORS_1ST);
   if (sortConstructorsFirst) {
     int ord1 = c1->isConstructor() ? 2 : (c1->isDestructor() ? 1 : 0);
     int ord2 = c2->isConstructor() ? 2 : (c2->isDestructor() ? 1 : 0);
@@ -150,7 +169,7 @@ void MemberList::countDecMembers(bool countEnumValues,GroupDef *gd)
                                      break;
         case MemberType_Typedef:     m_typeCnt++,m_numDecMembers++; break;
         //case MemberType_Prototype:   m_protoCnt++,m_numDecMembers++; break;
-        case MemberType_Define:      if (Config_getBool("EXTRACT_ALL") || 
+        case MemberType_Define:      if (Config_getBool(EXTRACT_ALL) || 
                                          md->argsString() || 
                                          !md->initializer().isEmpty() ||
                                          md->hasDocumentation() 
@@ -214,11 +233,6 @@ void MemberList::countDocMembers(bool countEnumValues)
   //printf("MemberList::countDocMembers()=%d memberGroupList=%p\n",m_numDocMembers,memberGroupList);
 }
 
-bool MemberList::insert(uint index,const MemberDef *md)
-{
-  return QList<MemberDef>::insert(index,md);
-}
-
 void MemberList::inSort(const MemberDef *md)
 {
   QList<MemberDef>::inSort(md);
@@ -229,9 +243,65 @@ void MemberList::append(const MemberDef *md)
   QList<MemberDef>::append(md);
 }
 
-MemberListIterator::MemberListIterator(const QList<MemberDef> &l) :
+void MemberList::remove(const MemberDef *md)
+{
+  QList<MemberDef>::remove(md);
+}
+
+void MemberList::sort()
+{
+  QList<MemberDef>::sort();
+}
+
+uint MemberList::count() const
+{
+  return QList<MemberDef>::count();
+}
+
+int MemberList::findRef(const MemberDef *md) const
+{
+  return QList<MemberDef>::findRef(md);
+}
+
+MemberDef *MemberList::getFirst() const
+{
+  return QList<MemberDef>::getFirst();
+}
+
+MemberDef *MemberList::take(uint index)
+{
+  return QList<MemberDef>::take(index);
+}
+
+MemberListIterator::MemberListIterator(const MemberList &l) :
   QListIterator<MemberDef>(l) 
 {
+}
+
+int MemberList::countEnumValues(MemberDef *md,bool setAnonEnumType) const
+{
+  int enumVars=0;
+  MemberListIterator vmli(*this);
+  MemberDef *vmd;
+  QCString name(md->name());
+  int i=name.findRev("::");
+  if (i!=-1) name=name.right(name.length()-i-2); // strip scope (TODO: is this needed?)
+  if (name[0]=='@') // anonymous enum => append variables
+  {
+    for ( ; (vmd=vmli.current()) ; ++vmli)
+    {
+      QCString vtype=vmd->typeString();
+      if ((vtype.find(name))!=-1) 
+      {
+        enumVars++;
+        if (setAnonEnumType)
+        {
+          vmd->setAnonymousEnumType(md);
+        }
+      }
+    }
+  }
+  return enumVars;
 }
 
 bool MemberList::declVisible() const
@@ -258,26 +328,9 @@ bool MemberList::declVisible() const
           return TRUE;
         case MemberType_Enumeration: 
           {
-            int enumVars=0;
-            MemberListIterator vmli(*this);
-            MemberDef *vmd;
-            QCString name(md->name());
-            int i=name.findRev("::");
-            if (i!=-1) name=name.right(name.length()-i-2); // strip scope (TODO: is this needed?)
-            if (name[0]=='@') // anonymous enum => append variables
-            {
-              for ( ; (vmd=vmli.current()) ; ++vmli)
-              {
-                QCString vtype=vmd->typeString();
-                if ((vtype.find(name))!=-1) 
-                {
-                  enumVars++;
-                }
-              }
-            }
             // if this is an anonymous enum and there are variables of this
             // enum type (i.e. enumVars>0), then we do not show the enum here.
-            if (enumVars==0) // show enum here
+            if (countEnumValues(md,FALSE)==0) // show enum here
             {
               return TRUE;
             }
@@ -301,11 +354,11 @@ bool MemberList::declVisible() const
 
 void MemberList::writePlainDeclarations(OutputList &ol,
                        ClassDef *cd,NamespaceDef *nd,FileDef *fd,
-                       GroupDef *gd, const DefinitionIntf::DefType compoundType,
-                       ClassDef *inheritedFrom,const char *inheritId
+                       GroupDef *gd,ClassDef *inheritedFrom,const char *inheritId
                       )
 {
   //printf("----- writePlainDeclaration() ----\n");
+  static bool hideUndocMembers = Config_getBool(HIDE_UNDOC_MEMBERS);
   countDecMembers();
   if (numDecMembers()==0) 
   {
@@ -344,32 +397,14 @@ void MemberList::writePlainDeclarations(OutputList &ol,
         case MemberType_Event:  
           {
             if (first) ol.startMemberList(),first=FALSE;
-            md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,compoundType,inheritedFrom,inheritId);
+            md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,inheritedFrom,inheritId);
             break;
           }
         case MemberType_Enumeration: 
           {
-            int enumVars=0;
-            MemberListIterator vmli(*this);
-            MemberDef *vmd;
-            QCString name(md->name());
-            int i=name.findRev("::");
-            if (i!=-1) name=name.right(name.length()-i-2); // strip scope (TODO: is this needed?)
-            if (name[0]=='@') // anonymous enum => append variables
-            {
-              for ( ; (vmd=vmli.current()) ; ++vmli)
-              {
-                QCString vtype=vmd->typeString();
-                if ((vtype.find(name))!=-1) 
-                {
-                  enumVars++;
-                  vmd->setAnonymousEnumType(md);
-                }
-              }
-            }
             // if this is an anonymous enum and there are variables of this
             // enum type (i.e. enumVars>0), then we do not show the enum here.
-            if (enumVars==0) // show enum here
+            if (countEnumValues(md,TRUE)==0) // show enum here
             {
               //printf("Enum!!\n");
               if (first)
@@ -386,13 +421,12 @@ void MemberList::writePlainDeclarations(OutputList &ol,
               }
               ol.writeString("enum ");
               ol.insertMemberAlign();
-              md->writeEnumDeclaration(ol,cd,nd,fd,gd,compoundType);
+              md->writeEnumDeclaration(ol,cd,nd,fd,gd);
               if (!detailsLinkable)
               {
                 ol.endDoxyAnchor(md->getOutputFileBase(),md->anchor());
               }
-              ol.endMemberItem();
-              if (!md->briefDescription().isEmpty() && Config_getBool("BRIEF_MEMBER_DESC"))
+              if (!md->briefDescription().isEmpty() && Config_getBool(BRIEF_MEMBER_DESC))
               {
                 DocRoot *rootNode = validatingParseDoc(
                     md->briefFile(),md->briefLine(),
@@ -418,6 +452,7 @@ void MemberList::writePlainDeclarations(OutputList &ol,
                 }
                 delete rootNode;
               }
+              ol.endMemberItem();
               ol.endMemberDeclaration(md->anchor(),inheritId);
             }
             md->warnIfUndocumented();
@@ -431,7 +466,7 @@ void MemberList::writePlainDeclarations(OutputList &ol,
               ol.startMemberList();
               first=FALSE;
             }
-            md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,compoundType,inheritedFrom,inheritId);
+            md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,inheritedFrom,inheritId);
             break;
           }
         case MemberType_EnumValue: 
@@ -440,7 +475,7 @@ void MemberList::writePlainDeclarations(OutputList &ol,
             {
               //printf("EnumValue!\n");
               if (first) ol.startMemberList(),first=FALSE;
-              md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,compoundType,inheritedFrom,inheritId);
+              md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,inheritedFrom,inheritId);
             }
           }
           break;
@@ -466,7 +501,7 @@ void MemberList::writePlainDeclarations(OutputList &ol,
             ol.startMemberList();
             first=FALSE;
           }
-          md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup,compoundType);
+          md->writeDeclaration(ol,cd,nd,fd,gd,m_inGroup);
         }
         md->setFromAnonymousScope(TRUE);
       }
@@ -490,7 +525,6 @@ void MemberList::writePlainDeclarations(OutputList &ol,
  *  @param gd non-null if this list is part of group documentation.
  *  @param title Title to use for the member list.
  *  @param subtitle Sub title to use for the member list.
- *  @param compoundType Container type for this member list.
  *  @param showEnumValues Obsolete, always set to FALSE.
  *  @param showInline if set to TRUE if title is rendered differently
  *  @param inheritedFrom if not 0, the list is shown inside the
@@ -500,14 +534,13 @@ void MemberList::writePlainDeclarations(OutputList &ol,
  */
 void MemberList::writeDeclarations(OutputList &ol,
              ClassDef *cd,NamespaceDef *nd,FileDef *fd,GroupDef *gd,
-             const char *title,const char *subtitle,
-             const DefinitionIntf::DefType compoundType,bool showEnumValues,
+             const char *title,const char *subtitle, bool showEnumValues,
              bool showInline,ClassDef *inheritedFrom,MemberListType lt)
 {
   (void)showEnumValues; // unused
 
   //printf("----- writeDeclaration() this=%p ---- inheritedFrom=%p\n",this,inheritedFrom);
-  static bool optimizeVhdl = Config_getBool("OPTIMIZE_OUTPUT_VHDL");
+  static bool optimizeVhdl = Config_getBool(OPTIMIZE_OUTPUT_VHDL);
   QCString inheritId;
 
   countDecMembers(/*showEnumValues*/FALSE,gd); // count members shown in this section
@@ -587,7 +620,7 @@ void MemberList::writeDeclarations(OutputList &ol,
     }
     else
     {
-      writePlainDeclarations(ol,cd,nd,fd,gd,compoundType,inheritedFrom,inheritId);
+      writePlainDeclarations(ol,cd,nd,fd,gd,inheritedFrom,inheritId);
     }
 
     //printf("memberGroupList=%p\n",memberGroupList);
@@ -611,7 +644,7 @@ void MemberList::writeDeclarations(OutputList &ol,
           {
             //printf("Member group has docs!\n");
             ol.startMemberGroupDocs();
-            ol.generateDoc("[generated]",-1,ctx,0,mg->documentation()+"\n",FALSE,FALSE);
+            ol.generateDoc(mg->docFile(),mg->docLine(),ctx,0,mg->documentation()+"\n",FALSE,FALSE);
             ol.endMemberGroupDocs();
           }
           ol.startMemberGroup();
@@ -655,17 +688,48 @@ void MemberList::writeDocumentation(OutputList &ol,
     ol.endGroupHeader(showInline ? 2 : 0);
   }
   ol.startMemberDocList();
-  
+
   MemberListIterator mli(*this);
   MemberDef *md;
-  for ( ; (md=mli.current()) ; ++mli)
+
+  // count the number of overloaded members
+  QDict<uint> overloadTotalDict(67);
+  QDict<uint> overloadCountDict(67);
+  overloadTotalDict.setAutoDelete(TRUE);
+  overloadCountDict.setAutoDelete(TRUE);
+  for (mli.toFirst() ; (md=mli.current()) ; ++mli)
   {
-    md->writeDocumentation(this,ol,scopeName,container,
-                           m_inGroup,showEnumValues,showInline);
+    if (md->isDetailedSectionVisible(m_inGroup,container->definitionType()==Definition::TypeFile) && 
+        !(md->isEnumValue() && !showInline))
+    {
+      uint *pCount = overloadTotalDict.find(md->name());
+      if (pCount)
+      {
+        (*pCount)++;
+      }
+      else
+      {
+        overloadTotalDict.insert(md->name(),new uint(1));
+        overloadCountDict.insert(md->name(),new uint(1));
+      }
+    }
+  }
+
+  for (mli.toFirst() ; (md=mli.current()) ; ++mli)
+  {
+    if (md->isDetailedSectionVisible(m_inGroup,container->definitionType()==Definition::TypeFile) && 
+        !(md->isEnumValue() && !showInline))
+    {
+      uint overloadCount = *overloadTotalDict.find(md->name());
+      uint *pCount = overloadCountDict.find(md->name());
+      md->writeDocumentation(this,*pCount,overloadCount,ol,scopeName,container,
+          m_inGroup,showEnumValues,showInline);
+      (*pCount)++;
+    }
   }
   if (memberGroupList)
   {
-    //printf("MemberList::writeDocumentation()  --  member groups\n");
+    printf("MemberList::writeDocumentation()  --  member groups %d\n",memberGroupList->count());
     MemberGroupListIterator mgli(*memberGroupList);
     MemberGroup *mg;
     for (;(mg=mgli.current());++mgli)
@@ -684,27 +748,57 @@ void MemberList::writeSimpleDocumentation(OutputList &ol,
   //printf("MemberList count=%d\n",numDocMembers());
   if (numDocMembers()==0) return;
 
-  ol.startMemberDocSimple();
+  ClassDef *cd = 0;
+  if (container && container->definitionType()==Definition::TypeClass)
+  {
+    cd = (ClassDef*)container;
+  }
+  ol.startMemberDocSimple(cd && cd->isJavaEnum());
   MemberListIterator mli(*this);
   MemberDef *md;
   for ( ; (md=mli.current()) ; ++mli)
   {
     md->writeMemberDocSimple(ol,container);
   }
-  ol.endMemberDocSimple();
+  ol.endMemberDocSimple(cd && cd->isJavaEnum());
 }
 
 // separate member pages
 void MemberList::writeDocumentationPage(OutputList &ol,
                      const char *scopeName, Definition *container)
 {
-  static bool generateTreeView = Config_getBool("GENERATE_TREEVIEW");
+  static bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
+
+  // count the number of overloaded members
+  QDict<uint> overloadTotalDict(67);
+  QDict<uint> overloadCountDict(67);
+  overloadTotalDict.setAutoDelete(TRUE);
+  overloadCountDict.setAutoDelete(TRUE);
   MemberListIterator mli(*this);
   MemberDef *md;
-  for ( ; (md=mli.current()) ; ++mli)
+  for (mli.toFirst() ; (md=mli.current()) ; ++mli)
   {
     if (md->isDetailedSectionLinkable())
     {
+      uint *pCount = overloadTotalDict.find(md->name());
+      if (pCount)
+      {
+        (*pCount)++;
+      }
+      else
+      {
+        overloadTotalDict.insert(md->name(),new uint(1));
+        overloadCountDict.insert(md->name(),new uint(1));
+      }
+    }
+  }
+
+  for ( mli.toFirst() ; (md=mli.current()) ; ++mli)
+  {
+    if (md->isDetailedSectionLinkable())
+    {
+      uint overloadCount = *overloadTotalDict.find(md->name());
+      uint *pCount = overloadCountDict.find(md->name());
       QCString diskName=md->getOutputFileBase();
       QCString title=md->qualifiedName();
       startFile(ol,diskName,md->name(),title,HLI_None,!generateTreeView,diskName);
@@ -717,7 +811,8 @@ void MemberList::writeDocumentationPage(OutputList &ol,
 
       if (generateTreeView)
       {
-        md->writeDocumentation(this,ol,scopeName,container,m_inGroup);
+        md->writeDocumentation(this,*pCount,overloadCount,ol,scopeName,container,m_inGroup);
+        (*pCount)++;
         ol.endContents();
         endFileWithNavPath(container,ol);
       }
@@ -732,7 +827,8 @@ void MemberList::writeDocumentationPage(OutputList &ol,
         ol.writeString("   </td>\n");
         ol.writeString("   <td valign=\"top\" class=\"mempage\">\n");
 
-        md->writeDocumentation(this,ol,scopeName,container,m_inGroup);
+        md->writeDocumentation(this,*pCount,overloadCount,ol,scopeName,container,m_inGroup);
+        (*pCount)++;
 
         ol.writeString("    </td>\n");
         ol.writeString("  </tr>\n");
@@ -741,15 +837,15 @@ void MemberList::writeDocumentationPage(OutputList &ol,
         endFile(ol);
       }
     }
-    if (memberGroupList)
+  }
+  if (memberGroupList)
+  {
+    //printf("MemberList::writeDocumentation()  --  member groups\n");
+    MemberGroupListIterator mgli(*memberGroupList);
+    MemberGroup *mg;
+    for (;(mg=mgli.current());++mgli)
     {
-      //printf("MemberList::writeDocumentation()  --  member groups\n");
-      MemberGroupListIterator mgli(*memberGroupList);
-      MemberGroup *mg;
-      for (;(mg=mgli.current());++mgli)
-      {
-        mg->writeDocumentationPage(ol,scopeName,container);
-      }
+      mg->writeDocumentationPage(ol,scopeName,container);
     }
   }
 }
@@ -943,6 +1039,40 @@ QCString MemberList::listTypeAsString(MemberListType type)
   return "";
 }
 
+void MemberList::writeTagFile(FTextStream &tagFile)
+{
+  MemberListIterator mli(*this);
+  MemberDef *md;
+  for ( ; (md=mli.current()) ; ++mli)
+  {
+    if (md->getLanguage()!=SrcLangExt_VHDL)
+    {
+      md->writeTagFile(tagFile);
+      if (md->memberType()==MemberType_Enumeration && md->enumFieldList() && !md->isStrong())
+      {
+        MemberListIterator vmli(*md->enumFieldList());
+        MemberDef *vmd;
+        for ( ; (vmd=vmli.current()) ; ++vmli)
+        {
+          vmd->writeTagFile(tagFile);
+        }
+      }
+    }
+    else
+    {
+      VhdlDocGen::writeTagFile(md,tagFile);
+    }
+  }
+  if (memberGroupList)
+  {
+    MemberGroupListIterator mgli(*memberGroupList);
+    MemberGroup *mg;
+    for (;(mg=mgli.current());++mgli)
+    {
+      mg->writeTagFile(tagFile);
+    }
+  }
+}
 
 //--------------------------------------------------------------------------
 

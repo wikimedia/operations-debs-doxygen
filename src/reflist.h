@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -23,14 +23,17 @@
 #include <qlist.h>
 #include "sortdict.h"
 
+class Definition;
+
 /** This struct represents an item in the list of references. */
 struct RefItem
 {
-  RefItem() /*: written(FALSE)*/ {}
+  RefItem() : scope(0) {}
   QCString text;           //!< text of the item.
   QCString listAnchor;     //!< anchor in the list
 
   QCString prefix;         //!< type prefix for the name
+  Definition *scope;       //!< scope to use for references.
   QCString name;           //!< name of the entity containing the reference
   QCString title;          //!< display name of the entity
   QCString args;           //!< optional arguments for the entity (if function)
@@ -69,6 +72,7 @@ class RefList
     RefItem *getFirstRefItem();
     RefItem *getNextRefItem();
     QCString listName() const;
+    QCString fileName() const;
     QCString pageTitle() const;
     QCString sectionTitle() const;
 
@@ -82,6 +86,7 @@ class RefList
   private:
     int m_id;
     QCString m_listName;
+    QCString m_fileName;
     QCString m_pageTitle;
     QCString m_secTitle;
     SortedRefItems *m_itemList;

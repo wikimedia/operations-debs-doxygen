@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -103,7 +103,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Alan Dokümantasyonu";
       }
@@ -170,7 +170,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Yapıları";
       }
@@ -187,7 +187,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Alanları";
       }
@@ -200,7 +200,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globaller";
       }
@@ -241,7 +241,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Kısa tanımlarıyla birlikte veri yapıları:";
       }
@@ -260,7 +260,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
       {
         result+="dokümante edilmiş ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="yapı(struct) ve birleşim(union) yapılarını içerir";
       }
@@ -271,7 +271,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
       result+=" ve ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="her alanı yapı(struct)/birleşim(union) dokümantasyonuna bağlar:";
         }
@@ -282,7 +282,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="ait olduğu yapı(struct)/birleşime(union) bağlar:";
         }
@@ -300,7 +300,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
       QCString result="Bu liste tüm ";
       if (!extractAll) result+="dokümante edilmiş ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="fonksiyonları, değişkenleri, makroları, enümerasyonları ve typedef\'leri içerir";
       }
@@ -351,7 +351,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Yapıları İndeksi";
       }
@@ -378,7 +378,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Yapıları Dokümantasyonu";
       }
@@ -481,7 +481,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Yapıları";
       }
@@ -890,7 +890,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Alanları";
       }
@@ -1016,7 +1016,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
         "};\n"
         "\\endcode\n"
         "Bu kod aşağıdaki şemayı oluşturur:"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "Yukarıdaki şemadaki kutular aşağıda açıklanmıştır:\n"
         "<ul>\n"
@@ -1085,7 +1085,7 @@ class TranslatorTurkish : public TranslatorAdapter_1_7_5
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veri Yapıları";
       }

@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -65,7 +65,7 @@ struct StyleData
 
   unsigned index;   // index in style-sheet, i.e. number in s-clause
   char* reference;  // everything required to apply the style
-  char* definition; // aditional tags like \snext and style name
+  char* definition; // additional tags like \snext and style name
 
   StyleData(const char* reference, const char* definition);
   ~StyleData();

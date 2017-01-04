@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -91,7 +91,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Veld Dokumentasie";
       }
@@ -158,7 +158,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Strukture";
       }
@@ -175,7 +175,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Velde";
       }
@@ -188,7 +188,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globals";
       }
@@ -229,7 +229,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return " Data strukture met kort beskrywings:";
       }
@@ -248,7 +248,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
       {
         result+="gedokumenteerde ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="struct en union velde";
       }
@@ -259,7 +259,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
       result+=" met skakels na ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="die struct/union dokumentasie vir elke veld:";
         }
@@ -270,7 +270,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="die structures/unions waaraan hulle behoort:";
         }
@@ -288,7 +288,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
       QCString result="'n Lys van alle ";
       if (!extractAll) result+="gedokumenteerde ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="funksies, veranderlikes, defines, enums, en typedefs";
       }
@@ -337,7 +337,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Strukture Indeks";
       }
@@ -364,7 +364,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Strukture Dokumentasie";
       }
@@ -467,7 +467,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Strukture";
       }
@@ -875,7 +875,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Velde";
       }
@@ -1002,7 +1002,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
         "\\endcode\n"
         "As die \\c MAX_DOT_GRAPH_HEIGHT merker in die konfigurasie leër "
         "aan 240 gelyk gestel is, word die volgende diagram geproduseer:"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "Die reghoeke in die diagram het die volgende betekenis:\n"
         "<ul>\n"
@@ -1071,7 +1071,7 @@ class TranslatorAfrikaans : public TranslatorAdapter_1_6_0
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Data Strukture";
       }

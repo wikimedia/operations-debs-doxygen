@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -34,6 +34,7 @@ PageDef::PageDef(const char *f,int l,const char *n,
   m_subPageDict = new PageSDict(7);
   m_pageScope = 0;
   m_nestingLevel = 0;
+  m_fileName = ::convertNameToFile(n,FALSE,TRUE);
   m_showToc = FALSE;
 }
 
@@ -61,19 +62,10 @@ QCString PageDef::getOutputFileBase() const
     return m_fileName; 
 }
 
-void PageDef::setFileName(const char *name,bool dontEscape) 
-{ 
-  static bool shortNames = Config_getBool("SHORT_NAMES");
-  if (shortNames && !dontEscape)
-  {
-    m_fileName = convertNameToFile(name);
-  }
-  else
-  {
-    m_fileName = name; 
-  }
+void PageDef::setFileName(const char *name)
+{
+  m_fileName = name;
 }
-
 
 void PageDef::addInnerCompound(Definition *def)
 {
@@ -99,9 +91,33 @@ bool PageDef::hasParentPage() const
          getOuterScope()->definitionType()==Definition::TypePage;
 }
 
+void PageDef::writeTagFile(FTextStream &tagFile)
+{
+  bool found = name()=="citelist";
+  QDictIterator<RefList> rli(*Doxygen::xrefLists);
+  RefList *rl;
+  for (rli.toFirst();(rl=rli.current()) && !found;++rli)
+  {
+    if (rl->listName()==name())
+    {
+      found=TRUE;
+      break;
+    }
+  }
+  if (!found) // not one of the generated related pages
+  {
+    tagFile << "  <compound kind=\"page\">" << endl;
+    tagFile << "    <name>" << name() << "</name>" << endl;
+    tagFile << "    <title>" << convertToXML(title()) << "</title>" << endl;
+    tagFile << "    <filename>" << convertToXML(getOutputFileBase()) << "</filename>" << endl;
+    writeDocAnchorsToTagFile(tagFile);
+    tagFile << "  </compound>" << endl;
+  }
+}
+
 void PageDef::writeDocumentation(OutputList &ol)
 {
-  static bool generateTreeView = Config_getBool("GENERATE_TREEVIEW");
+  static bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
 
   //outputList->disable(OutputGenerator::Man);
   QCString pageName,manPageName;
@@ -137,7 +153,7 @@ void PageDef::writeDocumentation(OutputList &ol)
 
   if (!generateTreeView)
   {
-    if (getOuterScope()!=Doxygen::globalScope && !Config_getBool("DISABLE_INDEX"))
+    if (getOuterScope()!=Doxygen::globalScope && !Config_getBool(DISABLE_INDEX))
     {
       getOuterScope()->writeNavigationPath(ol);
     }
@@ -187,7 +203,7 @@ void PageDef::writeDocumentation(OutputList &ol)
 
   writePageDocumentation(ol);
 
-  if (generateTreeView && getOuterScope()!=Doxygen::globalScope && !Config_getBool("DISABLE_INDEX"))
+  if (generateTreeView && getOuterScope()!=Doxygen::globalScope && !Config_getBool(DISABLE_INDEX))
   {
     ol.endContents();
     endFileWithNavPath(getOuterScope(),ol);
@@ -199,30 +215,6 @@ void PageDef::writeDocumentation(OutputList &ol)
 
   ol.popGeneratorState();
   //1.}
-
-  if (!Config_getString("GENERATE_TAGFILE").isEmpty())
-  {
-    bool found = name()=="citelist";
-    QDictIterator<RefList> rli(*Doxygen::xrefLists);
-    RefList *rl;
-    for (rli.toFirst();(rl=rli.current()) && !found;++rli)
-    {
-      if (rl->listName()==name())
-      {
-        found=TRUE;
-        break;
-      }
-    }
-    if (!found) // not one of the generated related pages
-    {
-      Doxygen::tagFile << "  <compound kind=\"page\">" << endl;
-      Doxygen::tagFile << "    <name>" << name() << "</name>" << endl;
-      Doxygen::tagFile << "    <title>" << convertToXML(title()) << "</title>" << endl;
-      Doxygen::tagFile << "    <filename>" << getOutputFileBase() << "</filename>" << endl;
-      writeDocAnchorsToTagFile();
-      Doxygen::tagFile << "  </compound>" << endl;
-    }
-  }
 
   Doxygen::indexList->addIndexItem(this,0,0,filterTitle(title()));
 }
@@ -237,12 +229,20 @@ void PageDef::writePageDocumentation(OutputList &ol)
   }
 
   ol.startTextBlock();
+  QCString docStr = documentation()+inbodyDocumentation();
+  if (!docStr.isEmpty())
+  {
+    ol.pushGeneratorState();
+    ol.disableAllBut(OutputGenerator::Man);
+    ol.writeString(" - ");
+    ol.popGeneratorState();
+  }
   ol.generateDoc(
       docFile(),           // fileName
       docLine(),           // startLine
       this,                // context
       0,                   // memberdef
-      documentation()+inbodyDocumentation(), // docStr
+      docStr,              // docStr
       TRUE,                // index words
       FALSE                // not an example
       );
@@ -288,7 +288,7 @@ void PageDef::writePageDocumentation(OutputList &ol)
 
 bool PageDef::visibleInIndex() const
 {
-  static bool externalPages = Config_getBool("EXTERNAL_PAGES");
+  static bool externalPages = Config_getBool(EXTERNAL_PAGES);
   return // not part of a group
          !getGroupDef() && 
          // not an externally defined page
@@ -316,6 +316,6 @@ void PageDef::setNestingLevel(int l)
 
 void PageDef::setShowToc(bool b)
 {
-  m_showToc = b;
+  m_showToc |= b;
 }
 

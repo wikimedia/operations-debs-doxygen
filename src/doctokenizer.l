@@ -3,7 +3,7 @@
  * $Id: $
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -16,6 +16,8 @@
  *
  */
 
+%option never-interactive
+%option prefix="doctokenizerYY"
 
 %{
 
@@ -37,8 +39,8 @@
 #include "doxygen.h"
 #include "portable.h"
 
-#define YY_NEVER_INTERACTIVE 1
 #define YY_NO_INPUT 1
+#define YY_NO_UNISTD_H 1
   
 //--------------------------------------------------------------------------
 
@@ -49,6 +51,7 @@ static int g_inputPos = 0;
 static const char *g_inputString;
 static QCString g_fileName;
 static bool g_insidePre;
+static int g_sharpCount=0;
 
 // context for section finding phase
 static Definition  *g_definition;
@@ -127,7 +130,7 @@ static int computeIndent(const char *str,int length)
 {
   int i;
   int indent=0;
-  static int tabSize=Config_getInt("TAB_SIZE");
+  static int tabSize=Config_getInt(TAB_SIZE);
   for (i=0;i<length;i++)
   {
     if (str[i]=='\t')
@@ -168,8 +171,7 @@ static void processSection()
   if ((si=Doxygen::sectionDict->find(g_secLabel)))
   {
     si->fileName = file;
-    //si = new SectionInfo(file,g_secLabel,g_secTitle,g_secType);
-    //Doxygen::sectionDict.insert(g_secLabel,si);
+    si->type     = g_secType;
   }
 }
 
@@ -320,9 +322,9 @@ static int yyread(char *buf,int max_size)
 }
 
 //--------------------------------------------------------------------------
-#define REAL_YY_DECL int doctokenizerYYlex (void)
-#define YY_DECL static int local_doctokinizer(void)
-#define LOCAL_YY_DECL local_doctokinizer()
+//#define REAL_YY_DECL int doctokenizerYYlex (void)
+//#define YY_DECL static int local_doctokinizer(void)
+//#define LOCAL_YY_DECL local_doctokinizer()
 
 %}
 
@@ -333,9 +335,9 @@ BLANK     [ \t\r]
 ID        "$"?[a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF]*
 LABELID   [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-]*
 PHPTYPE   [\\:a-z_A-Z0-9\x80-\xFF\-]+
-CITESCHAR [a-z_A-Z\x80-\xFF]
+CITESCHAR [a-z_A-Z0-9\x80-\xFF]
 CITEECHAR [a-z_A-Z0-9\x80-\xFF\-\+:\/]*
-CITEID    {CITESCHAR}*{CITEECHAR}+("."{CITESCHAR}*{CITEECHAR}+)*
+CITEID    {CITESCHAR}{CITEECHAR}*("."{CITESCHAR}{CITEECHAR}*)*
 MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z_A-Z0-9\-]+
 OPTSTARS  ("//"{BLANK}*)?"*"*{BLANK}*
 LISTITEM  {BLANK}*[-]("#")?{WS}
@@ -353,7 +355,7 @@ FILEMASK  ({FILESCHAR}*{FILEECHAR}+("."{FILESCHAR}*{FILEECHAR}+)*)|{HFILEMASK}
 LINKMASK  [^ \t\n\r\\@<&${}]+("("[^\n)]*")")?({BLANK}*("const"|"volatile"){BLANK}+)? 
 VERBATIM  "verbatim"{BLANK}*
 SPCMD1    {CMD}([a-z_A-Z][a-z_A-Z0-9]*|{VERBATIM}|"--"|"---")
-SPCMD2    {CMD}[\\@<>&$#%~".|]
+SPCMD2    {CMD}[\\@<>&$#%~".+|-]
 SPCMD3    {CMD}form#[0-9]+
 SPCMD4    {CMD}"::"
 INOUT	  "inout"|"in"|"out"|("in"{BLANK}*","{BLANK}*"out")|("out"{BLANK}*","{BLANK}*"in")
@@ -370,12 +372,14 @@ SCOPECPP  {SCOPEPRE}*(~)?{ID}{TEMPLPART}?
 SCOPEOBJC {SCOPEPRE}?{ID}{SCOPEKEYS}?
 SCOPEMASK {SCOPECPP}|{SCOPEOBJC}
 FUNCARG   "("{FUNCPART}")"({BLANK}*("volatile"|"const"){BLANK})?
+FUNCARG2  "("{FUNCPART}")"({BLANK}*("volatile"|"const"))?
 OPNEW     {BLANK}+"new"({BLANK}*"[]")?
 OPDEL     {BLANK}+"delete"({BLANK}*"[]")?
 OPNORM    {OPNEW}|{OPDEL}|"+"|"-"|"*"|"/"|"%"|"^"|"&"|"|"|"~"|"!"|"="|"<"|">"|"+="|"-="|"*="|"/="|"%="|"^="|"&="|"|="|"<<"|">>"|"<<="|">>="|"=="|"!="|"<="|">="|"&&"|"||"|"++"|"--"|","|"->*"|"->"|"[]"|"()"
 OPCAST    {BLANK}+[^<(\r\n.,][^(\r\n.,]*
 OPMASK    ({BLANK}*{OPNORM}{FUNCARG})
 OPMASKOPT ({BLANK}*{OPNORM}{FUNCARG}?)|({OPCAST}{FUNCARG})
+OPMASKOP2 ({BLANK}*{OPNORM}{FUNCARG2}?)|({OPCAST}{FUNCARG2})
 LNKWORD1  ("::"|"#")?{SCOPEMASK}
 CVSPEC    {BLANK}*("const"|"volatile")
 LNKWORD2  (({SCOPEPRE}*"operator"{OPMASK})|({SCOPEPRE}"operator"{OPMASKOPT})|(("::"|"#"){SCOPEPRE}*"operator"{OPMASKOPT})){CVSPEC}?
@@ -386,13 +390,15 @@ WORD1     {ESCWORD}|{CHARWORDQ}+|"{"|"}"|"'\"'"|("\""[^"\n]*\n?[^"\n]*"\"")
 WORD2     "."|","|"("|")"|"["|"]"|":"|";"|"\?"|"="|"'"
 WORD1NQ   {ESCWORD}|{CHARWORDQ}+|"{"|"}"
 WORD2NQ   "."|","|"("|")"|"["|"]"|":"|";"|"\?"|"="|"'"
+CAPTION   [cC][aA][pP][tT][iI][oO][nN]
 HTMLTAG   "<"(("/")?){ID}({WS}+{ATTRIB})*{WS}*(("/")?)">" 
 HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"pre"|"sub"|"sup"|"tr"|"td"|"th"|"ol"|"ul"|"li"|"tt"|"kbd"|"em"|"hr"|"dl"|"dt"|"dd"|"br"|"i"|"a"|"b"|"p"
 HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"
 HTMLKEYW  {HTMLKEYL}|{HTMLKEYU}
-REFWORD2  ("#"|"::")?((({ID}{TEMPLPART}?)|{ANONNS})("."|"#"|"::"|"-"|"/"))*({ID}{TEMPLPART}?(":")?){FUNCARG}?
+REFWORD2  ("#"|"::")?((({ID}{TEMPLPART}?)|{ANONNS})("."|"#"|"::"|"-"|"/"))*({ID}{TEMPLPART}?(":")?){FUNCARG2}?
 REFWORD3  ({ID}":")*{ID}":"?
-REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
+REFWORD4  (({SCOPEPRE}*"operator"{OPMASKOP2})|(("::"|"#"){SCOPEPRE}*"operator"{OPMASKOP2})){CVSPEC}?
+REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{REFWORD4}
 
 %option noyywrap
 %option yylineno
@@ -433,6 +439,8 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 %x St_SkipTitle
 %x St_Anchor
 %x St_Snippet
+%x St_SetScope
+%x St_SetScopeEnd
 
 %x St_Sections
 %s St_SecLabel1
@@ -853,14 +861,28 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 <St_Msc>.              { /* msc text */
   			 g_token->verb+=yytext;
   		       }
-<St_PlantUMLOpt>\n     {
-                         g_token->sectionId=g_token->sectionId.stripWhiteSpace();
-                         BEGIN(St_PlantUML);
+<St_PlantUMLOpt>{BLANK}*"{"[^}]*"}" { // case 1: file name is specified as {filename}
+                         g_token->sectionId = QCString(yytext).stripWhiteSpace();
+                         // skip curly brackets around the optional image name
+			 g_token->sectionId = g_token->sectionId.mid(1,g_token->sectionId.length()-2).stripWhiteSpace();
+                         return RetVal_OK;
                        }
-<St_PlantUMLOpt>["{}]   { // skip curly brackets or quotes around the optional image name
+<St_PlantUMLOpt>{BLANK}*{FILEMASK}{BLANK}+/{ID}"=" { // case 2: plain file name specified followed by an attribute
+                         g_token->sectionId = QCString(yytext).stripWhiteSpace();
+                         return RetVal_OK;
+                       }
+<St_PlantUMLOpt>{BLANK}*{FILEMASK}{BLANK}+/"\"" { // case 3: plain file name specified followed by a quoted title
+                         g_token->sectionId = QCString(yytext).stripWhiteSpace();
+                         return RetVal_OK;
+                       }
+<St_PlantUMLOpt>{BLANK}*{FILEMASK}{BLANK}*/\n { // case 4: plain file name specified without title or attributes
+                         g_token->sectionId = QCString(yytext).stripWhiteSpace();
+                         return RetVal_OK;
                        }
 <St_PlantUMLOpt>.      {
-                         g_token->sectionId += yytext;
+                         g_token->sectionId = "";
+                         unput(*yytext);
+                         return RetVal_OK;
                        }
 <St_PlantUML>{CMD}"enduml"  {
                          return RetVal_OK;
@@ -872,7 +894,7 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
   		       }
 <St_Title>"\""	       { // quoted title
   			 BEGIN(St_TitleQ);
-  		       } 
+  		       }
 <St_Title>[ \t]+       {
                          g_token->chars=yytext;
   			 return TK_WHITESPACE;
@@ -896,6 +918,13 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
                          g_token->name = yytext+1;
 			 g_token->paramDir=TokenInfo::Unspecified;
                          return TK_COMMAND;
+                       }
+<St_TitleN>{ID}"="     { /* attribute */
+                         if (yytext[0]=='%') // strip % if present
+			   g_token->name = &yytext[1];
+			 else
+                           g_token->name = yytext;
+			 return TK_WORD;
                        }
 <St_TitleN>{WORD1}     |
 <St_TitleN>{WORD2}     { /* word */
@@ -942,8 +971,7 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
                        }
 <St_TitleA>{BLANK}*{ID}{BLANK}*"="{BLANK}* { // title attribute
   			 g_token->name = yytext;
-			 g_token->name = g_token->name.left(
-			       g_token->name.find('=')).stripWhiteSpace();
+			 g_token->name = g_token->name.left(g_token->name.find('=')).stripWhiteSpace();
   			 BEGIN(St_TitleV);
   		       }
 <St_TitleV>[^ \t\r\n]+ { // attribute value
@@ -1008,6 +1036,34 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
   		       }
 <St_IntRef>{BLANK}+"\"" {
                          BEGIN(St_Ref2);
+                       }
+<St_SetScope>({SCOPEMASK}|{ANONNS}){BLANK} {
+                         g_token->name = yytext;
+                         g_token->name = g_token->name.stripWhiteSpace();
+			 return TK_WORD;
+  		       }
+<St_SetScope>{SCOPEMASK}"<" {
+                         g_token->name = yytext;
+                         g_token->name = g_token->name.stripWhiteSpace();
+                         g_sharpCount=1;
+                         BEGIN(St_SetScopeEnd);
+                       }
+<St_SetScope>{BLANK}   {
+                       }
+<St_SetScopeEnd>"<"    {
+                         g_token->name += yytext;
+                         g_sharpCount++;
+                       }
+<St_SetScopeEnd>">"    {
+                         g_token->name += yytext;
+                         g_sharpCount--;
+                         if (g_sharpCount<=0)
+                         {
+                           return TK_WORD;
+                         }
+                       }
+<St_SetScopeEnd>.      {
+                         g_token->name += yytext;
                        }
 <St_Ref2>"&"{ID}";"    { /* symbol */
                          g_token->name = yytext;
@@ -1096,8 +1152,8 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 <St_Comment>"-->"      { /* end of html comment */
                          BEGIN(g_commentState); 
                        }
-<St_Comment>[^-\n]+       /* inside html comment */
-<St_Comment>.             /* inside html comment */
+<St_Comment>[^-]+      /* inside html comment */
+<St_Comment>.          /* inside html comment */
 
      /* State for skipping title (all chars until the end of the line) */
 
@@ -1106,8 +1162,26 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 
      /* State for the pass used to find the anchors and sections */ 
 
-<St_Sections>[^\n@\\]+
-<St_Sections>"@@"|"\\\\"
+<St_Sections>[^\n@\\<]+
+<St_Sections>"@@"|"\\\\"|"@<"|"\\<"
+<St_Sections>"<"{CAPTION}({WS}+{ATTRIB})*">" {
+                                      QCString tag=yytext;
+                                      int s=tag.find("id=");
+                                      if (s!=-1) // command has id attribute
+                                      {
+                                        char c=tag[s+3];
+                                        if (c=='\'' || c=='"') // valid start
+                                        {
+                                          int e=tag.find(c,s+4);
+                                          if (e!=-1) // found matching end
+                                          {
+                                            g_secType = SectionInfo::Table;
+                                            g_secLabel=tag.mid(s+4,e-s-4); // extract id
+                                            processSection();
+                                          }
+                                        }
+                                      }
+                                    }
 <St_Sections>{CMD}"anchor"{BLANK}+  { 
                                       g_secType = SectionInfo::Anchor; 
 				      BEGIN(St_SecLabel1); 
@@ -1224,7 +1298,7 @@ REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}|{LNKWORD2}
 			 return TK_COMMAND;
                        }
 <*>.                   { 
-                         warn(g_fileName,yylineno,"Unexpected character `%s'",yytext); 
+                         warn(g_fileName,yylineno,"Unexpected character `%s'",yytext);
 		       }
 %%
 
@@ -1341,11 +1415,17 @@ void doctokenizerYYsetStateMsc()
   BEGIN(St_Msc);
 }
 
-void doctokenizerYYsetStatePlantUML()
+void doctokenizerYYsetStatePlantUMLOpt()
 {
   g_token->verb="";
   g_token->sectionId="";
   BEGIN(St_PlantUMLOpt);
+}
+
+void doctokenizerYYsetStatePlantUML()
+{
+  g_token->verb="";
+  BEGIN(St_PlantUML);
 }
 
 void doctokenizerYYsetStateParam()
@@ -1408,6 +1488,11 @@ void doctokenizerYYsetStateSnippet()
   BEGIN(St_Snippet);
 }
 
+void doctokenizerYYsetStateSetScope()
+{
+  BEGIN(St_SetScope);
+}
+
 void doctokenizerYYcleanup()
 {
   yy_delete_buffer( YY_CURRENT_BUFFER );
@@ -1440,13 +1525,13 @@ void doctokenizerYYendAutoList()
   g_autoListLevel--;
 }
 
-REAL_YY_DECL
-{
-  printlex(yy_flex_debug, TRUE, __FILE__, g_fileName);
-  int retval = LOCAL_YY_DECL;
-  printlex(yy_flex_debug, FALSE, __FILE__, g_fileName);
-  return retval;
-}
+//REAL_YY_DECL
+//{
+//  printlex(yy_flex_debug, TRUE, __FILE__, g_fileName);
+//  int retval = LOCAL_YY_DECL;
+//  printlex(yy_flex_debug, FALSE, __FILE__, g_fileName);
+//  return retval;
+//}
 #if !defined(YY_FLEX_SUBMINOR_VERSION) 
 extern "C" { // some bogus code to keep the compiler happy
     void doctokenizerYYdummy() { yy_flex_realloc(0,0); }

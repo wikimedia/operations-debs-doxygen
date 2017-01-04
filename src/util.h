@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -57,6 +57,7 @@ class BufStr;
 class QFileInfo;
 class QStrList;
 class FTextStream;
+class QFile;
 
 //--------------------------------------------------------------------
 
@@ -192,7 +193,7 @@ void mergeArguments(ArgumentList *,ArgumentList *,bool forceNameOverwrite=FALSE)
 
 QCString substituteClassNames(const QCString &s);
 
-QCString substitute(const char *s,const char *src,const char *dst);
+QCString substitute(const QCString &s,const QCString &src,const QCString &dst);
 
 QCString clearBlock(const char *s,const char *begin,const char *end);
 
@@ -229,7 +230,7 @@ QCString removeRedundantWhiteSpace(const QCString &s);
 
 QCString argListToString(ArgumentList *al,bool useCanonicalType=FALSE,bool showDefVals=TRUE);
 
-QCString tempArgListToString(ArgumentList *al);
+QCString tempArgListToString(ArgumentList *al,SrcLangExt lang);
 
 QCString generateMarker(int id);
 
@@ -274,7 +275,11 @@ QCString insertTemplateSpecifierInScope(const QCString &scope,const QCString &te
 
 QCString stripScope(const char *name);
 
+QCString convertToId(const char *s);
+
 QCString convertToHtml(const char *s,bool keepEntities=TRUE);
+
+QCString convertToLaTeX(const QCString &s,bool insideTabbing=FALSE,bool keepSpaces=FALSE);
 
 QCString convertToXML(const char *s);
 
@@ -316,7 +321,7 @@ int filterCRLF(char *buf,int len);
 
 void addRefItem(const QList<ListItemInfo> *sli,const char *prefix,
                 const char *key,
-                const char *name,const char *title,const char *args);
+                const char *name,const char *title,const char *args,Definition *scope);
 
 PageDef *addRelatedPage(const char *name,const QCString &ptitle,
                            const QCString &doc,QList<SectionInfo> *anchors,
@@ -334,11 +339,20 @@ void addGroupListToTitle(OutputList &ol,Definition *d);
 void filterLatexString(FTextStream &t,const char *str,
                        bool insideTabbing=FALSE,
                        bool insidePre=FALSE,
-                       bool insideItem=FALSE);
+                       bool insideItem=FALSE,
+                       bool keepSpaces=FALSE);
+
+QCString latexEscapeLabelName(const char *s,bool insideTabbing);
+QCString latexEscapeIndexChars(const char *s,bool insideTabbing);
+QCString latexEscapePDFString(const char *s);
 
 QCString rtfFormatBmkStr(const char *name);
 
 QCString linkToText(SrcLangExt lang,const char *link,bool isFileName);
+
+bool checkExtension(const char *fName, const char *ext);
+
+QCString stripExtensionGeneral(const char *fName, const char *ext);
 
 QCString stripExtension(const char *fName);
 
@@ -372,6 +386,7 @@ QCString stripLeadingAndTrailingEmptyLines(const QCString &s,int &docLine);
 bool updateLanguageMapping(const QCString &extension,const QCString &parser);
 SrcLangExt getLanguageFromFileName(const QCString fileName);
 void initDefaultExtensionMapping();
+void addCodeOnlyMappings();
 
 MemberDef *getMemberFromSymbol(Definition *scope,FileDef *fileScope, 
                                 const char *n);
@@ -430,6 +445,7 @@ QCString replaceColorMarkers(const char *str);
 
 bool copyFile(const QCString &src,const QCString &dest);
 QCString extractBlock(const QCString text,const QCString marker);
+int lineBlock(const QCString text,const QCString marker);
 
 QCString correctURL(const QCString &url,const QCString &relPath);
 
@@ -438,6 +454,8 @@ QCString processMarkup(const QCString &s);
 bool protectionLevelVisible(Protection prot);
 
 QCString stripIndentation(const QCString &s);
+
+QCString getDotImageExtension(void);
 
 bool fileVisibleInIndex(FileDef *fd,bool &genSourceFile);
 
@@ -457,6 +475,8 @@ void convertProtectionLevel(
                   );
 
 bool mainPageHasTitle();
+bool openOutputFile(const char *outFile,QFile &f);
+void writeExtraLatexPackages(FTextStream &t);
 
 #endif
 

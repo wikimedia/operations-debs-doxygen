@@ -1,0 +1,13 @@
+Index: b/cmake/FindLibClang.cmake
+===================================================================
+--- a/cmake/FindLibClang.cmake
++++ b/cmake/FindLibClang.cmake
+@@ -41,7 +41,7 @@ if (NOT CLANG_LIBS)
+       if (MSVC)
+         set (CLANG_LIBS "${CLANG_LIBDIR}/libclang.lib")
+       else()
+-        set (CLANG_LIBS "-L${CLANG_LIBDIR}" "-lclang" "-Wl,-rpath,${CLANG_LIBDIR}")
++        set (CLANG_LIBS "-L${CLANG_LIBDIR}" "-lclang")
+       endif()
+     endif ()
+   else ()

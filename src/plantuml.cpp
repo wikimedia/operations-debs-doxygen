@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -16,11 +16,13 @@
 #include "plantuml.h"
 #include "portable.h"
 #include "config.h"
+#include "doxygen.h"
+#include "index.h"
 #include "message.h"
 
 #include <qdir.h>
 
-//static const int maxCmdLine = 40960;
+static const int maxCmdLine = 40960;
 
 QCString writePlantUMLSource(const QCString &outDir,const QCString &fileName,const QCString &content)
 {
@@ -53,45 +55,89 @@ QCString writePlantUMLSource(const QCString &outDir,const QCString &fileName,con
 
 void generatePlantUMLOutput(const char *baseName,const char *outDir,PlantUMLOutputFormat format)
 {
-  static QCString plantumlJarPath = Config_getString("PLANTUML_JAR_PATH");
+  static QCString plantumlJarPath = Config_getString(PLANTUML_JAR_PATH);
+  static QCString plantumlConfigFile = Config_getString(PLANTUML_CFG_FILE);
 
   QCString pumlExe = "java";
-  QCString pumlArgs = "-Djava.awt.headless=true -jar \""+plantumlJarPath+"plantuml.jar\" ";
+  QCString pumlArgs = "";
+
+  QStrList &pumlIncludePathList = Config_getList(PLANTUML_INCLUDE_PATH);
+  char *s=pumlIncludePathList.first();
+  if (s)
+  {
+    pumlArgs += "-Dplantuml.include.path=\"";
+    pumlArgs += s;
+    s = pumlIncludePathList.next(); 
+  }
+  while (s)
+  {
+    pumlArgs += portable_pathListSeparator();
+    pumlArgs += s;
+    s = pumlIncludePathList.next(); 
+  }
+  if (pumlIncludePathList.first()) pumlArgs += "\" ";
+  pumlArgs += "-Djava.awt.headless=true -jar \""+plantumlJarPath+"plantuml.jar\" ";
+  if (!plantumlConfigFile.isEmpty())
+  {
+    pumlArgs += "-config \"";
+    pumlArgs += plantumlConfigFile;
+    pumlArgs += "\" ";
+  }
   pumlArgs+="-o \"";
   pumlArgs+=outDir;
   pumlArgs+="\" ";
-  QCString extension;
+  QCString imgName = baseName;
+  // The basename contains path, we need to strip the path from the filename in order
+  // to create the image file name which should be included in the index.qhp (Qt help index file).
+  int i;
+  if ((i=imgName.findRev('/'))!=-1) // strip path
+  {
+    imgName=imgName.right(imgName.length()-i-1);
+  }
   switch (format)
   {
     case PUML_BITMAP:
       pumlArgs+="-tpng";
-      extension=".png";
+      imgName+=".png";
       break;
     case PUML_EPS:
       pumlArgs+="-teps";
-      extension=".eps";
+      imgName+=".eps";
       break;
     case PUML_SVG:
       pumlArgs+="-tsvg";
-      extension=".svg";
+      imgName+=".svg";
       break;
   }
   pumlArgs+=" \"";
   pumlArgs+=baseName;
   pumlArgs+=".pu\" ";
+  pumlArgs+="-charset UTF-8 ";
   int exitCode;
-  //printf("*** running: %s %s outDir:%s %s\n",pumlExe.data(),pumlArgs.data(),outDir,outFile);
+  //printf("*** running: %s %s outDir:%s %s\n",pumlExe.data(),pumlArgs.data(),outDir,baseName);
   msg("Running PlantUML on generated file %s.pu\n",baseName);
   portable_sysTimerStart();
-  if ((exitCode=portable_system(pumlExe,pumlArgs,FALSE))!=0)
+  if ((exitCode=portable_system(pumlExe,pumlArgs,TRUE))!=0)
   {
-    err("Problems running PlantUML. Verify that the command 'java -jar \"%splantuml.jar\" -h' works from the command line\n",
-        plantumlJarPath.data());
+    err("Problems running PlantUML. Verify that the command 'java -jar \"%splantuml.jar\" -h' works from the command line. Exit code: %d\n",
+        plantumlJarPath.data(),exitCode);
   }
-  else if (Config_getBool("DOT_CLEANUP"))
+  else if (Config_getBool(DOT_CLEANUP))
   {
     QFile(QCString(baseName)+".pu").remove();
   }
   portable_sysTimerStop();
+  if ( (format==PUML_EPS) && (Config_getBool(USE_PDFLATEX)) )
+  {
+    QCString epstopdfArgs(maxCmdLine);
+    epstopdfArgs.sprintf("\"%s.eps\" --outfile=\"%s.pdf\"",baseName,baseName);
+    portable_sysTimerStart();
+    if ((exitCode=portable_system("epstopdf",epstopdfArgs))!=0)
+    {
+      err("Problems running epstopdf. Check your TeX installation! Exit code: %d\n",exitCode);
+    }
+    portable_sysTimerStop();
+  }
+  Doxygen::indexList->addImageFile(imgName);
 }
 

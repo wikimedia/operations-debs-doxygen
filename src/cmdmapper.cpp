@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -88,6 +88,8 @@ CommandMap cmdMap[] =
   { "secreflist",    CMD_SECREFLIST },
   { "section",       CMD_SECTION },
   { "snippet",       CMD_SNIPPET },
+  { "snippetdoc",    CMD_SNIPPETDOC },
+  { "snippetlineno", CMD_SNIPWITHLINES },
   { "subpage",       CMD_SUBPAGE },
   { "subsection",    CMD_SUBSECTION },
   { "subsubsection", CMD_SUBSUBSECTION },
@@ -115,6 +117,9 @@ CommandMap cmdMap[] =
   { "#",             CMD_HASH },
   { "%",             CMD_PERCENT },
   { "|",             CMD_PIPE },
+  { ".",             CMD_PUNT },
+  { "+",             CMD_PLUS },
+  { "-",             CMD_MINUS },
   { "::",            CMD_DCOLON },
   { "\"",            CMD_QUOTE },
   { "_internalref",  CMD_INTERNALREF },
@@ -127,6 +132,7 @@ CommandMap cmdMap[] =
   { "manonly",       CMD_MANONLY },
   { "endmanonly",    CMD_ENDMANONLY },
   { "includelineno", CMD_INCWITHLINES },
+  { "includedoc",    CMD_INCLUDEDOC },
   { "inheritdoc",    CMD_INHERITDOC },
   { "mscfile",       CMD_MSCFILE },
   { "rtfonly",       CMD_RTFONLY },
@@ -140,6 +146,7 @@ CommandMap cmdMap[] =
   { "diafile",       CMD_DIAFILE },
   { "--",            CMD_NDASH },
   { "---",           CMD_MDASH },
+  { "_setscope",     CMD_SETSCOPE },
   { 0,               0 },
 };
 
@@ -224,6 +231,16 @@ int Mapper::map(const char *n)
   if (!m_cs) name=name.lower();
   int *result;
   return !name.isEmpty() && (result=m_map.find(name)) ? *result: 0;
+}
+
+QString Mapper::find(const int n)
+{
+  QDictIterator<int> mapIterator(m_map);
+  for (int *curVal = mapIterator.toFirst();(curVal = mapIterator.current());++mapIterator)
+  {
+    if (*curVal == n || (*curVal == (n | SIMPLESECT_BIT))) return mapIterator.currentKey();
+  }
+  return NULL;
 }
 
 Mapper::Mapper(const CommandMap *cm,bool caseSensitive) : m_map(89), m_cs(caseSensitive)

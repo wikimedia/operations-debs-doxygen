@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -14,6 +14,8 @@
  * input used in their production; they are not affected by this license.
  *
  */
+%option never-interactive
+%option prefix="codeYY"
 
 %{
 
@@ -46,7 +48,7 @@
 //#define DBG_CTX(x) fprintf x
 #define DBG_CTX(x) do { } while(0)
 
-#define YY_NEVER_INTERACTIVE 1
+#define YY_NO_UNISTD_H 1
 
 #define CLASSBLOCK (int *)4
 #define SCOPEBLOCK (int *)8
@@ -109,6 +111,7 @@ static int	     g_lastSpecialCContext;
 static int           g_lastStringContext;
 static int           g_lastSkipCppContext;
 static int           g_lastVerbStringContext;
+static int           g_lastObjCCallContext;
 static int           g_memCallContext;
 static int	     g_lastCContext;
 static int           g_skipInlineInitContext;
@@ -132,6 +135,7 @@ struct ObjCCallCtx
   int id;
   QCString methodName;
   QCString objectTypeOrName;
+  QGString comment;
   ClassDef *objectType;
   MemberDef *objectVar;
   MemberDef *method;
@@ -146,11 +150,13 @@ static int g_currentCtxId=0;
 static int g_currentNameId=0;
 static int g_currentObjId=0;
 static int g_currentWordId=0;
+static int g_currentCommentId=0;
 static QStack<ObjCCallCtx> g_contextStack;
 static QIntDict<ObjCCallCtx> g_contextDict;
 static QIntDict<QCString> g_nameDict;
 static QIntDict<QCString> g_objectDict;
 static QIntDict<QCString> g_wordDict;
+static QIntDict<QCString> g_commentDict;
 static int g_braceCount=0;
   
 static void saveObjCContext();
@@ -600,7 +606,7 @@ static void writeMultiLineCodeLink(CodeOutputInterface &ol,
                                    Definition *d,
                                    const char *text)
 {
-  static bool sourceTooltips = Config_getBool("SOURCE_TOOLTIPS");
+  static bool sourceTooltips = Config_getBool(SOURCE_TOOLTIPS);
   TooltipManager::instance()->addTooltip(d);
   QCString ref  = d->getReference();
   QCString file = d->getOutputFileBase();
@@ -858,42 +864,51 @@ static bool getLinkInScope(const QCString &c,  // scope
   GroupDef     *gd;
   DBG_CTX((stderr,"getLinkInScope: trying `%s'::`%s' varOnly=%d\n",c.data(),m.data(),varOnly));
   if (getDefs(c,m,"()",md,cd,fd,nd,gd,FALSE,g_sourceFileDef,FALSE,g_forceTagReference) && 
-      md->isLinkable() && (!varOnly || md->isVariable()))
+      (!varOnly || md->isVariable()))
   {
-    //printf("found it %s!\n",md->qualifiedName().data());
-    if (g_exampleBlock)
+    if (md->isLinkable())
     {
-      QCString anchor;
-      anchor.sprintf("a%d",g_anchorCount);
-      //printf("addExampleFile(%s,%s,%s)\n",anchor.data(),g_exampleName.data(),
-      //                                  g_exampleFile.data());
-      if (md->addExample(anchor,g_exampleName,g_exampleFile))
+      //printf("found it %s!\n",md->qualifiedName().data());
+      if (g_exampleBlock)
       {
-	ol.writeCodeAnchor(anchor);
-	g_anchorCount++;
+        QCString anchor;
+        anchor.sprintf("a%d",g_anchorCount);
+        //printf("addExampleFile(%s,%s,%s)\n",anchor.data(),g_exampleName.data(),
+        //                                  g_exampleFile.data());
+        if (md->addExample(anchor,g_exampleName,g_exampleFile))
+        {
+          ol.writeCodeAnchor(anchor);
+          g_anchorCount++;
+        }
+      }
+
+      Definition *d = md->getOuterScope()==Doxygen::globalScope ?
+        md->getFileDef() : md->getOuterScope();
+      if (md->getGroupDef()) d = md->getGroupDef();
+      if (d && d->isLinkable())
+      {
+        g_theCallContext.setScope(stripClassName(md->typeString(),md->getOuterScope()));
+        //printf("g_currentDefinition=%p g_currentMemberDef=%p g_insideBody=%d\n",
+        //        g_currentDefinition,g_currentMemberDef,g_insideBody);
+
+        if (g_currentDefinition && g_currentMemberDef &&
+            md!=g_currentMemberDef && g_insideBody && g_collectXRefs)
+        {
+          addDocCrossReference(g_currentMemberDef,md);
+        }
+        //printf("d->getReference()=`%s' d->getOutputBase()=`%s' name=`%s' member name=`%s'\n",d->getReference().data(),d->getOutputFileBase().data(),d->name().data(),md->name().data());
+
+        writeMultiLineCodeLink(ol,md, text ? text : memberText);
+        addToSearchIndex(text ? text : memberText);
+        return TRUE;
       }
     }
-
-    Definition *d = md->getOuterScope()==Doxygen::globalScope ?
-	            md->getFileDef() : md->getOuterScope();
-    if (md->getGroupDef()) d = md->getGroupDef();
-    if (d && d->isLinkable())
+    else // found member, but is is not linkable, so make sure content inside is not assign
+         // to the previous member, see bug762760
     {
-      g_theCallContext.setScope(stripClassName(md->typeString(),md->getOuterScope()));
-      //printf("g_currentDefinition=%p g_currentMemberDef=%p g_insideBody=%d\n",
-      //        g_currentDefinition,g_currentMemberDef,g_insideBody);
-
-      if (g_currentDefinition && g_currentMemberDef &&
-          md!=g_currentMemberDef && g_insideBody && g_collectXRefs)
-      {
-	addDocCrossReference(g_currentMemberDef,md);
-      }
-      //printf("d->getReference()=`%s' d->getOutputBase()=`%s' name=`%s' member name=`%s'\n",d->getReference().data(),d->getOutputFileBase().data(),d->name().data(),md->name().data());
-     
-      writeMultiLineCodeLink(ol,md, text ? text : memberText);
-      addToSearchIndex(text ? text : memberText);
-      return TRUE;
-    } 
+      DBG_CTX((stderr,"unlinkable member %s\n",md->name().data()));
+      g_currentMemberDef = 0;
+    }
   }
   return FALSE;
 }
@@ -1236,7 +1251,6 @@ static void generateMemberLink(CodeOutputInterface &ol,const QCString &varName,
       {
 	int vi;
 	QCString vn=varName;
-	QCString scope;
 	if ((vi=vn.findRev("::"))!=-1 || (vi=vn.findRev('.'))!=-1)  // explicit scope A::b(), probably static member
 	{
 	  ClassDef *jcd = getClass(vn.left(vi));
@@ -1706,6 +1720,21 @@ static void writeObjCMethodCall(ObjCCallCtx *ctx)
             codifyLines(pWord->data());
 	  }
 	}
+        else if (nc=='d') // comment block
+        {
+          nc=*p++;
+	  QCString refIdStr;
+	  while (nc!=0 && isdigit(nc)) { refIdStr+=nc; nc=*p++; }
+	  p--;
+	  int refId=refIdStr.toInt();
+	  QCString *pComment = g_commentDict.find(refId);
+          if (pComment)
+          {
+            startFontClass("comment");
+	    codifyLines(pComment->data());
+	    endFontClass();
+          }
+        }
 	else // illegal marker
 	{
 	  ASSERT(!"invalid escape sequence");
@@ -1718,7 +1747,7 @@ static void writeObjCMethodCall(ObjCCallCtx *ctx)
       s[0]=c;s[1]=0;
       codifyLines(s);
     }
-  }  
+  }
   //printf("%s %s]\n",ctx->objectTypeOrName.data(),ctx->methodName.data());
   //printf("}=(type='%s',name='%s')",
   //    ctx->objectTypeOrName.data(),
@@ -1755,6 +1784,15 @@ static QCString escapeWord(const char *s)
   return result;
 }
 
+static QCString escapeComment(const char *s)
+{
+  QCString result;
+  result.sprintf("$d%d",g_currentCommentId);
+  g_commentDict.insert(g_currentCommentId,new QCString(s));
+  g_currentCommentId++;
+  return result;
+}
+
 /* -----------------------------------------------------------------
  */
 #undef	YY_INPUT
@@ -1782,7 +1820,7 @@ TEMPLIST "<"[^\"\}\{\(\)\/\n\>]*">"
 SCOPETNAME (((({ID}{TEMPLIST}?){BN}*)?{SEP}{BN}*)*)((~{BN}*)?{ID})
 SCOPEPREFIX ({ID}{TEMPLIST}?{BN}*{SEP}{BN}*)+
 KEYWORD_OBJC ("@public"|"@private"|"@protected"|"@class"|"@implementation"|"@interface"|"@end"|"@selector"|"@protocol"|"@optional"|"@required"|"@throw"|"@synthesize"|"@property")
-KEYWORD ("asm"|"__assume"|"auto"|"class"|"const"|"delete"|"enum"|"explicit"|"extern"|"false"|"friend"|"gcnew"|"gcroot"|"get"|"inline"|"internal"|"mutable"|"namespace"|"new"|"nullptr"|"override"|"operator"|"pin_ptr"|"private"|"protected"|"public"|"raise"|"register"|"remove"|"self"|"sizeof"|"static"|"struct"|"__super"|"function"|"template"|"generic"|"this"|"true"|"typedef"|"typeid"|"typename"|"union"|"using"|"virtual"|"volatile"|"abstract"|"final"|"import"|"synchronized"|"transient"|"alignas"|"alignof"|{KEYWORD_OBJC})
+KEYWORD ("asm"|"__assume"|"auto"|"class"|"const"|"delete"|"enum"|"explicit"|"extern"|"false"|"friend"|"gcnew"|"gcroot"|"set"|"get"|"inline"|"internal"|"mutable"|"namespace"|"new"|"nullptr"|"override"|"operator"|"pin_ptr"|"private"|"protected"|"public"|"raise"|"register"|"remove"|"self"|"sizeof"|"static"|"struct"|"__super"|"function"|"template"|"generic"|"this"|"true"|"typedef"|"typeid"|"typename"|"union"|"using"|"virtual"|"volatile"|"abstract"|"final"|"import"|"synchronized"|"transient"|"alignas"|"alignof"|{KEYWORD_OBJC})
 FLOWKW  ("break"|"case"|"catch"|"continue"|"default"|"do"|"else"|"finally"|"for"|"foreach"|"for each"|"goto"|"if"|"return"|"switch"|"throw"|"throws"|"try"|"while"|"@try"|"@catch"|"@finally")
 TYPEKW  ("bool"|"char"|"double"|"float"|"int"|"long"|"object"|"short"|"signed"|"unsigned"|"void"|"wchar_t"|"size_t"|"boolean"|"id"|"SEL"|"string"|"nullptr")
 CASTKW ("const_cast"|"dynamic_cast"|"reinterpret_cast"|"static_cast")
@@ -1828,6 +1866,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 %x      ObjCCall
 %x      ObjCMName
 %x      ObjCSkipStr
+%x      ObjCCallComment
 %x      OldStyleArgs
 %x	UsingName
 %x      RawString
@@ -2026,6 +2065,11 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					}
 <SkipCPP>"//"				{ 
   					  g_code->codify(yytext);
+					}
+<Body,FuncCall>"}"			{ 
+                                          g_theVarContext.popScope();
+					  g_yyColNr++;
+					  g_code->codify(yytext);
 					}
 <Body,FuncCall>"{"			{ 
                                           g_theVarContext.pushScope();
@@ -2522,7 +2566,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  generateClassOrGlobalLink(*g_code,yytext);
   					  g_name+=yytext; 
 					}
-<Body>{SCOPENAME}/{BN}*[;,)\]]		{ // "int var;" or "var, var2" or "debug(f) macro" 
+<Body>{SCOPENAME}/{BN}*[:;,)\]]		{ // "int var;" or "var, var2" or "debug(f) macro" , or int var : 5;
 					  addType();
 					  // changed this to generateFunctionLink, see bug 624514
 					  //generateClassOrGlobalLink(*g_code,yytext,FALSE,TRUE);
@@ -2719,10 +2763,12 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					    g_nameDict.setAutoDelete(TRUE);
 					    g_objectDict.setAutoDelete(TRUE);
 					    g_wordDict.setAutoDelete(TRUE);
+                                            g_commentDict.setAutoDelete(TRUE);
 					    g_contextDict.clear();
 					    g_nameDict.clear();
 					    g_objectDict.clear();
 					    g_wordDict.clear();
+                                            g_commentDict.clear();
 					    g_currentCtxId  = 0;
 					    g_currentNameId  = 0;
 					    g_currentObjId  = 0;
@@ -2807,13 +2853,13 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  BEGIN(Body);
   					}
   */
-<ObjCCall,ObjCMName>"["         { 
-                                   saveObjCContext();
-			           g_currentCtx->format+=*yytext;
-			           BEGIN(ObjCCall);
-		                   //printf("open\n");
-                                 }
-<ObjCCall,ObjCMName>"]"         { 
+<ObjCCall,ObjCMName>"["|"{"       {
+                                    saveObjCContext();
+			            g_currentCtx->format+=*yytext;
+			            BEGIN(ObjCCall);
+		                    //printf("open\n");
+                                  }
+<ObjCCall,ObjCMName>"]"|"}"       {
 			            g_currentCtx->format+=*yytext;
                                     restoreObjCContext();
 			            BEGIN(ObjCMName);
@@ -2825,6 +2871,23 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 				    }
 			            //printf("close\n");
                                   }
+<ObjCCall,ObjCMName>"//".*        {
+                                    g_currentCtx->format+=escapeComment(yytext);
+                                  }
+<ObjCCall,ObjCMName>"/*"          {
+                                    g_lastObjCCallContext = YY_START;
+                                    g_currentCtx->comment=yytext;
+                                    BEGIN(ObjCCallComment);
+                                  }
+<ObjCCallComment>"*/"		  {
+                                    g_currentCtx->comment+=yytext;
+                                    g_currentCtx->format+=escapeComment(g_currentCtx->comment);
+  			  	    BEGIN(g_lastObjCCallContext);
+				  }
+<ObjCCallComment>[^*\n]+          { g_currentCtx->comment+=yytext; }
+<ObjCCallComment>"//"|"/*"        { g_currentCtx->comment+=yytext; }
+<ObjCCallComment>\n               { g_currentCtx->comment+=*yytext; }
+<ObjCCallComment>.                { g_currentCtx->comment+=*yytext; }
 <ObjCCall>{ID}	                  {
                                     g_currentCtx->format+=escapeObject(yytext);
 			            if (g_braceCount==0)
@@ -2977,12 +3040,18 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
                                           if (yytext[0]==')') // no a pointer cast
                                           {
                                             //printf("addVariable(%s,%s)\n",g_parmType.data(),g_parmName.data());
+                                            if (g_parmType.isEmpty())
+                                            {
+                                              g_parmType=g_parmName;
+                                              g_parmName.resize(0);
+                                            }
 					    g_theVarContext.addVariable(g_parmType,g_parmName);
                                           }
                                           else
                                           {
-                                            g_parmType.resize(0);
+                                            g_parmType = g_parmName;
                                             g_parmName.resize(0);
+					    g_theVarContext.addVariable(g_parmType,g_parmName);
                                           }
 					  g_theCallContext.popScope();
 					  g_inForEachExpression = FALSE;
@@ -3270,7 +3339,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					}
 <*>\n({B}*"//"[!/][^\n]*\n)+		{ // remove special one-line comment
 					  if (YY_START==SkipCPP) REJECT;
-  					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+  					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_yyLineNr+=((QCString)yytext).contains('\n');
 					    nextCodeLine();
@@ -3293,7 +3362,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  BEGIN( g_lastSkipCppContext ) ;
 					}
 <*>\n{B}*"//@"[{}].*\n			{ // remove one-line group marker
-  					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+  					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_yyLineNr+=2;
 					    nextCodeLine();
@@ -3311,7 +3380,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  }
   					}
 <*>\n{B}*"/*@"[{}]			{ // remove one-line group marker
-					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+					  if (Config_getBool(STRIP_CODE_COMMENTS))
   					  {
 					    g_lastSpecialCContext = YY_START;
 					    g_yyLineNr++;
@@ -3330,7 +3399,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
   					  }
   					}
 <*>^{B}*"//@"[{}].*\n			{ // remove one-line group marker
-  					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+  					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_yyLineNr++;
 					    nextCodeLine();
@@ -3343,7 +3412,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  }
   					}
 <*>^{B}*"/*@"[{}]			{ // remove multi-line group marker
-					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_lastSpecialCContext = YY_START;
 					    BEGIN(RemoveSpecialCComment);
@@ -3361,7 +3430,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
  					  }
   					}
 <*>^{B}*"//"[!/][^\n]*\n		{ // remove special one-line comment
-  					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+  					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_yyLineNr++;
 					    //nextCodeLine();
@@ -3375,7 +3444,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
   					}
 <*>"//"[!/][^\n]*\n			{ // strip special one-line comment
                                           if (YY_START==SkipComment || YY_START==SkipString) REJECT;
-  					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+  					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    char c[2]; c[0]='\n'; c[1]=0;
 					    codifyLines(c);
@@ -3394,7 +3463,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  g_forceTagReference = g_forceTagReference.mid(s+1,e-s-1);
   					}
 <*>\n{B}*"/*"[!*]/[^/*] 		{
-					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+					  if (Config_getBool(STRIP_CODE_COMMENTS))
   					  {
 					    g_lastSpecialCContext = YY_START;
 					    g_yyLineNr++;
@@ -3413,7 +3482,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
   					  }
 					}
 <*>^{B}*"/*"[!*]/[^/*]			{ // special C comment block at a new line
-					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_lastSpecialCContext = YY_START;
 					    BEGIN(RemoveSpecialCComment);
@@ -3432,7 +3501,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					}
 <*>"/*"[!*]/[^/*]			{ // special C comment block half way a line
                                           if (YY_START==SkipString) REJECT;
-					  if (Config_getBool("STRIP_CODE_COMMENTS"))
+					  if (Config_getBool(STRIP_CODE_COMMENTS))
 					  {
 					    g_lastSpecialCContext = YY_START;
 					    BEGIN(RemoveSpecialCComment);
@@ -3451,7 +3520,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					}
 <*>"/*"("!"?)"*/"			{ 
                                           if (YY_START==SkipString) REJECT;
-                                          if (!Config_getBool("STRIP_CODE_COMMENTS"))
+                                          if (!Config_getBool(STRIP_CODE_COMMENTS))
   					  {
 					    startFontClass("comment");
 					    g_code->codify(yytext);
@@ -3598,15 +3667,16 @@ void parseCCode(CodeOutputInterface &od,const char *className,const QCString &s,
   g_searchCtx = searchCtx;
   g_collectXRefs = collectXRefs;
   g_inFunctionTryBlock = FALSE;
-  if (endLine!=-1)
-    g_inputLines  = endLine+1;
-  else
-    g_inputLines  = countLines();
 
   if (startLine!=-1)
     g_yyLineNr    = startLine;
   else
     g_yyLineNr    = 1;
+
+  if (endLine!=-1)
+    g_inputLines  = endLine+1;
+  else
+    g_inputLines  = g_yyLineNr + countLines() - 1;
 
   g_curlyCount    = 0;
   g_bodyCurlyCount    = 0;
@@ -3696,7 +3766,7 @@ void codeFreeScanner()
 extern "C" { // some bogus code to keep the compiler happy
   void codeYYdummy() { yy_flex_realloc(0,0); } 
 }
-#elif YY_FLEX_SUBMINOR_VERSION<33
-#error "You seem to be using a version of flex newer than 2.5.4 but older than 2.5.33. These versions do NOT work with doxygen! Please use version <=2.5.4 or >=2.5.33 or expect things to be parsed wrongly!"
+#elif YY_FLEX_MAJOR_VERSION<=2 && YY_FLEX_MINOR_VERSION<=5 && YY_FLEX_SUBMINOR_VERSION<33
+#error "You seem to be using a version of flex newer than 2.5.4. These are currently incompatible with 2.5.4, and do NOT work with doxygen! Please use version 2.5.4 or expect things to be parsed wrongly! A bug report has been submitted (#732132)."
 #endif
 

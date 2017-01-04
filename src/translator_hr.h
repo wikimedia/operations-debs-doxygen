@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -134,7 +134,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
     { return "Stablo klasa"; }
     QCString trCompoundList()
 	{
-		if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+		if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
 		{
 			return "Sve strukture";
 		}
@@ -147,7 +147,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
     { return "Popis datoteka"; }
     QCString trCompoundMembers()
 	{
-		if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+		if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
 			return "Svi članovi struktura";
 		else
 			return "Svi članovi klasa";
@@ -181,7 +181,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
       if (!extractAll)
 		  result+="dokumentiranih ";
 
-	  if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+	  if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
 		  result+="članova klasa s linkovima na ";
 	  else
 		  result+="članova struktura s linkovima na ";
@@ -192,7 +192,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
       }
 	  else
 	  {
-		  if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+		  if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
 			  result+="dokumentaciju klase :";
 		  else
 			  result +="dokumentaciju strukture";
@@ -226,7 +226,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
     { return "Hijerarhijsko kazalo"; }
     QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Kazalo struktura podataka";
       }
@@ -241,7 +241,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
     { return "Dokumentacija modula"; }
     QCString trClassDocumentation()
     {
-		if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+		if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
 		{
 			return "Dokumentacija struktura podataka";
 		}
@@ -753,7 +753,7 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
         "};\n"
         "\\endcode\n"
         "To će rezultirati grafikonom:"
-        "<p><center><img src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "Pravokutnici imaju slijedeće značenje:\n"
         "<ul>\n"
@@ -943,9 +943,9 @@ class TranslatorCroatian : public TranslatorAdapter_1_8_2
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trMember(bool first_capital, bool singular)
+    virtual QCString trMember(bool, bool singular)
     {
-      QCString result((first_capital ? "član" : "član"));
+      QCString result("član");
       if (!singular)  result+="ovi";
       return result;
     }

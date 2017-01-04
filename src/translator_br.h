@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -15,26 +15,30 @@
  *    Thanks to Jorge Ramos, Fernando Carijo and others for their contributions.
  *
  * History:
- *   20110628:
- *	- Updated to 1.7.5;
- *   20100531:
- *	- Updated to 1.6.3;
- *   20091218:
- *      - Updated to 1.6.1;
- *      - Copyright year updated;
- *      - Translation updates suggested by Fernando Carijó added;
- *   20080709:
+ * 20131129:
+ *  - Updated to 1.8.5;
+ *  - Translation in the method trFileMembers() fixed;
+ *  - Translation in the method trEnumerationValues() fixed;
+ * 20110628:
+ *  - Updated to 1.7.5;
+ * 20100531:
+ *  - Updated to 1.6.3;
+ * 20091218:
+ *  - Updated to 1.6.1;
+ *  - Copyright year updated;
+ *  - Translation updates suggested by Fernando Carijó added;
+ * 20080709:
  *	- References to MAX_DOT_GRAPH_HEIGHT removed from trLegendDocs().
- *   20080206:
- *      - Method trTypeContraints() renamed to trTypeConstraints().
- *   20071216:
+ * 20080206:
+ *  - Method trTypeContraints() renamed to trTypeConstraints().
+ * 20071216:
  * 	- New methods since 1.5.4 updated.
- *   Previous history removed from this version.
+ * Previous history removed from this version.
  */
 #ifndef TRANSLATOR_BR_H
 #define TRANSLATOR_BR_H
 
-class TranslatorBrazilian : public TranslatorAdapter_1_8_0
+class TranslatorBrazilian : public Translator
 {
   public:
 
@@ -91,7 +95,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Campos";
       }
@@ -158,7 +162,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Estruturas de Dados";
       }
@@ -175,7 +179,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Campos de Dados";
       }
@@ -188,13 +192,13 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globais";
       }
       else
       {
-        return "Arquivos Membros";
+        return "Membros dos Arquivos";
       }
     }
 
@@ -227,7 +231,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Aqui estão as estruturas de dados, uniões e suas respectivas descrições:";
       }
@@ -242,7 +246,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     {
       QCString result="Esta é a lista de ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="todas as estruturas e campos de uniões ";
         if (!extractAll)
@@ -261,7 +265,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
       result+=" com referências para ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="a documentação da estrutura/união de cada campo:";
         }
@@ -272,7 +276,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="a estrutura/união a que pertencem:";
         }
@@ -288,7 +292,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     virtual QCString trFileMembersDescription(bool extractAll)
     {
       QCString result="Esta é a lista de ";
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="todas as funções, variáveis, definições, enumerações e definições de tipos ";
         if (!extractAll) result+="documentadas ";
@@ -339,7 +343,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Índice das Estruturas de Dados";
       }
@@ -366,7 +370,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Estruturas";
       }
@@ -432,7 +436,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
      *  list of (global) variables
      */
     virtual QCString trEnumerationValues()
-    { return "Valores enumerados"; }
+    { return "Valores de enumerações"; }
 
     /*! This is used in the documentation of a file before the list of
      *  documentation blocks for defines
@@ -469,7 +473,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Estruturas de Dados";
       }
@@ -881,7 +885,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Campos de Dados";
       }
@@ -1003,7 +1007,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
         "};\n"
         "\\endcode\n"
         "Isto irá gerar o seguinte gráfo:"
-        "<p><center><img src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "As caixas no grafo acima tem as seguintes interpretações:\n"
         "<ul>\n"
@@ -1070,7 +1074,7 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Estruturas de Dados";
       }
@@ -1834,5 +1838,185 @@ class TranslatorBrazilian : public TranslatorAdapter_1_8_0
     /*! Header for the graph showing the directory dependencies */
     virtual QCString trDirDepGraph(const char *name)
     { return QCString("Grafo de dependências do diretório ")+name+":"; }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.0
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Detail level selector shown for hierarchical indices */
+    virtual QCString trDetailLevel()
+    { return "nível de detalhes"; }
+
+    /*! Section header for list of template parameters */
+    virtual QCString trTemplateParameters()
+    { return "Parâmetros de template"; }
+
+    /*! Used in dot graph when UML_LOOK is enabled and there are many fields */
+    virtual QCString trAndMore(const QCString &number)
+    { return "e "+number+" mais..."; }
+
+    /*! Used file list for a Java enum */
+    virtual QCString trEnumGeneratedFromFiles(bool single)
+    { QCString result = "A documentação para esta enumeração foi gerada a partir";
+      if (single) {
+        result += "do seguinte arquivo:";
+      } else {
+        result += "dos seguintes arquivos:";
+      }
+      return result;
+    }
+
+    /*! Header of a Java enum page (Java enums are represented as classes). */
+    virtual QCString trEnumReference(const char *name)
+    {
+      QCString result = "Referência da enumeração ";
+      return result + name;
+    }
+
+    /*! Used for a section containing inherited members */
+    virtual QCString trInheritedFrom(const char *members,const char *what)
+    { return QCString(members)+" herdados de "+what; }
+
+    /*! Header of the sections with inherited members specific for the
+     *  base class(es)
+     */
+    virtual QCString trAdditionalInheritedMembers()
+    { return "Outros membros herdados"; }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.2
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Used as a tooltip for the toggle button that appears in the
+     *  navigation tree in the HTML output when GENERATE_TREEVIEW is
+     *  enabled. This tooltip explains the meaning of the button.
+     */
+    virtual QCString trPanelSynchronisationTooltip(bool enable)
+    {
+      QCString opt = enable ? "ativar" : "desativar";
+      return "clique para "+opt+" a sincronização do painel";
+    }
+
+    /*! Used in a method of an Objective-C class that is declared in a
+     *  a category. Note that the @1 marker is required and is replaced
+     *  by a link.
+     */
+    virtual QCString trProvidedByCategory()
+    {
+      return "Provido pela categoria @0.";
+    }
+
+    /*! Used in a method of an Objective-C category that extends a class.
+     *  Note that the @1 marker is required and is replaced by a link to
+     *  the class method.
+     */
+    virtual QCString trExtendsClass()
+    {
+      return "estende a classe @0.";
+    }
+
+    /*! Used as the header of a list of class methods in Objective-C.
+     *  These are similar to static public member functions in C++.
+     */
+    virtual QCString trClassMethods()
+    {
+      return "Métodos de classe";
+    }
+
+    /*! Used as the header of a list of instance methods in Objective-C.
+     *  These are similar to public member functions in C++.
+     */
+    virtual QCString trInstanceMethods()
+    {
+      return "Métodos de instância";
+    }
+
+    /*! Used as the header of the member functions of an Objective-C class.
+     */
+    virtual QCString trMethodDocumentation()
+    {
+      return "Documentação do método";
+    }
+
+    /*! Used as the title of the design overview picture created for the
+     *  VHDL output.
+     */
+    virtual QCString trDesignOverview()
+    {
+      // I'm not sure how to accurately translate it
+      return "Visão geral do design";
+    }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.4
+//////////////////////////////////////////////////////////////////////////
+
+    /** old style UNO IDL services: implemented interfaces */
+    virtual QCString trInterfaces()
+    { return "Interfaces Exportadas"; }
+
+    /** old style UNO IDL services: inherited services */
+    virtual QCString trServices()
+    { return "Serviços Incluídos"; }
+
+    /** UNO IDL constant groups */
+    virtual QCString trConstantGroups()
+    { return "Grupos de Constantes"; }
+
+    /** UNO IDL constant groups */
+    virtual QCString trConstantGroupReference(const char *namespaceName)
+    {
+      QCString result = "Referência do grupo de constantes ";
+      result += namespaceName;
+      return result;
+    }
+
+    /** UNO IDL service page title */
+    virtual QCString trServiceReference(const char *sName)
+    {
+      QCString result = "Referência do serviço ";
+      result += sName;
+      return result;
+    }
+
+    /** UNO IDL singleton page title */
+    virtual QCString trSingletonReference(const char *sName)
+    {
+      QCString result = "Referência do Singleton ";
+      result += sName;
+      return result;
+    }
+
+    /** UNO IDL service page */
+    virtual QCString trServiceGeneratedFromFiles(bool single)
+    {
+      // single is true implies a single file
+      QCString result=(QCString)"A documentação para este serviço "
+                                "foi gerada a partir ";
+      if (single) {
+        result+="do seguinte arquivo:";
+      } else {
+        result+="dos: seguintes arquivos:";
+      }
+      return result;
+    }
+
+    /** UNO IDL singleton page */
+    virtual QCString trSingletonGeneratedFromFiles(bool single)
+    {
+      // single is true implies a single file
+      QCString result=(QCString)"A documentação para este singleton "
+                                "foi gerada a partir ";
+      if (single) {
+        result+="do seguinte arquivo:";
+      } else {
+        result+="dos: seguintes arquivos:";
+      }
+
+      return result;
+    }
+
+//////////////////////////////////////////////////////////////////////////
 };
 #endif
+

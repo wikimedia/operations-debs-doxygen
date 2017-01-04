@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -557,7 +557,7 @@ void generateDEFForFile(FileDef *fd,FTextStream &t)
 
 void generateDEF()
 {
-  QCString outputDirectory = Config_getString("OUTPUT_DIRECTORY");
+  QCString outputDirectory = Config_getString(OUTPUT_DIRECTORY);
   if (outputDirectory.isEmpty())
   {
     outputDirectory=QDir::currentDirPath().utf8();

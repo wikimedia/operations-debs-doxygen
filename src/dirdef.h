@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -54,7 +54,7 @@ class DirDef : public Definition
     bool isLinkableInProject() const;
     bool isLinkable() const;
     QCString displayName(bool=TRUE) const { return m_dispName; }
-    QCString shortName() const { return m_shortName; }
+    const QCString &shortName() const { return m_shortName; }
     void addSubDir(DirDef *subdir);
     FileList *   getFiles() const        { return m_fileList; }
     void addFile(FileDef *fd);
@@ -71,11 +71,12 @@ class DirDef : public Definition
 
     // generate output
     void writeDocumentation(OutputList &ol);
-    void writeDepGraph(FTextStream &t);
+    void writeTagFile(FTextStream &t);
 
     static DirDef *mergeDirectoryInTree(const QCString &path);
     bool visited;
     void setDiskName(const QCString &name) { m_diskName = name; }
+    void sort();
 
   private:
     friend void computeDirDependencies();
@@ -138,6 +139,7 @@ class UsedDir
     const FilePairDict &filePairs() const { return m_filePairs; }
     const DirDef *dir() const { return m_dir; }
     bool inherited() const { return m_inherited; }
+    void sort();
 
   private:
     DirDef *m_dir;

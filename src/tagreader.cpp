@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -95,7 +95,7 @@ class TagMemberInfo
 class TagClassInfo
 {
   public:
-    enum Kind { Class, Struct, Union, Interface, Exception, Protocol, Category };
+    enum Kind { Class, Struct, Union, Interface, Exception, Protocol, Category, Enum, Service, Singleton };
     TagClassInfo() { bases=0, templateArguments=0; members.setAutoDelete(TRUE); isObjC=FALSE; }
    ~TagClassInfo() { delete bases; delete templateArguments; }
     QCString name;
@@ -251,8 +251,20 @@ class TagFileParser : public QXmlDefaultHandler
     {
       m_startElementHandlers.setAutoDelete(TRUE);
       m_endElementHandlers.setAutoDelete(TRUE);
+      m_curClass=0;
+      m_curFile=0;
+      m_curNamespace=0;
+      m_curPackage=0;
+      m_curGroup=0;
+      m_curPage=0;
+      m_curDir=0;
+      m_curMember=0;
+      m_curEnumValue=0;
+      m_curIncludes=0;
+      m_state = Invalid;
+      m_locator = 0;
     }
-    
+
     void setDocumentLocator ( QXmlLocator * locator )
     {
       m_locator = locator;
@@ -301,6 +313,12 @@ class TagFileParser : public QXmlDefaultHandler
         m_curClass->kind = TagClassInfo::Interface;
         m_state = InClass;
       }
+      else if (kind=="enum")
+      {
+        m_curClass = new TagClassInfo;
+        m_curClass->kind = TagClassInfo::Enum;
+        m_state = InClass;
+      }
       else if (kind=="exception")
       {
         m_curClass = new TagClassInfo;
@@ -317,6 +335,18 @@ class TagFileParser : public QXmlDefaultHandler
       {
         m_curClass = new TagClassInfo;
         m_curClass->kind = TagClassInfo::Category;
+        m_state = InClass;
+      }
+      else if (kind=="service")
+      {
+        m_curClass = new TagClassInfo;
+        m_curClass->kind = TagClassInfo::Service;
+        m_state = InClass;
+      }
+      else if (kind=="singleton")
+      {
+        m_curClass = new TagClassInfo;
+        m_curClass->kind = TagClassInfo::Singleton;
         m_state = InClass;
       }
       else if (kind=="file")
@@ -463,14 +493,14 @@ class TagFileParser : public QXmlDefaultHandler
     {
       switch(m_state)
       {
-        case InClass:     m_curClass->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
-        case InFile:      m_curFile->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
-        case InNamespace: m_curNamespace->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
-        case InGroup:     m_curGroup->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
+        case InClass:     m_curClass->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
+        case InFile:      m_curFile->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
+        case InNamespace: m_curNamespace->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
+        case InGroup:     m_curGroup->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
         case InPage:      m_curPage->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
-        case InMember:    m_curMember->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
-        case InPackage:   m_curPackage->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
-        case InDir:       m_curDir->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString)); break;
+        case InMember:    m_curMember->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
+        case InPackage:   m_curPackage->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
+        case InDir:       m_curDir->docAnchors.append(new TagAnchorInfo(m_fileName,m_curString,m_title)); break;
         default:   warn("Unexpected tag `member' found\n"); break; 
       }
     }
@@ -1286,9 +1316,12 @@ void TagFileParser::buildLists(Entry *root)
       case TagClassInfo::Struct:    ce->spec = Entry::Struct;    break;
       case TagClassInfo::Union:     ce->spec = Entry::Union;     break;
       case TagClassInfo::Interface: ce->spec = Entry::Interface; break;
+      case TagClassInfo::Enum:      ce->spec = Entry::Enum;      break;
       case TagClassInfo::Exception: ce->spec = Entry::Exception; break;
       case TagClassInfo::Protocol:  ce->spec = Entry::Protocol;  break;
       case TagClassInfo::Category:  ce->spec = Entry::Category;  break;
+      case TagClassInfo::Service:   ce->spec = Entry::Service;   break;
+      case TagClassInfo::Singleton: ce->spec = Entry::Singleton; break;
     }
     ce->name     = tci->name;
     if (tci->kind==TagClassInfo::Protocol)

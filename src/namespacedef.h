@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -33,6 +33,7 @@ class MemberDef;
 class NamespaceList;
 class MemberGroupSDict;
 class NamespaceSDict;
+class FTextStream;
 
 /** A model of a namespace symbol. */
 class NamespaceDef : public Definition
@@ -51,6 +52,7 @@ class NamespaceDef : public Definition
     void writeDocumentation(OutputList &ol);
     void writeMemberPages(OutputList &ol);
     void writeQuickMemberLinks(OutputList &ol,MemberDef *currentMd) const;
+    void writeTagFile(FTextStream &);
 
     void insertClass(ClassDef *cd);
     void insertNamespace(NamespaceDef *nd);
@@ -81,6 +83,7 @@ class NamespaceDef : public Definition
     virtual Definition *findInnerCompound(const char *name);
     void addInnerCompound(Definition *d);
     void addListReferences();
+    void setFileName(const QCString &fn);
 
     bool subGrouping() const { return m_subGrouping; }
     

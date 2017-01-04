@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -45,9 +45,12 @@ void FileName::generateDiskNames()
   {
     // skip references
     for (it.toFirst();(fd=it.current()) && fd->isReference();++it) { }
-    // name if unique, so diskname is simply the name
-    //printf("!!!!!!!! Unique disk name=%s for fd=%s\n",name.data(),fd->diskname.data());
-    fd->m_diskName=name;
+    if (fd)
+    {
+      // name if unique, so diskname is simply the name
+      //printf("!!!!!!!! Unique disk name=%s for fd=%s\n",name.data(),fd->diskname.data());
+      fd->setDiskName(name);
+    }
   }
   else if (count>1) // multiple occurrences of the same file name
   {
@@ -57,38 +60,43 @@ void FileName::generateDiskNames()
     while (!found) // search for the common prefix of all paths
     {
       for (it.toFirst();(fd=it.current()) && fd->isReference();++it) { }
-      char c=fd->m_path.at(i);
-      if (c=='/') j=i; // remember last position of dirname
-      ++it;
-      while ((fd=it.current()) && !found)
+      if (fd)
       {
-        if (!fd->isReference())
-        {
-          //printf("i=%d j=%d fd->path=`%s' fd->name=`%s'\n",i,j,fd->path.left(i).data(),fd->name().data());
-          if (i==(int)fd->m_path.length())
-          {
-            //warning("Input file %s found multiple times!\n"
-            //        "         The generated documentation for this file may not be correct!\n",fd->absFilePath().data());
-            found=TRUE;
-          }
-          else if (fd->m_path[i]!=c)
-          {
-            found=TRUE;
-          }
-        }
+        char c=fd->getPath().at(i);
+        if (c=='/') j=i; // remember last position of dirname
         ++it;
+        while ((fd=it.current()) && !found)
+        {
+          QCString path = fd->getPath();
+          if (!fd->isReference())
+          {
+            //printf("i=%d j=%d fd->path=`%s' fd->name=`%s'\n",i,j,fd->path.left(i).data(),fd->name().data());
+            if (i==(int)path.length())
+            {
+              //warning("Input file %s found multiple times!\n"
+              //        "         The generated documentation for this file may not be correct!\n",fd->absFilePath().data());
+              found=TRUE;
+            }
+            else if (path[i]!=c)
+            {
+              found=TRUE;
+            }
+          }
+          ++it;
+        }
+        i++;
       }
-      i++;
     }
     for (it.toFirst();(fd=it.current());++it)
     {
       //printf("fd->setName(%s)\n",(fd->path.right(fd->path.length()-j-1)+name).data());
       if (!fd->isReference())
       {
-        QCString prefix = fd->m_path.right(fd->m_path.length()-j-1);
+        QCString path   = fd->getPath();
+        QCString prefix = path.right(path.length()-j-1);
         fd->setName(prefix+name);
-        //printf("!!!!!!!! non unique disk name=%s for fd=%s\n",(prefix+name).data(),fd->diskname.data());
-        fd->m_diskName=prefix+name;
+        //printf("!!!!!!!! non unique disk name=%s:%s\n",prefix.data(),name.data());
+        fd->setDiskName(prefix+name);
       }
     }
   }
@@ -124,7 +132,7 @@ void FileNameList::generateDiskNames()
 
 int FileNameList::compareValues(const FileName *f1, const FileName *f2) const
 {
-  return Config_getBool("FULL_PATH_NAMES") ?
+  return Config_getBool(FULL_PATH_NAMES) ?
          qstricmp(f1->fullName(),f2->fullName()) :
          qstricmp(f1->fileName(),f2->fileName());
 }
@@ -136,7 +144,7 @@ FileNameListIterator::FileNameListIterator(const FileNameList &fnlist) :
 
 static bool getCaseSenseNames()
 {
-  static bool caseSenseNames = Config_getBool("CASE_SENSE_NAMES");
+  static bool caseSenseNames = Config_getBool(CASE_SENSE_NAMES);
   return caseSenseNames;
 }
 

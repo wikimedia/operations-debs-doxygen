@@ -1,10 +1,10 @@
 Last-Update: 2014-05-16
 
-Index: doxygen/src/config.xml
+Index: b/src/config.xml
 ===================================================================
---- doxygen.orig/src/config.xml	2014-05-16 20:13:20.000000000 +0200
-+++ doxygen/src/config.xml	2014-05-16 20:14:40.000000000 +0200
-@@ -3049,7 +3049,7 @@
+--- a/src/config.xml
++++ b/src/config.xml
+@@ -3156,7 +3156,7 @@ to be found in the default search path.
  ]]>
        </docs>
      </option>
@@ -13,7 +13,7 @@ Index: doxygen/src/config.xml
        <docs>
  <![CDATA[
   If you set the \c HAVE_DOT tag to \c YES then doxygen will assume the \c dot tool is
-@@ -3232,8 +3232,21 @@
+@@ -3345,8 +3345,21 @@ to be found in the default search path.
  ]]>
        </docs>
        <value name='png'/>
@@ -33,5 +33,5 @@ Index: doxygen/src/config.xml
 +      <value name='gif:gd'/>
 +      <value name='gif:gd:gd'/>
        <value name='svg'/>
-     </option>
-     <option type='bool' id='INTERACTIVE_SVG' defval='0' depends='HAVE_DOT'>
+       <value name='png:gd'/>
+       <value name='png:gd:gd'/>

@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -14,6 +14,8 @@
  * input used in their production; they are not affected by this license.
  *
  */
+%option never-interactive
+%option prefix="preYY"
 
 %{
 
@@ -54,11 +56,11 @@
 #include "memberdef.h"
 #include "membername.h"
 
+#define YY_NO_UNISTD_H 1
+
 // Toggle for some debugging info
 //#define DBG_CTX(x) fprintf x
 #define DBG_CTX(x) do { } while(0)
-
-#define YY_NEVER_INTERACTIVE 1
 
 struct CondCtx
 {
@@ -71,8 +73,8 @@ struct CondCtx
 
 struct FileState
 {
-  FileState(int size) : fileBuf(size), 
-                        oldFileBuf(0), oldFileBufPos(0) {}
+  FileState(int size) : lineNr(1), fileBuf(size),
+                        oldFileBuf(0), oldFileBufPos(0), bufState(0) {}
   int lineNr;
   BufStr fileBuf;
   BufStr *oldFileBuf;
@@ -207,6 +209,7 @@ class DefineManager
       if (dpf==0)
       {
 	dpf = new DefinesPerFile;
+	m_fileMap.insert(fileName,dpf);
       }
       dpf->addDefine(def);
     }
@@ -223,6 +226,7 @@ class DefineManager
       if (dpf==0)
       {
 	dpf = new DefinesPerFile;
+	m_fileMap.insert(fromFileName,dpf);
       }
       dpf->addInclude(toFileName);
     }
@@ -452,7 +456,7 @@ static FileState *checkAndOpenFile(const QCString &fileName,bool &alreadyInclude
   QFileInfo fi(fileName);
   if (fi.exists() && fi.isFile())
   {
-    static QStrList &exclPatterns = Config_getList("EXCLUDE_PATTERNS");
+    static QStrList &exclPatterns = Config_getList(EXCLUDE_PATTERNS);
     if (patternMatch(fi,&exclPatterns)) return 0;
 
     QCString absName = fi.absFilePath().utf8();
@@ -1459,7 +1463,7 @@ static inline void outputArray(const char *a,int len)
 
 static void readIncludeFile(const QCString &inc)
 {
-  static bool searchIncludes = Config_getBool("SEARCH_INCLUDES");
+  static bool searchIncludes = Config_getBool(SEARCH_INCLUDES);
   uint i=0;
 
   // find the start of the include file name
@@ -1505,7 +1509,7 @@ static void readIncludeFile(const QCString &inc)
 	}
 	else if (searchIncludes) // search in INCLUDE_PATH as well
 	{
-	  QStrList &includePath = Config_getList("INCLUDE_PATH");
+	  QStrList &includePath = Config_getList(INCLUDE_PATH);
 	  char *s=includePath.first();
 	  while (s)
 	  {
@@ -1616,11 +1620,11 @@ static void readIncludeFile(const QCString &inc)
       {
 	if (alreadyIncluded)
 	{
-          Debug::print(Debug::Preprocessor,0,"#include %s: already included! skipping...\n",incFileName.data());
+          Debug::print(Debug::Preprocessor,0,"#include %s: already included! skipping...\n",qPrint(incFileName));
 	}
 	else
 	{
-          Debug::print(Debug::Preprocessor,0,"#include %s: not found! skipping...\n",incFileName.data());
+          Debug::print(Debug::Preprocessor,0,"#include %s: not found! skipping...\n",qPrint(incFileName));
 	}
         //printf("error: include file %s not found\n",yytext);
       }
@@ -1657,6 +1661,7 @@ static void endCondSection()
   {
     CondCtx *ctx = g_condStack.pop();
     g_skip=ctx->skip;
+    delete ctx;
   }
   //printf("endCondSection: skip=%d stack=%d\n",g_skip,g_condStack.count());
 }
@@ -1665,7 +1670,7 @@ static void forceEndCondSection()
 {
   while (!g_condStack.isEmpty())
   {
-    g_condStack.pop();
+    delete g_condStack.pop();
   }
   g_skip=FALSE;
 }
@@ -1734,6 +1739,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 %x	SkipString
 %x	CopyLine
 %x	CopyString
+%x	CopyStringFtn
 %x      Include
 %x      IncludeID
 %x      EndImport
@@ -1786,7 +1792,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
                                         }
 <Start>^{B}*[_A-Z][_A-Z0-9]+{B}*"("[^\(\)\n]*"("[^\)\n]*")"[^\)\n]*")"{B}*\n | // function list macro with one (...) argument, e.g. for K_GLOBAL_STATIC_WITH_ARGS
 <Start>^{B}*[_A-Z][_A-Z0-9]+{B}*"("[^\)\n]*")"{B}*\n { // function like macro
-  					  static bool skipFuncMacros = Config_getBool("SKIP_FUNCTION_MACROS");
+  					  static bool skipFuncMacros = Config_getBool(SKIP_FUNCTION_MACROS);
 					  QCString name(yytext);
 					  name=name.left(name.find('(')).stripWhiteSpace();
 
@@ -1847,6 +1853,11 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  outputChar(*yytext);
 					  BEGIN( CopyString );
 					}
+<CopyLine>\'				{
+                                          if (getLanguageFromFileName(g_yyFileName)!=SrcLangExt_Fortran) REJECT;
+					  outputChar(*yytext);
+					  BEGIN( CopyStringFtn );
+					}
 <CopyString>[^\"\\\r\n]+		{
   					  outputArray(yytext,(int)yyleng);
 					}
@@ -1854,6 +1865,16 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  outputArray(yytext,(int)yyleng);
 					}
 <CopyString>\"				{
+					  outputChar(*yytext);
+					  BEGIN( CopyLine );
+					}
+<CopyStringFtn>[^\'\\\r\n]+		{
+  					  outputArray(yytext,(int)yyleng);
+					}
+<CopyStringFtn>\\.			{
+					  outputArray(yytext,(int)yyleng);
+					}
+<CopyStringFtn>\'			{
 					  outputChar(*yytext);
 					  BEGIN( CopyLine );
 					}
@@ -2283,6 +2304,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					}
 <DefName>{ID}/("\\\n")*"("		{ // define with argument
   					  //printf("Define() `%s'\n",yytext);
+					  delete g_argDict;
 					  g_argDict = new QDict<int>(31);
 					  g_argDict->setAutoDelete(TRUE);
 					  g_defArgs = 0; 
@@ -2296,7 +2318,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					}
 <DefName>{ID}{B}+"1"/[ \r\t\n]		{ // special case: define with 1 -> can be "guard"
   					  //printf("Define `%s'\n",yytext);
-  					  g_argDict = 0;
+					  delete g_argDict; g_argDict=0;
 					  g_defArgs = -1;
                                           g_defArgsStr.resize(0);
 					  g_defName = yytext;
@@ -2325,7 +2347,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  g_expectGuard=FALSE;
   					}
 <DefName>{ID}/{B}*"\n"			{ // empty define
-  					  g_argDict = 0;
+					  delete g_argDict; g_argDict=0;
 					  g_defArgs = -1;
 					  g_defName = yytext;
                                           g_defArgsStr.resize(0);
@@ -2354,7 +2376,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					}
 <DefName>{ID}/{B}*			{ // define with content
   					  //printf("Define `%s'\n",yytext);
-  					  g_argDict = 0;
+					  delete g_argDict; g_argDict=0;
 					  g_defArgs = -1;
                                           g_defArgsStr.resize(0);
 					  g_defText.resize(0);
@@ -2449,8 +2471,21 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 <SkipCComment>[\\@][\\@]("f{"|"f$"|"f[") {
   					  outputArray(yytext,(int)yyleng);
   					}
-<SkipCComment>"~~~"[~]*                 {
-                                          static bool markdownSupport = Config_getBool("MARKDOWN_SUPPORT");
+<SkipCComment>^({B}*"*"+)?{B}{0,3}"~~~"[~]*   {
+                                          static bool markdownSupport = Config_getBool(MARKDOWN_SUPPORT);
+                                          if (!markdownSupport)
+                                          {
+                                            REJECT;
+                                          }
+                                          else
+                                          {
+  					    outputArray(yytext,(int)yyleng);
+                                            g_fenceSize=yyleng;
+                                            BEGIN(SkipVerbatim);
+                                          }
+                                        }
+<SkipCComment>^({B}*"*"+)?{B}{0,3}"```"[`]*            {
+                                          static bool markdownSupport = Config_getBool(MARKDOWN_SUPPORT);
                                           if (!markdownSupport)
                                           {
                                             REJECT;
@@ -2596,7 +2631,14 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					    BEGIN(SkipCComment);
 					  }
   					}
-<SkipVerbatim>"~~~"[~]*                 {
+<SkipVerbatim>^({B}*"*"+)?{B}{0,3}"~~~"[~]*                 {
+  					  outputArray(yytext,(int)yyleng);
+                                          if (g_fenceSize==yyleng)
+                                          {
+                                            BEGIN(SkipCComment);
+                                          }
+                                        }
+<SkipVerbatim>^({B}*"*"+)?{B}{0,3}"```"[`]*                 {
   					  outputArray(yytext,(int)yyleng);
                                           if (g_fenceSize==yyleng)
                                           {
@@ -2606,7 +2648,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 <SkipVerbatim>"*/"|"/*"			{
   					  outputArray(yytext,(int)yyleng);
   					}
-<SkipCComment,SkipVerbatim>[^*\\@\x06~\n\/]+ {
+<SkipCComment,SkipVerbatim>[^*\\@\x06~`\n\/]+ {
   					  outputArray(yytext,(int)yyleng);
   					}
 <SkipCComment,SkipVerbatim>\n		{ 
@@ -2975,8 +3017,8 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
   //printf("##########################\n%s\n####################\n",
   //    input.data());
 
-  g_macroExpansion = Config_getBool("MACRO_EXPANSION");
-  g_expandOnlyPredef = Config_getBool("EXPAND_ONLY_PREDEF");
+  g_macroExpansion = Config_getBool(MACRO_EXPANSION);
+  g_expandOnlyPredef = Config_getBool(EXPAND_ONLY_PREDEF);
   g_skip=FALSE;
   g_curlyCount=0;
   g_nospaces=FALSE;
@@ -2987,8 +3029,8 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
   g_includeStack.clear();
   g_expandedDict->setAutoDelete(FALSE);
   g_expandedDict->clear();
-  g_condStack.clear();
   g_condStack.setAutoDelete(TRUE);
+  g_condStack.clear();
   //g_fileDefineDict->clear();
 
   setFileName(fileName);
@@ -3000,7 +3042,7 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
   {
     // add predefined macros
     char *defStr;
-    QStrList &predefList = Config_getList("PREDEFINED");
+    QStrList &predefList = Config_getList(PREDEFINED);
     QStrListIterator sli(predefList);
     for (sli.toFirst();(defStr=sli.current());++sli)
     {
@@ -3138,6 +3180,7 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
     if (ctx->sectionId!=" ") sectionInfo.sprintf(" with label %s ",ctx->sectionId.data()); 
     warn(fileName,ctx->lineNr,"Conditional section%sdoes not have "
 	"a corresponding \\endcond command within this file.",sectionInfo.data());
+    delete ctx;
   }
   // make sure we don't extend a \cond with missing \endcond over multiple files (see bug 624829)
   forceEndCondSection();
@@ -3176,7 +3219,7 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
       Define *def;
       for (di.toFirst();(def=di.current());++di)
       {
-        Debug::print(Debug::Preprocessor,0,"%s ",def->name.data());
+        Debug::print(Debug::Preprocessor,0,"%s ",qPrint(def->name));
       }
       Debug::print(Debug::Preprocessor,0,"\n---------\n");
     }

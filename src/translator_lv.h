@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -109,7 +109,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Lauka dokumentācija";
       }
@@ -176,7 +176,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu struktūras";
       }
@@ -193,7 +193,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu lauki";
       }
@@ -206,7 +206,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globālie";
       }
@@ -247,7 +247,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Šeit ir visas datu struktūras ar īsu aprakstu:";
       }
@@ -266,7 +266,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
       {
         result+="dokumentēto ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="struktūru un apvienojumu lauku";
       }
@@ -277,7 +277,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
       result+=" saraksts ar saitēm uz ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="struktūru/apvienojumu dokumentāciju katram laukam:";
         }
@@ -288,7 +288,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="struktūrām/apvienojumiem, kam tie pieder:";
         }
@@ -306,7 +306,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
       QCString result="Šeit ir visu ";
       if (!extractAll) result+="dokumentēto ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="funkciju, mainīgo, definīciju, uzskaitījumliterāļu un typedefs";
       }
@@ -357,7 +357,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu struktūru indess";
       }
@@ -384,7 +384,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu struktūras dokomentācija";
       }
@@ -487,7 +487,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu struktūras";
       }
@@ -894,7 +894,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu lauki";
       }
@@ -1020,7 +1020,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
         "};\n"
         "\\endcode\n"
         "This will result in the following graph:"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center></p>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center></p>\n"
         "<p>\n"
         "The boxes in the above graph have the following meaning:\n"
         "</p>\n"
@@ -1028,7 +1028,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
         "<li>%A filled gray box represents the struct or class for which the "
         "graph is generated.</li>\n"
         "<li>%A box with a black border denotes a documented struct or class.</li>\n"
-        "<li>%A box with a grey border denotes an undocumented struct or class.</li>\n"
+        "<li>%A box with a gray border denotes an undocumented struct or class.</li>\n"
         "<li>%A box with a red border denotes a documented struct or class for"
         "which not all inheritance/containment relations are shown. %A graph is "
         "truncated if it does not fit within the specified boundaries.</li>\n"
@@ -1092,7 +1092,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Datu struktūras";
       }
@@ -1901,7 +1901,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
      */
     virtual QCString trProvidedByCategory()
     {
-      return "Nodrošina kategorija @1.";
+      return "Nodrošina kategorija @0.";
     }
 
     /*! Used in a method of an Objective-C category that extends a class.
@@ -1910,7 +1910,7 @@ class TranslatorLatvian : public TranslatorAdapter_1_8_4
      */
     virtual QCString trExtendsClass()
     {
-      return "Paplašina klasi @1.";
+      return "Paplašina klasi @0.";
     }
 
     /*! Used as the header of a list of class methods in Objective-C.

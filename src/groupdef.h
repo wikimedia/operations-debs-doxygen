@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -39,6 +39,7 @@ class DirList;
 class FTVHelp;
 class Entry;
 class MemberDef;
+class FTextStream;
 
 /** A model of a group of symbols. */
 class GroupDef : public Definition
@@ -63,10 +64,11 @@ class GroupDef : public Definition
     void addDir(const DirDef *dd);
     bool insertMember(MemberDef *def,bool docOnly=FALSE);
     void removeMember(MemberDef *md);
-    bool containsGroup(const GroupDef *def);    // true if def is already a subgroup
+    bool findGroup(const GroupDef *def) const; // true if def is a subgroup of this group
     void writeDocumentation(OutputList &ol);
     void writeMemberPages(OutputList &ol);
     void writeQuickMemberLinks(OutputList &ol,MemberDef *currentMd) const;
+    void writeTagFile(FTextStream &);
     int  countMembers() const;
     bool isLinkableInProject() const;
     bool isLinkable() const;

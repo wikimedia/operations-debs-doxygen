@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -94,7 +94,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Lauko aprašymas";
       }
@@ -161,7 +161,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Struktūros";
       }
@@ -178,7 +178,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Laukai";
       }
@@ -191,13 +191,13 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globalūs Nariai";
       }
       else
       {
-        return "Globalūs Nariai";
+        return "Failų Nariai";
       }
     }
 
@@ -232,7 +232,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų struktūros su trumpais aprašymais:";
       }
@@ -251,7 +251,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
       {
         result+="dokumentuotų ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="struktūrų ir sąjungų laukų sąrašas";
       }
@@ -262,7 +262,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
       result+=" su ryšiais į ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="struktūrų/sąjungų kiekvieno lauko dokumentaciją:";
         }
@@ -273,7 +273,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="struktūros/sąjungos, kurios priklauso:";
         }
@@ -291,7 +291,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
       QCString result="Sąrašas visų ";
       if (!extractAll) result+="dokumentuotų ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="funkcijų, kintamųjų, apibrėžimų, išvardinimų, ir tipų apibrėžimų";
       }
@@ -342,7 +342,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Struktūros Indeksas";
       }
@@ -369,7 +369,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Struktūros Dokumentacija";
       }
@@ -472,7 +472,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų struktųros";
       }
@@ -879,7 +879,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Laukai";
       }
@@ -1006,14 +1006,14 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
         "\\endcode\n"
         "If the \\c MAX_DOT_GRAPH_HEIGHT tag in the configuration file "
         "is set to 240 this will result in the following graph:"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "The boxes in the above graph have the following meaning:\n"
         "<ul>\n"
         "<li>%A filled black box represents the struct or class for which the "
         "graph is generated.\n"
         "<li>%A box with a black border denotes a documented struct or class.\n"
-        "<li>%A box with a grey border denotes an undocumented struct or class.\n"
+        "<li>%A box with a gray border denotes an undocumented struct or class.\n"
         "<li>%A box with a red border denotes a documented struct or class for"
         "which not all inheritance/containment relations are shown. %A graph is "
         "truncated if it does not fit within the specified boundaries.\n"
@@ -1075,7 +1075,7 @@ class TranslatorLithuanian : public TranslatorAdapter_1_4_6
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Duomenų Struktūros";
       }

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -47,134 +47,171 @@
 
 const char * schema_queries[][2] = {
   { "includes",
-    "CREATE TABLE IF NOT EXISTS includes ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
-      "local INTEGER NOT NULL,"
-      "id_src INTEGER NOT NULL,"
-      "id_dst INTEGER NOT NULL);"
-    "CREATE UNIQUE INDEX idx_includes ON includes "
-      "(local, id_src, id_dst);"
+    "CREATE TABLE IF NOT EXISTS includes (\n"
+      "\t-- #include relations.\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tlocal        INTEGER NOT NULL,\n"
+      "\tid_src       INTEGER NOT NULL,  -- File id of the includer.\n"
+      "\tid_dst       INTEGER NOT NULL   -- File id of the includee.\n"
+      ");\n"
+    "CREATE UNIQUE INDEX idx_includes ON includes\n"
+      "\t(local, id_src, id_dst);"
   },
   { "innerclass",
-    "CREATE TABLE IF NOT EXISTS innerclass ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
-      "refid TEXT NOT NULL,"
-      "prot INTEGER NOT NULL,"
-      "name TEXT NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS innerclass (\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\trefid        INTEGER NOT NULL,\n"
+      "\tprot         INTEGER NOT NULL,\n"
+      "\tname         TEXT NOT NULL\n"
+      ");"
   },
   { "files",
-    "CREATE TABLE IF NOT EXISTS files ("
-      "name TEXT PRIMARY KEY NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS files (\n"
+      "\t-- Names of source files and includes.\n"
+      "\tname         TEXT PRIMARY KEY NOT NULL\n"
+      ");"
   },
   { "refids",
-    "CREATE TABLE IF NOT EXISTS refids ("
-      "refid TEXT PRIMARY KEY NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS refids (\n"
+      "\trefid        TEXT PRIMARY KEY NOT NULL\n"
+      ");"
   },
   { "xrefs",
-    "CREATE TABLE IF NOT EXISTS xrefs ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-      "refid_src INTEGER NOT NULL, "
-      "refid_dst INTEGER NOT NULL, "
-      "id_file INTEGER NOT NULL, "
-      "line INTEGER NOT NULL, "
-      "column INTEGER NOT NULL);"
-    "CREATE UNIQUE INDEX idx_xrefs ON xrefs "
-      "(refid_src, refid_dst, id_file, line, column);"
+    "CREATE TABLE IF NOT EXISTS xrefs (\n"
+      "\t-- Cross reference relation.\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\trefid_src    INTEGER NOT NULL, -- referrer id.\n"
+      "\trefid_dst    INTEGER NOT NULL, -- referee id.\n"
+      "\tid_file      INTEGER NOT NULL, -- file where the reference is happening.\n"
+      "\tline         INTEGER NOT NULL, -- line where the reference is happening.\n"
+      "\tcolumn       INTEGER NOT NULL  -- column where the reference is happening.\n"
+      ");\n"
+    "CREATE UNIQUE INDEX idx_xrefs ON xrefs\n"
+      "\t(refid_src, refid_dst, id_file, line, column);"
   },
   { "memberdef",
-    "CREATE TABLE IF NOT EXISTS memberdef ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
-      "id_file INTEGER NOT NULL,"
-      "line INTEGER NOT NULL,"
-      "column INTEGER NOT NULL,"
-      "refid TEXT NOT NULL,"
-      "name TEXT NOT NULL,"
-      "definition TEXT,"
-      "type TEXT,"
-      "argsstring TEXT,"
-      "scope TEXT,"
-      "initializer TEXT,"
-      "prot INTEGER,"
-      "const INTEGER,"
-      "virt INTEGER,"
-      "static INTEGER NOT NULL,"
-      "explicit INTEGER,"
-      "inline INTEGER,"
-      "final INTEGER,"
-      "sealed INTEGER,"
-      "new INTEGER,"
-      "optional INTEGER,"
-      "required INTEGER,"
-      "mutable INTEGER,"
-      "initonly INTEGER,"
-      "readable INTEGER,"
-      "writable INTEGER,"
-      "gettable INTEGER,"
-      "settable INTEGER,"
-      "accessor INTEGER,"
-      "addable INTEGER,"
-      "removable INTEGER,"
-      "raisable INTEGER,"
-      "kind INTEGER,"
-      "id_bodyfile INTEGER,"
-      "bodystart INTEGER,"
-      "bodyend INTEGER,"
-      "detaileddescription TEXT,"
-      "briefdescription TEXT,"
-      "inbodydescription TEXT"
-      ")"
+    "CREATE TABLE IF NOT EXISTS memberdef (\n"
+      "\t-- All processed identifiers.\n"
+      "\trowid                INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\trefid                INTEGER NOT NULL,  -- see the refids table\n"
+      "\tname                 TEXT NOT NULL,\n"
+      "\tdefinition           TEXT,\n"
+      "\ttype                 TEXT,\n"
+      "\targsstring           TEXT,\n"
+      "\tscope                TEXT,\n"
+      "\tinitializer          TEXT,\n"
+      "\tbitfield             TEXT,\n"
+      "\tread                 TEXT,\n"
+      "\twrite                TEXT,\n"
+      "\tprot                 INTEGER DEFAULT 0, -- 0:public 1:protected 2:private 3:package\n"
+      "\tstatic               INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tconst                INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\texplicit             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tinline               INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tfinal                INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tsealed               INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tnew                  INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\toptional             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\trequired             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tvolatile             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tvirt                 INTEGER DEFAULT 0, -- 0:no 1:virtual 2:pure-virtual\n"
+      "\tmutable              INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tinitonly             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tattribute            INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tproperty             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\treadonly             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tbound                INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tconstrained          INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\ttransient            INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tmaybevoid            INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tmaybedefault         INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tmaybeambiguous       INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\treadable             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\twritable             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tgettable             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tprivategettable      INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tprotectedgettable    INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tsettable             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tprivatesettable      INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tprotectedsettable    INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\taccessor             INTEGER DEFAULT 0, -- 0:no 1:assign 2:copy 3:retain 4:string 5:weak\n"
+      "\taddable              INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\tremovable            INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      "\traisable             INTEGER DEFAULT 0, -- 0:no 1:yes\n"
+      /// @todo make a `kind' table
+      "\tkind                 INTEGER DEFAULT 0, -- 0:define 1:function 2:variable 3:typedef 4:enum 5:enumvalue 6:signal 7:slot 8:friend 9:DCOP 10:property 11:event\n"
+      "\tbodystart            INTEGER DEFAULT 0, -- starting line of definition\n"
+      "\tbodyend              INTEGER DEFAULT 0, -- ending line of definition\n"
+      "\tid_bodyfile          INTEGER DEFAULT 0, -- file of definition\n"
+      "\tid_file              INTEGER NOT NULL,  -- file where this identifier is located\n"
+      "\tline                 INTEGER NOT NULL,  -- line where this identifier is located\n"
+      "\tcolumn               INTEGER NOT NULL,  -- column where this identifier is located\n"
+      /// @todo make a `detaileddescription' table
+      "\tdetaileddescription  TEXT,\n"
+      "\tbriefdescription     TEXT,\n"
+      "\tinbodydescription    TEXT\n"
+      ");"
   },
   { "compounddef",
-    "CREATE TABLE IF NOT EXISTS compounddef ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-      "name TEXT NOT NULL,"
-      "kind TEXT NOT NULL,"
-      "prot INTEGER NOT NULL,"
-      "refid TEXT NOT NULL,"
-      "id_file INTEGER NOT NULL,"
-      "line INTEGER NOT NULL,"
-      "column INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS compounddef (\n"
+      "\t-- class/struct definitions.\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tname         TEXT NOT NULL,\n"
+      "\tkind         TEXT NOT NULL,\n"
+      "\trefid        INTEGER NOT NULL,\n"
+      "\tprot         INTEGER NOT NULL,\n"
+      "\tid_file      INTEGER NOT NULL,\n"
+      "\tline         INTEGER NOT NULL,\n"
+      "\tcolumn       INTEGER NOT NULL\n"
+      ");"
   },
   { "basecompoundref",
-    "CREATE TABLE IF NOT EXISTS basecompoundref ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
-      "base TEXT NOT NULL,"
-      "derived TEXT NOT NULL,"
-      "refid TEXT NOT NULL,"
-      "prot INTEGER NOT NULL,"
-      "virt INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS basecompoundref (\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tbase         TEXT NOT NULL,\n"
+      "\tderived      TEXT NOT NULL,\n"
+      "\trefid        INTEGER NOT NULL,\n"
+      "\tprot         INTEGER NOT NULL,\n"
+      "\tvirt         INTEGER NOT NULL\n"
+      ");"
   },
   { "derivedcompoundref",
-    "CREATE TABLE IF NOT EXISTS derivedcompoundref ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
-      "base TEXT NOT NULL,"
-      "derived TEXT NOT NULL,"
-      "refid TEXT NOT NULL,"
-      "prot INTEGER NOT NULL,"
-      "virt INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS derivedcompoundref (\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tbase         TEXT NOT NULL,\n"
+      "\tderived      TEXT NOT NULL,\n"
+      "\trefid        INTEGER NOT NULL,\n"
+      "\tprot         INTEGER NOT NULL,\n"
+      "\tvirt         INTEGER NOT NULL\n"
+      ");"
   },
   { "params",
-    "CREATE TABLE IF NOT EXISTS params ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-      "attributes TEXT,"
-      "type TEXT,"
-      "declname TEXT,"
-      "defnname TEXT,"
-      "array TEXT,"
-      "defval TEXT,"
-      "briefdescription TEXT)"
+    "CREATE TABLE IF NOT EXISTS params (\n"
+      "\t-- All processed parameters.\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tattributes   TEXT,\n"
+      "\ttype         TEXT,\n"
+      "\tdeclname     TEXT,\n"
+      "\tdefname     TEXT,\n"
+      "\tarray        TEXT,\n"
+      "\tdefval       TEXT,\n"
+      "\tbriefdescription TEXT\n"
+      ");"
   },
   { "memberdef_params",
-    "CREATE TABLE IF NOT EXISTS memberdef_params ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-      "id_memberdef INTEGER NOT NULL,"
-      "id_param INTEGER NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS memberdef_params (\n"
+      "\t-- Junction table for memberdef parameters.\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\tid_memberdef INTEGER NOT NULL,\n"
+      "\tid_param     INTEGER NOT NULL\n"
+      ");"
   },
   { "innernamespaces",
-    "CREATE TABLE IF NOT EXISTS innernamespaces ("
-      "rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-      "refid TEXT NOT NULL,"
-      "name TEXT NOT NULL)"
+    "CREATE TABLE IF NOT EXISTS innernamespaces (\n"
+      "\trowid        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n"
+      "\trefid        INTEGER NOT NULL,\n"
+      "\tname         TEXT NOT NULL\n"
+      ");"
   }
 };
 
@@ -231,9 +268,121 @@ SqlStmt xrefs_insert= {"INSERT INTO xrefs "
 };
 //////////////////////////////////////////////////////
 SqlStmt memberdef_insert={"INSERT INTO memberdef "
-    "( refid, prot, static, const, explicit, inline, final, sealed, new, optional, required, virt, mutable, initonly, readable, writable, gettable, settable, accessor, addable, removable, raisable, name, type, definition, argsstring, scope, initializer, kind, id_bodyfile, bodystart, bodyend, id_file, line, column, detaileddescription, briefdescription, inbodydescription)"
+    "("
+      "refid,"
+      "name,"
+      "definition,"
+      "type,"
+      "argsstring,"
+      "scope,"
+      "initializer,"
+      "bitfield,"
+      "read,"
+      "write,"
+      "prot,"
+      "static,"
+      "const,"
+      "explicit,"
+      "inline,"
+      "final,"
+      "sealed,"
+      "new,"
+      "optional,"
+      "required,"
+      "volatile,"
+      "virt,"
+      "mutable,"
+      "initonly,"
+      "attribute,"
+      "property,"
+      "readonly,"
+      "bound,"
+      "constrained,"
+      "transient,"
+      "maybevoid,"
+      "maybedefault,"
+      "maybeambiguous,"
+      "readable,"
+      "writable,"
+      "gettable,"
+      "protectedsettable,"
+      "protectedgettable,"
+      "settable,"
+      "privatesettable,"
+      "privategettable,"
+      "accessor,"
+      "addable,"
+      "removable,"
+      "raisable,"
+      "kind,"
+      "bodystart,"
+      "bodyend,"
+      "id_bodyfile,"
+      "id_file,"
+      "line,"
+      "column,"
+      "detaileddescription,"
+      "briefdescription,"
+      "inbodydescription"
+    ")"
     "VALUES "
-    "(:refid,:prot,:static,:const,:explicit,:inline,:final,:sealed,:new,:optional,:required,:virt,:mutable,:initonly,:readable,:writable,:gettable,:settable,:accessor,:addable,:removable,:raisable,:name,:type,:definition,:argsstring,:scope,:initializer,:kind,:id_bodyfile,:bodystart,:bodyend,:id_file,:line,:column,:detaileddescription,:briefdescription,:inbodydescription)"
+    "("
+      ":refid,"
+      ":name,"
+      ":definition,"
+      ":type,"
+      ":argsstring,"
+      ":scope,"
+      ":initializer,"
+      ":bitfield,"
+      ":read,"
+      ":write,"
+      ":prot,"
+      ":static,"
+      ":const,"
+      ":explicit,"
+      ":inline,"
+      ":final,"
+      ":sealed,"
+      ":new,"
+      ":optional,"
+      ":required,"
+      ":volatile,"
+      ":virt,"
+      ":mutable,"
+      ":initonly,"
+      ":attribute,"
+      ":property,"
+      ":readonly,"
+      ":bound,"
+      ":constrained,"
+      ":transient,"
+      ":maybevoid,"
+      ":maybedefault,"
+      ":maybeambiguous,"
+      ":readable,"
+      ":writable,"
+      ":gettable,"
+      ":privategettable,"
+      ":protectedgettable,"
+      ":settable,"
+      ":privatesettable,"
+      ":privategettable,"
+      ":accessor,"
+      ":addable,"
+      ":removable,"
+      ":raisable,"
+      ":kind,"
+      ":bodystart,"
+      ":bodyend,"
+      ":id_bodyfile,"
+      ":id_file,"
+      ":line,"
+      ":column,"
+      ":detaileddescription,"
+      ":briefdescription,"
+      ":inbodydescription"
+    ")"
     ,NULL
 };
 //////////////////////////////////////////////////////
@@ -262,16 +411,16 @@ SqlStmt params_select = { "SELECT rowid FROM  params WHERE "
     "(attributes IS NULL OR attributes=:attributes) AND "
     "(type IS NULL OR type=:type) AND "
     "(declname IS NULL OR declname=:declname) AND "
-    "(defnname IS NULL OR defnname=:defnname) AND "
+    "(defname IS NULL OR defname=:defname) AND "
     "(array IS NULL OR array=:array) AND "
     "(defval IS NULL OR defval=:defval) AND "
     "(briefdescription IS NULL OR briefdescription=:briefdescription)"
     ,NULL
 };
 SqlStmt params_insert = { "INSERT INTO  params "
-  "( attributes, type, declname, defnname, array, defval, briefdescription ) "
+  "( attributes, type, declname, defname, array, defval, briefdescription ) "
     "VALUES "
-    "(:attributes,:type,:declname,:defnname,:array,:defval,:briefdescription)"
+    "(:attributes,:type,:declname,:defname,:array,:defval,:briefdescription)"
     ,NULL
 };
 //////////////////////////////////////////////////////
@@ -380,11 +529,9 @@ static int insertRefid(sqlite3 *db, const char *refid)
 }
 
 
-static void insertMemberReference(sqlite3 *db, const char*src, const char*dst, const char *file, int line, int column)
+static void insertMemberReference(sqlite3 *db, int refid_src, int refid_dst,
+                                  int id_file, int line, int column)
 {
-  int id_file = insertFile(db,file);
-  int refid_src = insertRefid(db,src);
-  int refid_dst = insertRefid(db,dst);
   if (id_file==-1||refid_src==-1||refid_dst==-1)
     return;
 
@@ -392,26 +539,20 @@ static void insertMemberReference(sqlite3 *db, const char*src, const char*dst, c
   bindIntParameter(xrefs_insert,":refid_dst",refid_dst);
   bindIntParameter(xrefs_insert,":id_file",id_file);
   bindIntParameter(xrefs_insert,":line",line);
-  bindIntParameter(xrefs_insert,":column",1);
+  bindIntParameter(xrefs_insert,":column",column);
   step(db,xrefs_insert);
 }
 
-static void insertMemberReference(sqlite3 *db, MemberDef *src, MemberDef *dst, const char*floc)
+static void insertMemberReference(sqlite3 *db, MemberDef *src, MemberDef *dst)
 {
+  QCString qrefid_dst = dst->getOutputFileBase() + "_1" + dst->anchor();
+  QCString qrefid_src = src->getOutputFileBase() + "_1" + src->anchor();
   if (dst->getStartBodyLine()!=-1 && dst->getBodyDef())
   {
-    static char file[4096];
-    int line=0,column=0;
-    if (floc)
-    {
-      int rv = sscanf(floc,"%[^:]:%d:%d",file,&line,&column);
-      if (rv!=3)
-      {
-        msg("unable to read file loc from[%s]\n",floc);
-        return;
-      }
-    }
-    insertMemberReference(db,src->anchor().data(),dst->anchor().data(),file,line,column);
+    int refid_src = insertRefid(db,qrefid_src.data());
+    int refid_dst = insertRefid(db,qrefid_dst.data());
+    int id_file = insertFile(db,"no-file"); // TODO: replace no-file with proper file
+    insertMemberReference(db,refid_src,refid_dst,id_file,dst->getStartBodyLine(),-1);
   }
 }
 
@@ -442,7 +583,11 @@ static void insertMemberFunctionParams(sqlite3 *db,int id_memberdef,MemberDef *m
         QCString *s;
         while ((s=li.current()))
         {
-          insertMemberReference(db,md->anchor().data(),s->data(),def->getDefFileName().data(),md->getDefLine(),1);
+          QCString qrefid_src = md->getOutputFileBase() + "_1" + md->anchor();
+          int refid_src = insertRefid(db,qrefid_src.data());
+          int refid_dst = insertRefid(db,s->data());
+          int id_file = insertFile(db,stripFromPath(def->getDefFileName()));
+          insertMemberReference(db,refid_src,refid_dst,id_file,md->getDefLine(),-1);
           ++li;
         }
         bindTextParameter(params_select,":type",a->type.data());
@@ -455,8 +600,8 @@ static void insertMemberFunctionParams(sqlite3 *db,int id_memberdef,MemberDef *m
       }
       if (defArg && !defArg->name.isEmpty() && defArg->name!=a->name)
       {
-        bindTextParameter(params_select,":defnname",defArg->name.data());
-        bindTextParameter(params_insert,":defnname",defArg->name.data());
+        bindTextParameter(params_select,":defname",defArg->name.data());
+        bindTextParameter(params_insert,":defname",defArg->name.data());
       }
       if (!a->array.isEmpty())
       {
@@ -497,7 +642,7 @@ static void insertMemberDefineParams(sqlite3 *db,int id_memberdef,MemberDef *md,
       Argument *a;
       for (ali.toFirst();(a=ali.current());++ali)
       {
-        bindTextParameter(params_insert,":defnname",a->type.data());
+        bindTextParameter(params_insert,":defname",a->type.data());
         int id_param=step(db,params_insert,TRUE);
 
         bindIntParameter(memberdef_params_insert,":id_memberdef",id_memberdef);
@@ -617,7 +762,8 @@ static void writeInnerClasses(sqlite3*db,const ClassSDict *cl)
   {
     if (!cd->isHidden() && cd->name().find('@')==-1) // skip anonymous scopes
     {
-      bindTextParameter(innerclass_insert,":refid",cd->getOutputFileBase(),FALSE);
+      int refid = insertRefid(db, cd->getOutputFileBase());
+      bindIntParameter(innerclass_insert,":refid", refid);
       bindIntParameter(innerclass_insert,":prot",cd->protection());
       bindTextParameter(innerclass_insert,":name",cd->name());
       step(db,innerclass_insert);
@@ -636,7 +782,8 @@ static void writeInnerNamespaces(sqlite3 *db,const NamespaceSDict *nl)
     {
       if (!nd->isHidden() && nd->name().find('@')==-1) // skip anonymouse scopes
       {
-        bindTextParameter(innernamespace_insert,":refid",nd->getOutputFileBase(),FALSE);
+        int refid = insertRefid(db, nd->getOutputFileBase());
+        bindIntParameter(innernamespace_insert,":refid",refid);
         bindTextParameter(innernamespace_insert,":name",nd->name(),FALSE);
         step(db,innernamespace_insert);
       }
@@ -666,8 +813,8 @@ static void writeTemplateArgumentList(sqlite3* db,
       {
         bindTextParameter(params_select,":declname",a->name);
         bindTextParameter(params_insert,":declname",a->name);
-        bindTextParameter(params_select,":defnname",a->name);
-        bindTextParameter(params_insert,":defnname",a->name);
+        bindTextParameter(params_select,":defname",a->name);
+        bindTextParameter(params_insert,":defname",a->name);
       }
       if (!a->defval.isEmpty())
       {
@@ -720,8 +867,12 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
   // group members are only visible in their group
   //if (def->definitionType()!=Definition::TypeGroup && md->getGroupDef()) return;
   QCString memType;
+
   // memberdef
-  bindTextParameter(memberdef_insert,":refid",md->anchor().data(),FALSE);
+  QCString qrefid = md->getOutputFileBase() + "_1" + md->anchor();
+  int refid = insertRefid(db, qrefid.data());
+
+  bindIntParameter(memberdef_insert,":refid", refid);
   bindIntParameter(memberdef_insert,":kind",md->memberType());
   bindIntParameter(memberdef_insert,":prot",md->protection());
 
@@ -740,12 +891,14 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
     default:
       break;
   }
+
   if (isFunc)
   {
     ArgumentList *al = md->argumentList();
-    if (al!=0 && al->constSpecifier)
+    if (al!=0)
     {
       bindIntParameter(memberdef_insert,":const",al->constSpecifier);
+      bindIntParameter(memberdef_insert,":volatile",al->volatileSpecifier);
     }
     bindIntParameter(memberdef_insert,":explicit",md->isExplicit());
     bindIntParameter(memberdef_insert,":inline",md->isInline());
@@ -754,29 +907,55 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
     bindIntParameter(memberdef_insert,":new",md->isNew());
     bindIntParameter(memberdef_insert,":optional",md->isOptional());
     bindIntParameter(memberdef_insert,":required",md->isRequired());
-    
+
     bindIntParameter(memberdef_insert,":virt",md->virtualness());
   }
-  // place in the arguments and linkify the arguments
 
   if (md->memberType() == MemberType_Variable)
   {
     bindIntParameter(memberdef_insert,":mutable",md->isMutable());
     bindIntParameter(memberdef_insert,":initonly",md->isInitonly());
+    bindIntParameter(memberdef_insert,":attribute",md->isAttribute());
+    bindIntParameter(memberdef_insert,":property",md->isProperty());
+    bindIntParameter(memberdef_insert,":readonly",md->isReadonly());
+    bindIntParameter(memberdef_insert,":bound",md->isBound());
+    bindIntParameter(memberdef_insert,":removable",md->isRemovable());
+    bindIntParameter(memberdef_insert,":constrained",md->isConstrained());
+    bindIntParameter(memberdef_insert,":transient",md->isTransient());
+    bindIntParameter(memberdef_insert,":maybevoid",md->isMaybeVoid());
+    bindIntParameter(memberdef_insert,":maybedefault",md->isMaybeDefault());
+    bindIntParameter(memberdef_insert,":maybeambiguous",md->isMaybeAmbiguous());
+    if (md->bitfieldString())
+    {
+      QCString bitfield = md->bitfieldString();
+      if (bitfield.at(0)==':') bitfield=bitfield.mid(1);
+      bindTextParameter(memberdef_insert,":bitfield",bitfield.stripWhiteSpace());
+    }
   }
   else if (md->memberType() == MemberType_Property)
   {
     bindIntParameter(memberdef_insert,":readable",md->isReadable());
     bindIntParameter(memberdef_insert,":writable",md->isWritable());
     bindIntParameter(memberdef_insert,":gettable",md->isGettable());
+    bindIntParameter(memberdef_insert,":privategettable",md->isPrivateGettable());
+    bindIntParameter(memberdef_insert,":protectedgettable",md->isProtectedGettable());
     bindIntParameter(memberdef_insert,":settable",md->isSettable());
-    if (md->isAssign() || md->isCopy() || md->isRetain())
+    bindIntParameter(memberdef_insert,":privatesettable",md->isPrivateSettable());
+    bindIntParameter(memberdef_insert,":protectedsettable",md->isProtectedSettable());
+    if (md->isAssign() || md->isCopy() || md->isRetain()
+     || md->isStrong() || md->isWeak())
     {
-      int accessor = md->isAssign() ? md->isAssign() :
-          (md->isCopy() ? md->isCopy() : md->isRetain()) ;
+      int accessor=0;
+      if (md->isAssign())      accessor = 1;
+      else if (md->isCopy())   accessor = 2;
+      else if (md->isRetain()) accessor = 3;
+      else if (md->isStrong()) accessor = 4;
+      else if (md->isWeak())   accessor = 5;
 
       bindIntParameter(memberdef_insert,":accessor",accessor);
     }
+    bindTextParameter(memberdef_insert,":read",md->getReadAccessor());
+    bindTextParameter(memberdef_insert,":write",md->getWriteAccessor());
   }
   else if (md->memberType() == MemberType_Event)
   {
@@ -816,19 +995,6 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
 
   bindTextParameter(memberdef_insert,":name",md->name());
 
-  if (md->memberType() == MemberType_Property)
-  {
-    if (md->isReadable())
-    {
-      bindIntParameter(memberdef_insert,":readable",1);
-    }
-    if (md->isWritable())
-    {
-      bindIntParameter(memberdef_insert,":writable",1);
-    }
-  }
-
-
   // Extract references from initializer
   if (md->hasMultiLineInitializer() || md->hasOneLineInitializer())
   {
@@ -847,7 +1013,11 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
               s->data(),
               md->getBodyDef()->getDefFileName().data(),
               md->getStartBodyLine()));
-        insertMemberReference(db,md->anchor().data(),s->data(),md->getBodyDef()->getDefFileName().data(),md->getStartBodyLine(),1);
+        QCString qrefid_src = md->getOutputFileBase() + "_1" + md->anchor();
+        int refid_src = insertRefid(db,qrefid_src.data());
+        int refid_dst = insertRefid(db,s->data());
+        int id_file = insertFile(db,stripFromPath(md->getBodyDef()->getDefFileName()));
+        insertMemberReference(db,refid_src,refid_dst,id_file,md->getStartBodyLine(),-1);
       }
       ++li;
     }
@@ -866,7 +1036,7 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
   // File location
   if (md->getDefLine() != -1)
   {
-    int id_file = insertFile(db,md->getDefFileName());
+    int id_file = insertFile(db,stripFromPath(md->getDefFileName()));
     if (id_file!=-1)
     {
       bindIntParameter(memberdef_insert,":id_file",id_file);
@@ -875,7 +1045,7 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
 
       if (md->getStartBodyLine()!=-1)
       {
-        int id_bodyfile = insertFile(db,md->getBodyDef()->absFilePath());
+        int id_bodyfile = insertFile(db,stripFromPath(md->getBodyDef()->absFilePath()));
         if (id_bodyfile == -1)
         {
             sqlite3_clear_bindings(memberdef_insert.stmt);
@@ -912,7 +1082,7 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
     MemberDef *rmd;
     for (mdi.toFirst();(rmd=mdi.current());++mdi)
     {
-      insertMemberReference(db,md,rmd,mdi.currentKey());
+      insertMemberReference(db,md,rmd);//,mdi.currentKey());
     }
   }
   // + source referenced by
@@ -923,7 +1093,7 @@ static void generateSqlite3ForMember(sqlite3*db,MemberDef *md,Definition *def)
     MemberDef *rmd;
     for (mdi.toFirst();(rmd=mdi.current());++mdi)
     {
-      insertMemberReference(db,rmd,md,mdi.currentKey());
+      insertMemberReference(db,rmd,md);//,mdi.currentKey());
     }
   }
 }
@@ -987,9 +1157,10 @@ static void generateSqlite3ForClass(sqlite3 *db, ClassDef *cd)
   bindTextParameter(compounddef_insert,":name",cd->name());
   bindTextParameter(compounddef_insert,":kind",cd->compoundTypeString(),FALSE);
   bindIntParameter(compounddef_insert,":prot",cd->protection());
-  bindTextParameter(compounddef_insert,":refid",cd->getOutputFileBase(),FALSE);
+  int refid = insertRefid(db, cd->getOutputFileBase());
+  bindIntParameter(compounddef_insert,":refid", refid);
 
-  int id_file = insertFile(db,cd->getDefFileName().data());
+  int id_file = insertFile(db,stripFromPath(cd->getDefFileName()));
   bindIntParameter(compounddef_insert,":id_file",id_file);
   bindIntParameter(compounddef_insert,":line",cd->getDefLine());
   bindIntParameter(compounddef_insert,":column",cd->getDefColumn());
@@ -1003,7 +1174,8 @@ static void generateSqlite3ForClass(sqlite3 *db, ClassDef *cd)
     BaseClassDef *bcd;
     for (bcli.toFirst();(bcd=bcli.current());++bcli)
     {
-      bindTextParameter(basecompoundref_insert,":refid",bcd->classDef->getOutputFileBase(),FALSE);
+      int refid = insertRefid(db, bcd->classDef->getOutputFileBase());
+      bindIntParameter(basecompoundref_insert,":refid", refid);
       bindIntParameter(basecompoundref_insert,":prot",bcd->prot);
       bindIntParameter(basecompoundref_insert,":virt",bcd->virt);
 
@@ -1027,9 +1199,17 @@ static void generateSqlite3ForClass(sqlite3 *db, ClassDef *cd)
     BaseClassDef *bcd;
     for (bcli.toFirst();(bcd=bcli.current());++bcli)
     {
-      bindTextParameter(derivedcompoundref_insert,":base",cd->displayName());
-      bindTextParameter(derivedcompoundref_insert,":dervied",bcd->classDef->displayName());
-      bindTextParameter(derivedcompoundref_insert,":refid",bcd->classDef->getOutputFileBase());
+      bindTextParameter(derivedcompoundref_insert,":base",cd->displayName(),FALSE);
+      if (!bcd->templSpecifiers.isEmpty())
+      {
+        bindTextParameter(derivedcompoundref_insert,":derived",insertTemplateSpecifierInScope(bcd->classDef->name(),bcd->templSpecifiers),FALSE);
+      }
+      else
+      {
+        bindTextParameter(derivedcompoundref_insert,":derived",bcd->classDef->displayName(),FALSE);
+      }
+      int refid = insertRefid(db, bcd->classDef->getOutputFileBase());
+      bindIntParameter(derivedcompoundref_insert,":refid", refid);
       bindIntParameter(derivedcompoundref_insert,":prot",bcd->prot);
       bindIntParameter(derivedcompoundref_insert,":virt",bcd->virt);
       step(db,derivedcompoundref_insert);
@@ -1254,7 +1434,7 @@ void generateSqlite3()
   // + examples
   // + main page
 
-  QCString outputDirectory = Config_getString("OUTPUT_DIRECTORY");
+  QCString outputDirectory = Config_getString(OUTPUT_DIRECTORY);
   QDir sqlite3Dir(outputDirectory);
   sqlite3 *db;
   sqlite3_initialize();

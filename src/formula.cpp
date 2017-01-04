@@ -1,7 +1,7 @@
 /******************************************************************************
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -15,8 +15,6 @@
  */
 
 #include <stdlib.h>
-#include <unistd.h>
-
 #include <qfile.h>
 #include <qfileinfo.h>
 #include <qtextstream.h>
@@ -69,15 +67,10 @@ void FormulaList::generateBitmaps(const char *path)
   if (f.open(IO_WriteOnly))
   {
     FTextStream t(&f);
-    if (Config_getBool("LATEX_BATCHMODE")) t << "\\batchmode" << endl;
+    if (Config_getBool(LATEX_BATCHMODE)) t << "\\batchmode" << endl;
     t << "\\documentclass{article}" << endl;
     t << "\\usepackage{epsfig}" << endl; // for those who want to include images
-    const char *s=Config_getList("EXTRA_PACKAGES").first();
-    while (s)
-    {
-      t << "\\usepackage{" << s << "}\n";
-      s=Config_getList("EXTRA_PACKAGES").next();
-    }
+    writeExtraLatexPackages(t);
     t << "\\pagestyle{empty}" << endl; 
     t << "\\begin{document}" << endl;
     int page=0;
@@ -103,7 +96,7 @@ void FormulaList::generateBitmaps(const char *path)
   {
     //printf("Running latex...\n");
     //system("latex _formulas.tex </dev/null >/dev/null");
-    QCString latexCmd = Config_getString("LATEX_CMD_NAME");
+    QCString latexCmd = Config_getString(LATEX_CMD_NAME);
     if (latexCmd.isEmpty()) latexCmd="latex";
     portable_sysTimerStart();
     if (portable_system(latexCmd,"_formulas.tex")!=0)
@@ -134,6 +127,7 @@ void FormulaList::generateBitmaps(const char *path)
       {
         err("Problems running dvips. Check your installation!\n");
         portable_sysTimerStop();
+        QDir::setCurrent(oldDir);
         return;
       }
       portable_sysTimerStop();
@@ -174,7 +168,7 @@ void FormulaList::generateBitmaps(const char *path)
       // scale the image so that it is four times larger than needed.
       // and the sizes are a multiple of four.
       double scaleFactor = 16.0/3.0; 
-      int zoomFactor = Config_getInt("FORMULA_FONTSIZE");
+      int zoomFactor = Config_getInt(FORMULA_FONTSIZE);
       if (zoomFactor<8 || zoomFactor>50) zoomFactor=10;
       scaleFactor *= zoomFactor/10.0;
       int gx = (((int)((x2-x1)*scaleFactor))+3)&~1;
@@ -194,6 +188,7 @@ void FormulaList::generateBitmaps(const char *path)
       {
         err("Problem running ghostscript %s %s. Check your installation!\n",portable_ghostScriptCommand(),gsArgs);
         portable_sysTimerStop();
+        QDir::setCurrent(oldDir);
         return;
       }
       portable_sysTimerStop();

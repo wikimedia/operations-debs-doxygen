@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Parker Waechter & Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Parker Waechter & Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -62,7 +62,7 @@ class RTFGenerator : public OutputGenerator
     void endTitle() {} 
 
     void newParagraph();
-    void startParagraph();
+    void startParagraph(const char *classDef);
     void endParagraph();
     void writeString(const char *text);
     void startIndexListItem();
@@ -126,7 +126,7 @@ class RTFGenerator : public OutputGenerator
     void writeAnchor(const char *fileName,const char *name);
     void startCodeFragment();
     void endCodeFragment();
-    void writeLineNumber(const char *,const char *,const char *,int l) { t << l << " "; }
+    void writeLineNumber(const char *,const char *,const char *,int l) { t << QString("%1").arg(l,5) << " "; }
     void startCodeLine(bool) { col=0; }
     void endCodeLine() { lineBreak(); }
     void startEmphasis() { t << "{\\i ";  }
@@ -138,7 +138,7 @@ class RTFGenerator : public OutputGenerator
     void startDescItem();
     void endDescItem();
     void lineBreak(const char *style=0);
-    void startMemberDoc(const char *,const char *,const char *,const char *,bool);
+    void startMemberDoc(const char *,const char *,const char *,const char *,int,int,bool);
     void endMemberDoc(bool);
     void startDoxyAnchor(const char *,const char *,const char *,const char *,const char *);
     void endDoxyAnchor(const char *,const char *);
@@ -193,6 +193,8 @@ class RTFGenerator : public OutputGenerator
 	
     void startDescTable(const char *title);
     void endDescTable();
+    void startDescTableRow();
+    void endDescTableRow();
     void startDescTableTitle();
     void endDescTableTitle();
     void startDescTableData();
@@ -242,8 +244,8 @@ class RTFGenerator : public OutputGenerator
     void endConstraintDocs();
     void endConstraintList();
 
-    void startMemberDocSimple();
-    void endMemberDocSimple();
+    void startMemberDocSimple(bool);
+    void endMemberDocSimple(bool);
     void startInlineMemberType();
     void endInlineMemberType();
     void startInlineMemberName();
@@ -277,6 +279,7 @@ class RTFGenerator : public OutputGenerator
     void incrementIndentLevel();
     void decrementIndentLevel();
     int  col;
+    bool m_prettyCode;
 
     bool m_bstartedBody;  // has startbody been called yet?
     int  m_listLevel; // // RTF does not really have a addative indent...manually set list level.

@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -309,10 +309,18 @@ class DocCite : public DocNode
 class DocStyleChange : public DocNode
 {
   public:
-    enum Style { Bold, Italic, Code, Center, Small, 
-                 Subscript, Superscript, Preformatted,
-                 Span, Div
+    enum Style { Bold          = (1<<0),
+                 Italic        = (1<<1),
+                 Code          = (1<<2),
+                 Center        = (1<<3),
+                 Small         = (1<<4),
+                 Subscript     = (1<<5),
+                 Superscript   = (1<<6),
+                 Preformatted  = (1<<7),
+                 Span          = (1<<8),
+                 Div           = (1<<9)
                };
+
     DocStyleChange(DocNode *parent,uint position,Style s,bool enable,
                    const HtmlAttribList *attribs=0) : 
       m_position(position), m_style(s), m_enable(enable)
@@ -395,7 +403,7 @@ class DocSymbol : public DocNode
                    /* doxygen commands mapped */
                    Sym_BSlash, Sym_At, Sym_Less, Sym_Greater, Sym_Amp,
                    Sym_Dollar, Sym_Hash, Sym_DoubleColon, Sym_Percent, Sym_Pipe,
-                   Sym_Quot, Sym_Minus
+                   Sym_Quot, Sym_Minus, Sym_Plus, Sym_Dot
                  };
     enum PerlType { Perl_unknown = 0, Perl_string, Perl_char, Perl_symbol, Perl_umlaut,
                     Perl_acute, Perl_grave, Perl_circ, Perl_slash, Perl_tilde,
@@ -447,6 +455,14 @@ class DocVerbatim : public DocNode
     QCString relPath() const     { return m_relPath; }
     QCString language() const    { return m_lang; }
     bool isBlock() const         { return m_isBlock; }
+    bool hasCaption() const      { return !m_children.isEmpty(); }
+    QCString width() const       { return m_width; }
+    QCString height() const      { return m_height; }
+    const QList<DocNode> &children() const { return m_children; }
+    QList<DocNode> &children()   { return m_children; }
+    void setText(const QCString &t)   { m_text=t;   }
+    void setWidth(const QCString &w)  { m_width=w;  }
+    void setHeight(const QCString &h) { m_height=h; }
 
   private:
     QCString  m_context;
@@ -457,6 +473,9 @@ class DocVerbatim : public DocNode
     QCString  m_relPath;
     QCString  m_lang;
     bool      m_isBlock;
+    QCString  m_width;
+    QCString  m_height;
+    QList<DocNode> m_children;
 };
 
 
@@ -464,7 +483,8 @@ class DocVerbatim : public DocNode
 class DocInclude : public DocNode
 {
   public:
-  enum Type { Include, DontInclude, VerbInclude, HtmlInclude, LatexInclude, IncWithLines, Snippet };
+  enum Type { Include, DontInclude, VerbInclude, HtmlInclude, LatexInclude,
+	      IncWithLines, Snippet , IncludeDoc, SnippetDoc, SnipWithLines};
     DocInclude(DocNode *parent,const QCString &file,
                const QCString context, Type t,
                bool isExample,const QCString exampleFile,
@@ -686,7 +706,7 @@ class DocImage : public CompAccept<DocImage>, public DocNode
   private:
     HtmlAttribList m_attribs;
     QCString  m_name;
-    Type     m_type;
+    Type      m_type;
     QCString  m_width;
     QCString  m_height;
     QCString  m_relPath;
@@ -811,15 +831,16 @@ class DocRef : public CompAccept<DocRef>, public DocNode
     QCString anchor() const       { return m_anchor; }
     QCString targetTitle() const  { return m_text; }
     bool hasLinkText() const     { return !m_children.isEmpty(); }
-    bool refToAnchor() const     { return m_refToAnchor; }
-    bool refToSection() const    { return m_refToSection; }
+    bool refToAnchor() const     { return m_refType==Anchor; }
+    bool refToSection() const    { return m_refType==Section; }
+    bool refToTable() const      { return m_refType==Table; }
     bool isSubPage() const       { return m_isSubPage; }
     void accept(DocVisitor *v)   { CompAccept<DocRef>::accept(this,v); }
 
   private:
-    bool      m_refToSection;
-    bool      m_refToAnchor;
-    bool      m_isSubPage;
+    enum RefType { Unknown, Anchor, Section, Table };
+    RefType    m_refType;
+    bool       m_isSubPage;
     QCString   m_file;
     QCString   m_relPath;
     QCString   m_ref;
@@ -1114,9 +1135,7 @@ class DocPara : public CompAccept<DocPara>, public DocNode
                            int direction);
     void handleIncludeOperator(const QCString &cmdName,DocIncOperator::Type t);
     void handleImage(const QCString &cmdName);
-    void handleDotFile(const QCString &cmdName);
-    void handleMscFile(const QCString &cmdName);
-    void handleDiaFile(const QCString &cmdName);
+    template<class T> void handleFile(const QCString &cmdName);
     void handleInclude(const QCString &cmdName,DocInclude::Type t);
     void handleLink(const QCString &cmdName,bool isJavaLink);
     void handleCite();
@@ -1270,15 +1289,20 @@ class DocHtmlCell : public CompAccept<DocHtmlCell>, public DocNode
 class DocHtmlCaption : public CompAccept<DocHtmlCaption>, public DocNode
 {
   public:
-    DocHtmlCaption(DocNode *parent,const HtmlAttribList &attribs) : 
-      m_attribs(attribs) { m_parent = parent; }
+    DocHtmlCaption(DocNode *parent,const HtmlAttribList &attribs);
     Kind kind() const          { return Kind_HtmlCaption; }
     void accept(DocVisitor *v) { CompAccept<DocHtmlCaption>::accept(this,v); }
     const HtmlAttribList &attribs() const { return m_attribs; }
     int parse();
+    bool hasCaptionId() const { return m_hasCaptionId; }
+    QCString file() const     { return m_file;         }
+    QCString anchor() const   { return m_anchor;       }
 
   private:
     HtmlAttribList m_attribs;
+    bool           m_hasCaptionId;
+    QCString       m_file;
+    QCString       m_anchor;
 };
 
 /** Node representing a HTML table row */
@@ -1294,8 +1318,18 @@ class DocHtmlRow : public CompAccept<DocHtmlRow>, public DocNode
     const HtmlAttribList &attribs() const { return m_attribs; }
     int parse();
     int parseXml(bool header);
-    bool isHeading() const     { return m_children.count()>0 && 
-                                 ((DocHtmlCell*)m_children.getFirst())->isHeading(); 
+    bool isHeading() const     { // a row is a table heading if all cells are marked as such
+                                 bool heading=TRUE;
+                                 QListIterator<DocNode> it(m_children);
+                                 DocNode *n;
+                                 for (;(n=it.current());++it)
+                                 {
+                                   if (n->kind()==Kind_HtmlCell)
+                                   {
+                                     heading = heading && ((DocHtmlCell*)n)->isHeading();
+                                   }
+                                 }
+                                 return m_children.count()>0 && heading;
                                }
     void setVisibleCells(int n) { m_visibleCells = n; }
     int visibleCells() const    { return m_visibleCells; }
@@ -1323,6 +1357,12 @@ class DocHtmlTable : public CompAccept<DocHtmlTable>, public DocNode
     int parseXml();
     uint numColumns() const { return m_numCols; }
     void accept(DocVisitor *v);
+    DocHtmlCaption *caption() const { return m_caption; }
+    DocHtmlRow *firstRow() const {
+                             DocNode *n = m_children.getFirst();
+                             if (n && n->kind()==Kind_HtmlRow) return (DocHtmlRow*)n;
+                             return 0;
+                           }
 
   private:
     void computeTableGrid();

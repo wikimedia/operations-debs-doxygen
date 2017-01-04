@@ -5,12 +5,12 @@ Source: http://www.stack.nl/~dimitri/doxygen/download.html
 
 Files: *
 Copyright: 1997-2014, Dimitri van Heesch and others
-License: GPL-2 with exceptions
+License: GPL-2 with Qt exception
 
 Files: debian/*
 Copyright:
  2000-2003, Luca Filipozzi
- 2004-2014, Matthias Klose
+ 2004-2016, Matthias Klose
  2013-2014, Helmut Grohne
  and others
 License: GPL-2
@@ -94,7 +94,7 @@ License: GPL-2
  License version 2 can be found in the file
  `/usr/share/common-licenses/GPL-2'.
 
-License: GPL-2 with exceptions
+License: GPL-2 with Qt exception
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public
  License as published by the Free Software Foundation;

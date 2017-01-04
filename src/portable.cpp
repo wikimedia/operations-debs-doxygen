@@ -45,7 +45,7 @@ int portable_system(const char *command,const char *args,bool commandHasConsole)
   fullCmd += " ";
   fullCmd += args;
 #ifndef NODEBUG
-  Debug::print(Debug::ExtCmd,0,"Executing external command `%s`\n",fullCmd.data());
+  Debug::print(Debug::ExtCmd,0,"Executing external command `%s`\n",qPrint(fullCmd));
 #endif
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -169,10 +169,16 @@ int portable_system(const char *command,const char *args,bool commandHasConsole)
     else if (sInfo.hProcess)      /* executable was launched, wait for it to finish */
     {
       WaitForSingleObject(sInfo.hProcess,INFINITE); 
+      /* get process exit code */
+      DWORD exitCode;
+      if (!GetExitCodeProcess(sInfo.hProcess,&exitCode))
+      {
+        exitCode = -1;
+      }
       CloseHandle(sInfo.hProcess);
+      return exitCode;
     }
   }
-  return 0;
 #endif
 
 }
@@ -188,7 +194,10 @@ uint portable_pid()
   return pid;
 }
 
-static char **last_environ;
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#else
+  static char **last_environ;
+#endif
 
 void portable_setenv(const char *name,const char *value)
 {
@@ -439,4 +448,27 @@ bool portable_isAbsolutePath(const char *fileName)
   return false;
 }
 
-
+/**
+ * Correct a possible wrong PATH variable
+ *
+ * This routine was inspired by the cause for bug 766059 was that in the Windows path there were forward slahes.
+ */
+void portable_correct_path(void)
+{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+  const char *p = portable_getenv("PATH");
+  char *q = (char *)malloc(strlen(p) + 1);
+  strcpy(q, p);
+  bool found = false;
+  for (int i = 0 ; i < strlen(q); i++)
+  {
+    if (q[i] == '/')
+    {
+      q[i] = '\\';
+      found = true;
+    }
+  }
+  if (found) portable_setenv("PATH",q);
+  free(q);
+#endif
+}

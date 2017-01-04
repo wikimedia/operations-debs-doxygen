@@ -1,8 +1,12 @@
 #!/usr/bin/make -f
 
+COMMA = ,
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
 #export DH_VERBOSE=1
 export DH_OPTIONS=
-export QTDIR=/usr/share/qt4
 
 CFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CFLAGS)
 CXXFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CXXFLAGS)
@@ -14,58 +18,55 @@ DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-clang_archs = alpha amd64 armel armhf arm64 i386 mips mipsel \
-	powerpc powerpcspe ppc64 ppc64el s390x \
-	kfreebsd-amd64 kfreebsd-i386
+export LLVM_CONFIG = llvm-config-3.9
 
-ifeq (,$(findstring stage1,$(DEB_BUILD_PROFILES)))
-  with_doxywizard := yes
-else
-  with_doxywizard := no
-endif
+clang_archs = alpha amd64 armel armhf arm64 i386 mips mipsel mips64el \
+	powerpc powerpcspe ppc64 ppc64el s390x sparc64 \
 
-ifeq ($(with_doxywizard),yes)
-  CONFIGUREFLAGS+=--with-doxywizard
-endif
-CONFIGUREFLAGS+=--dot /usr/bin/dot
-CONFIGUREFLAGS+=--install /usr/bin/install
-CONFIGUREFLAGS+=--python python3
-CONFIGUREFLAGS+=--with-doxysearch
-CONFIGUREFLAGS+=--with-sqlite3
-ifneq (,$(filter $(DEB_HOST_ARCH),$(clang_archs)))
-  CONFIGUREFLAGS+=--with-libclang
-endif
+#	kfreebsd-amd64 kfreebsd-i386
+
+with_doxywizard = $(if $(findstring stage1,$(DEB_BUILD_PROFILES)),no,yes)
+
+CONFIGUREFLAGS += -DCMAKE_INSTALL_PREFIX=/usr
+CONFIGUREFLAGS += -Dbuild_wizard=$(if $(filter yes, $(with_doxywizard)),ON,OFF)
+CONFIGUREFLAGS += -Dbuild_doc=$(if $(filter yes, $(with_docs)),ON,OFF)
+CONFIGUREFLAGS += -DPYTHON_EXECUTABLE=/usr/bin/python3
+CONFIGUREFLAGS += -Duse_libclang=$(if $(filter $(DEB_HOST_ARCH),$(clang_archs)),ON,OFF)
+CONFIGUREFLAGS += -Dbuild_search=ON
+# still experimental according to upstream
+#CONFIGUREFLAGS += -Duse_sqlite3=ON
 
 # used by jquery/Makefile
 export MINIFIER=/usr/share/yui-compressor/yui-compressor
 
-configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	$(MAKE) -C jquery install
-	./configure $(CONFIGUREFLAGS)
-	# get rid of prebuilt files from orig.tar.gz
-	$(MAKE) distclean
-	./configure $(CONFIGUREFLAGS)
-	sed -i 's/^TMAKE_MOC *=.*/TMAKE_MOC = moc/' addon/doxywizard/doxywizard.pro
+	rm -rf build
+	mkdir -p build
+	cd build && cmake -G "Unix Makefiles" $(CONFIGUREFLAGS) $(CURDIR)
 	touch $@
+
+build: with_docs=yes
+build-arch: with_docs=no
+build-indep: with_docs=yes
 
 build: build-stamp
 build-arch: build-stamp
 build-indep: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
-	$(MAKE) QMAKE=$(shell pwd)/debian/qmake
+	$(MAKE) -C build $(NJOBS) VERBOSE=1
+	[ "$(with_docs)" = no ] || $(MAKE) -C build $(NJOBS) VERBOSE=1 docs
 	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
-	rm -f configure-stamp build-stamp install*stamp
-	rm -rf qt tmake winbuild
-	$(MAKE) -C jquery clean
+	rm -f configure-stamp build-stamp install*stamp doc/config.doc doc/language.doc doc/mailto.txt doc/translator_report.txt templates/html/jquery.js
+	rm -rf build
 	rm -f src/jquery_*.js
-	[ ! -f Makefile ] || $(MAKE) distclean
+	rm -rf jquery/.sass-cache
 	rm -f qtools/Makefile.qtools
 	rm -f doxygen_sqlite3.db
 	dh_clean
@@ -74,44 +75,61 @@ uninstall:
 	dh_testdir
 	dh_testroot
 	rm -f install*stamp
-	dh_clean -k
+	dh_prep
 
 install-indep: install-arch
 install-indep: install-indep-stamp
 install-indep-stamp: DH_OPTIONS=-i
-install-indep-stamp: INSDIR=$(shell pwd)/debian/doxygen/usr
-install-indep-stamp: DOCDIR=$(shell pwd)/debian/doxygen-doc/usr/share/doc/doxygen
 install-indep-stamp:
 	dh_testdir
 	dh_testroot
 	dh_installdirs
-	$(MAKE) install_docs \
-		INSTALL=$(INSDIR) DOCDIR=$(DOCDIR) MAN1DIR=share/man/man1
+	$(MAKE) -C build install \
+		VERBOSE=1 \
+		DESTDIR=$(CURDIR)/debian/doxygen-doc
+	  mkdir -p debian/doxygen-doc/usr/share/doc/doxygen
+	  mv debian/doxygen-doc/usr/share/doc/packages/doxygen/* \
+		debian/doxygen-doc/usr/share/doc/doxygen/.
+	  rm -rf debian/doxygen-doc/usr/share/doc/packages
+	  rm -rf debian/doxygen-doc/usr/bin
+	  rm -rf debian/doxygen-doc/usr/share/man
 	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
 	touch $@
 
 install-arch: build
 install-arch: install-arch-stamp
 install-arch-stamp: DH_OPTIONS=-a
-install-arch-stamp: INSDIR=$(shell pwd)/debian/doxygen/usr
-install-arch-stamp: DOCDIR=$(shell pwd)/debian/doxygen/usr/share/doc/doxygen
 install-arch-stamp:
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_prep
 	dh_installdirs
-	$(MAKE) install \
-		INSTALL=$(INSDIR) DOCDIR=$(DOCDIR) MAN1DIR=share/man/man1
+	$(MAKE) -C build install \
+		VERBOSE=1 \
+		DESTDIR=$(CURDIR)/debian/doxygen
 	cd debian/dh-doxygen && pod2man -c Debhelper -r '' dh_doxygen dh_doxygen.1
+	: # FIXME: man pages not installed when building without docs
+	[ -f debian/doxygen/usr/share/man/man1/doxygen.1 ] \
+	  || install -D doc/doxygen.1 debian/doxygen/usr/share/man/man1/doxygen.1
 ifeq ($(with_doxywizard),yes)
+	[ -f debian/doxygen/usr/share/man/man1/doxywizard.1 ] \
+	  || install -D doc/doxywizard.1 debian/doxygen/usr/share/man/man1/doxywizard.1
 	dh_movefiles -Ndoxygen --sourcedir=debian/doxygen \
 		usr/bin/doxywizard \
 		usr/share/man/man1/doxywizard.1
 endif
+	rm -rf debian/doxygen/usr/share/doc/packages
+
+	rm -f debian/doxygen/usr/share/man/man1/doxyindexer.1
+	rm -f debian/doxygen/usr/share/man/man1/doxysearch.1
 	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
 	touch $@
 
 install: install-indep install-arch
+
+binary: with_docs=yes
+binary-arch: with_docs=no
+binary-indep: with_docs=yes
 
 binary-indep: DH_OPTIONS=-i
 binary-indep: install-indep
@@ -141,7 +159,7 @@ binary-arch: install-arch
 	dh_testdir
 	dh_testroot
 	dh_install
-	dh_installdocs LANGUAGE.HOWTO PLATFORMS README.md VERSION
+	dh_installdocs LANGUAGE.HOWTO README.md VERSION
 	dh_installman
 	dh_installchangelogs doc/changelog.doc
 	dh_strip --dbg-package=doxygen-dbg

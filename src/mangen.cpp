@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -38,7 +38,7 @@ static QCString getExtension()
    * in case of . missing, just ignore it
    * in case number missing, just place a 3 in front of it
    */
-  QCString ext = Config_getString("MAN_EXTENSION");
+  QCString ext = Config_getString(MAN_EXTENSION);
   if (ext.isEmpty())
   {
     ext = "3"; 
@@ -66,7 +66,7 @@ static QCString getExtension()
 
 static QCString getSubdir()
 {
-  QCString dir = Config_getString("MAN_SUBDIR");
+  QCString dir = Config_getString(MAN_SUBDIR);
   if (dir.isEmpty())
   {
     dir = "man" + getExtension();
@@ -76,7 +76,7 @@ static QCString getSubdir()
 
 ManGenerator::ManGenerator() : OutputGenerator()
 {
-  dir=Config_getString("MAN_OUTPUT") + "/" + getSubdir();
+  dir=Config_getString(MAN_OUTPUT) + "/" + getSubdir();
   firstCol=TRUE;
   paragraph=TRUE;
   col=0;
@@ -107,8 +107,7 @@ ManGenerator::~ManGenerator()
 
 void ManGenerator::init()
 {
-  QCString ext = getExtension();
-  QCString &manOutput = Config_getString("MAN_OUTPUT");
+  QCString &manOutput = Config_getString(MAN_OUTPUT);
   
   QDir d(manOutput);
   if (!d.exists() && !d.mkdir(manOutput))
@@ -182,18 +181,19 @@ void ManGenerator::endTitleHead(const char *,const char *name)
 {
   t << ".TH \"" << name << "\" " << getExtension() << " \"" 
     << dateToString(FALSE) << "\" \"";
-  if (!Config_getString("PROJECT_NUMBER").isEmpty())
-    t << "Version " << Config_getString("PROJECT_NUMBER") << "\" \"";
-  if (Config_getString("PROJECT_NAME").isEmpty()) 
+  if (!Config_getString(PROJECT_NUMBER).isEmpty())
+    t << "Version " << Config_getString(PROJECT_NUMBER) << "\" \"";
+  if (Config_getString(PROJECT_NAME).isEmpty()) 
     t << "Doxygen";
   else
-    t << Config_getString("PROJECT_NAME");
+    t << Config_getString(PROJECT_NAME);
   t << "\" \\\" -*- nroff -*-" << endl;
   t << ".ad l" << endl;
   t << ".nh" << endl;
   t << ".SH NAME" << endl;
-  t << name << " \\- ";
+  t << name;
   firstCol=FALSE;
+  paragraph=TRUE;
   inHeader=TRUE;
 }
 
@@ -208,7 +208,7 @@ void ManGenerator::newParagraph()
   paragraph=TRUE;
 }
 
-void ManGenerator::startParagraph()
+void ManGenerator::startParagraph(const char *)
 {
   if (!paragraph)
   {
@@ -306,6 +306,7 @@ void ManGenerator::docify(const char *str)
     {
       switch(c)
       {
+        case '-':  t << "\\-"; break; // see  bug747780
         case '.':  t << "\\&."; break; // see  bug652277
         case '\\': t << "\\\\"; col++; break;
         case '\n': t << "\n"; col=0; break;
@@ -334,13 +335,13 @@ void ManGenerator::codify(const char *str)
       {
         case '.':   t << "\\&."; break; // see  bug652277
         case '\t':  spacesToNextTabStop =
-                          Config_getInt("TAB_SIZE") - (col%Config_getInt("TAB_SIZE"));
+                          Config_getInt(TAB_SIZE) - (col%Config_getInt(TAB_SIZE));
                     t << Doxygen::spaces.left(spacesToNextTabStop); 
                     col+=spacesToNextTabStop; 
                     break;
         case '\n':  t << "\n"; firstCol=TRUE; col=0; break;
         case '\\':  t << "\\"; col++; break;
-        case '\"':  c = '\''; // no break!
+        case '\"':  // no break!
         default:    p=writeUtf8Char(t,p-1); firstCol=FALSE; col++; break;
       }
     }
@@ -417,7 +418,7 @@ void ManGenerator::endCodeFragment()
   col=0;
 }
 
-void ManGenerator::startMemberDoc(const char *,const char *,const char *,const char *,bool) 
+void ManGenerator::startMemberDoc(const char *,const char *,const char *,const char *,int,int,bool) 
 { 
   if (!firstCol) t << endl;
   t << ".SS \""; 
@@ -430,7 +431,7 @@ void ManGenerator::startDoxyAnchor(const char *,const char *manName,
                                    const char *)
 {
     // something to be done?
-    if( !Config_getBool("MAN_LINKS") ) 
+    if( !Config_getBool(MAN_LINKS) ) 
     {
 	return; // no
     }
@@ -761,19 +762,26 @@ void ManGenerator::endInlineHeader()
   firstCol = FALSE;
 }
 
-void ManGenerator::startMemberDocSimple()
+void ManGenerator::startMemberDocSimple(bool isEnum)
 {
   if (!firstCol) 
   {
     t << endl << ".PP" << endl;
   }
   t << "\\fB";
-  docify(theTranslator->trCompoundMembers());
+  if (isEnum)
+  {
+    docify(theTranslator->trEnumerationValues());
+  }
+  else
+  {
+    docify(theTranslator->trCompoundMembers());
+  }
   t << ":\\fP" << endl;
   t << ".RS 4" << endl;
 }
 
-void ManGenerator::endMemberDocSimple()
+void ManGenerator::endMemberDocSimple(bool)
 {
   if (!firstCol) t << endl;
   t << ".RE" << endl;
@@ -828,10 +836,4 @@ void ManGenerator::endLabels()
 
 void ManGenerator::endHeaderSection()
 {
-  if (!firstCol) 
-  { 
-    t<< endl; firstCol=TRUE; 
-  }
 }
-
-

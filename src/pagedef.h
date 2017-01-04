@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -23,6 +23,7 @@
 
 class PageSDict;
 class OutputList;
+class FTextStream;
 
 /** @brief A model of a page symbol. */
 class PageDef : public Definition
@@ -32,7 +33,7 @@ class PageDef : public Definition
    ~PageDef();
 
     // setters
-    void setFileName(const char *name,bool dontEscape);
+    void setFileName(const char *name);
     void setShowToc(bool b);
 
     // getters
@@ -64,6 +65,7 @@ class PageDef : public Definition
     QCString displayName(bool=TRUE) const { return !m_title.isEmpty() ? m_title : Definition::name(); }
 
     void writeDocumentation(OutputList &ol);
+    void writeTagFile(FTextStream &);
 
   private:
     void setNestingLevel(int l);

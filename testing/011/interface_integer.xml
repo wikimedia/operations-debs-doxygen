@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="">
-  <compounddef id="interface_integer" kind="class" prot="public">
+  <compounddef id="interface_integer" kind="class" language="Objective-C" prot="public">
     <compoundname>Integer</compoundname>
     <basecompoundref prot="public" virt="non-virtual">Object</basecompoundref>
     <sectiondef kind="protected-attrib">
@@ -16,7 +16,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="011_category.m" bodystart="8" bodyend="-1"/>
+        <location file="011_category.m" line="8" column="1" bodyfile="011_category.m" bodystart="8" bodyend="-1"/>
       </memberdef>
     </sectiondef>
     <sectiondef kind="public-func">
@@ -80,7 +80,7 @@
         </childnode>
       </node>
     </collaborationgraph>
-    <location file="011_category.m" bodystart="6" bodyend="-1"/>
+    <location file="011_category.m" line="6" column="1" bodyfile="011_category.m" bodystart="6" bodyend="-1"/>
     <listofallmembers>
       <member refid="interface_integer_1a35e89216966d8179a1b77f14b8211fda" prot="protected" virt="non-virtual">
         <scope>Integer</scope>

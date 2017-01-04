@@ -2,7 +2,7 @@
 #define CONDPARSER_H
 
 /**
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -28,24 +28,25 @@ class CondParser
 {
   // public functions
   public:
+    CondParser() : m_e(0), m_tokenType(NOTHING) {}
     bool parse(const char *fileName,int lineNr,const char *expr);
 
     // enumerations
   private:
-    enum TOKENTYPE 
+    enum TOKENTYPE
     {
-      NOTHING = -1, 
-      DELIMITER, 
-      VARIABLE, 
+      NOTHING = -1,
+      DELIMITER,
+      VARIABLE,
       UNKNOWN
     };
-    enum OPERATOR_ID 
+    enum OPERATOR_ID
     {
-      UNKNOWN_OP = -1, 
-      AND = 1, 
-      OR, 
+      UNKNOWN_OP = -1,
+      AND = 1,
+      OR,
       NOT
-    }; 
+    };
 
     // data
   private:

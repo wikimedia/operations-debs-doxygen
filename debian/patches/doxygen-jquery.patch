@@ -1,12 +1,12 @@
-Index: doxygen/src/htmlgen.cpp
+Index: b/src/htmlgen.cpp
 ===================================================================
---- doxygen.orig/src/htmlgen.cpp	2013-11-09 19:18:19.000000000 +0100
-+++ doxygen/src/htmlgen.cpp	2013-11-09 19:18:19.000000000 +0100
-@@ -1560,6 +1560,7 @@
-     fprintf(stderr,"Warning: Cannot open file %s for writing\n",fileName.data());
+--- a/src/htmlgen.cpp
++++ b/src/htmlgen.cpp
+@@ -741,6 +741,7 @@ void HtmlGenerator::init()
+     mgr.copyResource("menu.js",dname);
    }
  
-+  if (Config_getBool("GENERATE_TREEVIEW") || Config_getBool("SEARCHENGINE"))
++  if (Config_getBool(GENERATE_TREEVIEW) || Config_getBool(SEARCHENGINE))
    {
-     QFile f(dname+"/jquery.js");
+     QFile f(dname+"/dynsections.js");
      if (f.open(IO_WriteOnly))

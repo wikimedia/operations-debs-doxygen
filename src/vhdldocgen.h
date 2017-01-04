@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2013 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -119,6 +119,7 @@ class VhdlDocGen
     static QCString getClassTitle(const ClassDef*);
     static void writeInlineClassLink(const ClassDef*,
                                      OutputList &ol);
+    static void writeTagFile(MemberDef *mdef,FTextStream &tagFile);
 
     static bool isConstraint(const MemberDef *mdef);
     static bool isConfig(const MemberDef *mdef);
@@ -314,7 +315,7 @@ class FlowChart
     static void delFlowList();
     static const char* getNodeType(int c);
 
-    static void addFlowChart(int type,const char* text,const char* exp,const char * label=NULL);
+    static void addFlowChart(int type,const char* text,const char* exp,const char * label=0);
     static void moveToPrevLevel();
     static int getTimeStamp();
     static void writeFlowChart();
@@ -324,6 +325,9 @@ class FlowChart
     static void printFlowTree();
     static void buildCommentNodes(FTextStream &t);
     static void alignCommentNode(FTextStream &t,QCString com);
+
+    static void  printUmlTree();
+    static QCString printPlantUmlNode(const FlowChart *flo,bool,bool);
 
     static QList<FlowChart> flowList;
 

@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -209,9 +209,9 @@ static Color palette3[] =
 
 Image::Image(int w,int h)
 {
-  static int hue   = Config_getInt("HTML_COLORSTYLE_HUE");
-  static int sat   = Config_getInt("HTML_COLORSTYLE_SAT");
-  static int gamma = Config_getInt("HTML_COLORSTYLE_GAMMA");
+  static int hue   = Config_getInt(HTML_COLORSTYLE_HUE);
+  static int sat   = Config_getInt(HTML_COLORSTYLE_SAT);
+  static int gamma = Config_getInt(HTML_COLORSTYLE_GAMMA);
 
   double red1,green1,blue1;
   double red2,green2,blue2;
@@ -399,7 +399,7 @@ bool Image::save(const char *fileName,int mode)
     return FALSE;
   }
 #endif
-  static bool useTransparency = Config_getBool("FORMULA_TRANSPARENT");
+  static bool useTransparency = Config_getBool(FORMULA_TRANSPARENT);
   uchar* buffer;
   size_t bufferSize;
   LodePNG_Encoder encoder;

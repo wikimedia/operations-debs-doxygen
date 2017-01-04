@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -382,9 +382,9 @@ int Store::read(char *buf,uint size)
 void Store::printFreeList()
 {
   printf("FreeList: ");
-  portable_off_t pos = m_head->pos;
-  while (pos)
+  while (m_head)
   {
+    portable_off_t pos = m_head->pos;
     printf("%x ",(int)pos);
     m_head = m_head->next;
   }

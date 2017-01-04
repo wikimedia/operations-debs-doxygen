@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -24,6 +24,7 @@
 
 #include "definition.h"
 
+struct Argument;
 class MemberDef;
 class MemberList;
 class MemberDict;
@@ -38,6 +39,7 @@ class MemberDef;
 class ExampleSDict;
 class MemberNameInfoSDict;
 class UsesClassDict;
+class ConstraintClassDict;
 class MemberGroupSDict;
 class QTextStream;
 class PackageDef;
@@ -46,6 +48,7 @@ class StringDict;
 struct IncludeInfo;
 class ClassDefImpl;
 class ArgumentList;
+class FTextStream;
 
 /** A class representing of a compound symbol.
  *
@@ -105,7 +108,6 @@ class ClassDef : public Definition
     /** Returns the unique base name (without extension) of the class's file on disk */
     QCString getOutputFileBase() const;
     QCString getInstanceOutputFileBase() const; 
-    QCString getFileBase() const;
 
     /** Returns the base name for the source code file */
     QCString getSourceFileBase() const; 
@@ -127,6 +129,12 @@ class ClassDef : public Definition
 
     /** returns TRUE if this class has a non-empty detailed description */
     bool hasDetailedDescription() const;
+    
+    /** returns the file name to use for the collaboration graph */
+    QCString collaborationGraphFileName() const;
+
+    /** returns the file name to use for the inheritance graph */
+    QCString inheritanceGraphFileName() const;
 
     /** Returns the name as it is appears in the documentation */
     QCString displayName(bool includeScope=TRUE) const;
@@ -227,6 +235,8 @@ class ClassDef : public Definition
     UsesClassDict *usedByImplementationClasses() const;
 
     UsesClassDict *usedInterfaceClasses() const;
+
+    ConstraintClassDict *templateTypeConstraints() const;
 
     bool isTemplateArgument() const;
 
@@ -370,6 +380,7 @@ class ClassDef : public Definition
     void findSectionsInDocumentation();
     void addMembersToMemberGroup();
     void addListReferences();
+    void addTypeConstraints();
     void computeAnchors();
     void mergeMembers();
     void sortMemberLists();
@@ -391,6 +402,7 @@ class ClassDef : public Definition
                               ClassDef *inheritedFrom,const QCString &inheritId);
     int countMembersIncludingGrouped(MemberListType lt,ClassDef *inheritedFrom,bool additional);
     int countInheritanceNodes();
+    void writeTagFile(FTextStream &);
     
     bool visited;
 
@@ -400,7 +412,6 @@ class ClassDef : public Definition
     void showUsedFiles(OutputList &ol);
 
   private: 
-    void writeTagFileMarker();
     void writeDocumentationContents(OutputList &ol,const QCString &pageTitle);
     void internalInsertMember(MemberDef *md,Protection prot,bool addToAllList);
     void addMemberToList(MemberListType lt,MemberDef *md,bool isBrief);
@@ -440,11 +451,12 @@ class ClassDef : public Definition
     void getTitleForMemberListType(MemberListType type,
                QCString &title,QCString &subtitle);
     QCString includeStatement() const;
+    void addTypeConstraint(const QCString &typeConstraint,const QCString &type);
 
-    
     ClassDefImpl *m_impl;
-
 };
+
+//------------------------------------------------------------------------
 
 /** Class that contains information about a usage relation. 
  */
@@ -498,6 +510,8 @@ class UsesClassDictIterator : public QDictIterator<UsesClassDef>
       : QDictIterator<UsesClassDef>(d) {}
    ~UsesClassDictIterator() {}
 };
+
+//------------------------------------------------------------------------
 
 /** Class that contains information about an inheritance relation. 
  */
@@ -556,5 +570,57 @@ class BaseClassListIterator : public QListIterator<BaseClassDef>
     BaseClassListIterator(const BaseClassList &bcl) : 
       QListIterator<BaseClassDef>(bcl) {}
 };
+
+//------------------------------------------------------------------------
+
+
+/** Class that contains information about a type constraint relations.
+ */
+struct ConstraintClassDef
+{
+  ConstraintClassDef(ClassDef *cd) : classDef(cd)
+  {
+    accessors = new QDict<void>(17);
+  }
+ ~ConstraintClassDef()
+  {
+    delete accessors;
+  }
+  void addAccessor(const char *s)
+  {
+    if (accessors->find(s)==0)
+    {
+      accessors->insert(s,(void *)666);
+    }
+  }
+  /** Class definition that this relation uses. */
+  ClassDef *classDef;
+
+  /** Dictionary of member types names that form the edge labels of the
+   *  constraint relation.
+   */
+  QDict<void> *accessors;
+};
+
+/** Dictionary of constraint relations.
+ */
+class ConstraintClassDict : public QDict<ConstraintClassDef>
+{
+  public:
+    ConstraintClassDict(int size) : QDict<ConstraintClassDef>(size) {}
+   ~ConstraintClassDict() {}
+};
+
+/** Iterator class to iterate over a dictionary of constraint relations.
+ */
+class ConstraintClassDictIterator : public QDictIterator<ConstraintClassDef>
+{
+  public:
+    ConstraintClassDictIterator(const QDict<ConstraintClassDef> &d)
+      : QDictIterator<ConstraintClassDef>(d) {}
+   ~ConstraintClassDictIterator() {}
+};
+
+//------------------------------------------------------------------------
 
 #endif

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -59,7 +59,7 @@ static struct htmlEntityInfo
   { SYM(shy),      "\xc2\xad",     "&shy;",      "<shy/>",               "&#173;",        "{$\\-$}",                NULL,     "\\-",         { NULL,         DocSymbol::Perl_unknown }},
   { SYM(reg),      "\xc2\xae",     "&reg;",      "<registered/>",        "&#174;",        "\\textregistered{}",     "(R)",    "\\'AE",       { "registered", DocSymbol::Perl_symbol  }},
   { SYM(macr),     "\xc2\xaf",     "&macr;",     "<macr/>",              "&#175;",        "\\={}",                  NULL,     "\\'AF",       { NULL,         DocSymbol::Perl_unknown }},
-  { SYM(deg),      "\xc2\xb0",     "&deg;",      "<deg/>",               "&#176;",        "\\textdegree",           NULL,     "\\'B0",       { "deg",        DocSymbol::Perl_symbol  }},
+  { SYM(deg),      "\xc2\xb0",     "&deg;",      "<deg/>",               "&#176;",        "\\textdegree{}",         NULL,     "\\'B0",       { "deg",        DocSymbol::Perl_symbol  }},
   { SYM(plusmn),   "\xc2\xb1",     "&plusmn;",   "<plusmn/>",            "&#177;",        "{$\\pm$}",               NULL,     "\\'B1",       { "+/-",        DocSymbol::Perl_string  }},
   { SYM(sup2),     "\xc2\xb2",     "&sup2;",     "<sup2/>",              "&#178;",        "\\texttwosuperior{}",    NULL,     "\\'B2",       { NULL,         DocSymbol::Perl_unknown }},
   { SYM(sup3),     "\xc2\xb3",     "&sup3;",     "<sup3/>",              "&#179;",        "\\textthreesuperior{}",  NULL,     "\\'B3",       { NULL,         DocSymbol::Perl_unknown }},
@@ -193,13 +193,13 @@ static struct htmlEntityInfo
   { SYM(upsih),    "\xcf\x92",     "&upsih;",    "<upsih/>",             "&#978;",        "{$\\Upsilon$}",          NULL,     "\\u978?",     { NULL,         DocSymbol::Perl_unknown }},
   { SYM(piv),      "\xcf\x96",     "&piv;",      "<piv/>",               "&#982;",        "{$\\varpi$}",            NULL,     "\\u982?",     { NULL,         DocSymbol::Perl_unknown }},
   { SYM(bull),     "\xe2\x80\xa2", "&bull;",     "<bull/>",              "&#8226;",       "\\textbullet{}",         NULL,     "\\'95",       { NULL,         DocSymbol::Perl_unknown }},
-  { SYM(hellip),   "\xe2\x80\xa6", "&hellip;",   "<hellip/>",            "&#8230;",       "{$\\cdots$}",            NULL,     "\\'85",       { NULL,         DocSymbol::Perl_unknown }},
+  { SYM(hellip),   "\xe2\x80\xa6", "&hellip;",   "<hellip/>",            "&#8230;",       "{$\\dots$}",             NULL,     "\\'85",       { NULL,         DocSymbol::Perl_unknown }},
   { SYM(prime),    "\xe2\x80\xb2", "&prime;",    "<prime/>",             "&#8242;",       "'",                      NULL,     "\\u8242?",    { "\\\'",       DocSymbol::Perl_string  }},
   { SYM(Prime),    "\xe2\x80\xb3", "&Prime;",    "<Prime/>",             "&#8243;",       "''",                     NULL,     "\\u8243?",    { "\"",         DocSymbol::Perl_char    }},
   { SYM(oline),    "\xe2\x80\xbe", "&oline;",    "<oline/>",             "&#8254;",       "{$\\overline{\\,}$}",    NULL,     "\\u8254?",    { NULL,         DocSymbol::Perl_unknown }},
   { SYM(frasl),    "\xe2\x81\x84", "&frasl;",    "<frasl/>",             "&#8260;",       "/",                      NULL,     "\\u8260?",    { NULL,         DocSymbol::Perl_unknown }},
   { SYM(weierp),   "\xe2\x84\x98", "&weierp;",   "<weierp/>",            "&#8472;",       "{$\\wp$}",               NULL,     "\\u8472?",    { NULL,         DocSymbol::Perl_unknown }},
-  { SYM(image),    "\xe2\x84\x91", "&image;",    "<image/>",             "&#8465;",       "{$\\Im$}",               NULL,     "\\u8465?",    { NULL,         DocSymbol::Perl_unknown }},
+  { SYM(image),    "\xe2\x84\x91", "&image;",    "<imaginary/>",         "&#8465;",       "{$\\Im$}",               NULL,     "\\u8465?",    { NULL,         DocSymbol::Perl_unknown }},
   { SYM(real),     "\xe2\x84\x9c", "&real;",     "<real/>",              "&#8476;",       "{$\\Re$}",               NULL,     "\\u8476?",    { NULL,         DocSymbol::Perl_unknown }},
   { SYM(trade),    "\xe2\x84\xa2", "&trade;",    "<trademark/>",         "&#8482;",       "\\texttrademark{}",      "(TM)",   "\\'99",       { "trademark",  DocSymbol::Perl_symbol  }},
   { SYM(alefsym),  "\xe2\x85\xb5", "&alefsym;",  "<alefsym/>",           "&#8501;",       "{$\\aleph$}",            NULL,     "\\u8501?",    { NULL,         DocSymbol::Perl_unknown }},
@@ -297,8 +297,8 @@ static struct htmlEntityInfo
   { SYM(euro),     "\xe2\x82\xac", "&euro;",     "<euro/>",              "&#8364;",       "\\texteuro{}",           NULL,     "\\'80",       { NULL,         DocSymbol::Perl_unknown }},
 
   // doxygen extension to the HTML4 table of HTML entities
-  { SYM(tm),       "\xe2\x84\xa2", "&trade;",    "<trademark/>",         "&#8482;",       "\\texttrademark{}",      "(TM)",   "\\'99",       { "trademark",  DocSymbol::Perl_symbol  }},
-  { SYM(apos),     "'",            "'",          "'",                    "&apos;",        "'",                      "'",      "'",           { "\\\'",       DocSymbol::Perl_string  }},
+  { SYM(tm),       "\xe2\x84\xa2", "&trade;",    "<tm/>",                "&#8482;",       "\\texttrademark{}",      "(TM)",   "\\'99",       { "trademark",  DocSymbol::Perl_symbol  }},
+  { SYM(apos),     "'",            "'",          "'",                    "&apos;",        "\\textquotesingle{}",    "'",      "'",           { "\\\'",       DocSymbol::Perl_string  }},
 
   // doxygen commands represented as HTML entities
   { SYM(BSlash),   "\\",           "\\",         "\\",                   "\\",            "\\textbackslash{}",      "\\\\",   "\\\\",        { "\\\\",       DocSymbol::Perl_string  }},
@@ -312,7 +312,9 @@ static struct htmlEntityInfo
   { SYM(Percent),  "%",            "%",          "%",                    "%",             "\\%",                    "%",      "%",           { "%",          DocSymbol::Perl_char    }},
   { SYM(Pipe),     "|",            "|",          "|",                    "|",             "$|$",                    "|",      "|",           { "|",          DocSymbol::Perl_char    }},
   { SYM(Quot),     "\"",           "\"",         "\"",                   "&quot;",        "\"",                     "\"",     "\"",          { "\"",         DocSymbol::Perl_char    }},
-  { SYM(Minus),    "-",            "-",          "-",                    "-",             "-\\/",                   "-",      "-",           { "-",          DocSymbol::Perl_char    }}
+  { SYM(Minus),    "-",            "-",          "-",                    "-",             "-\\/",                   "-",      "-",           { "-",          DocSymbol::Perl_char    }},
+  { SYM(Plus),     "+",            "+",          "+",                    "+",             "+",                      "+",      "+",           { "+",          DocSymbol::Perl_char    }},
+  { SYM(Dot),      ".",            ".",          ".",                    ".",             ".",                      ".",      ".",           { ".",          DocSymbol::Perl_char    }}
 };
 
 static const int g_numHtmlEntities = (int)(sizeof(g_htmlEntities)/ sizeof(*g_htmlEntities));

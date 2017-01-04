@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -17,6 +17,9 @@
  * written by M. Kreis
  * supports VHDL-87/93/2008
  ******************************************************************************/
+%option never-interactive
+%option case-insensitive
+%option prefix="vhdlcodeYY"
 
 %{
 
@@ -44,8 +47,8 @@
 #include "filedef.h"
 #include "tooltip.h"
 
-#define YY_NEVER_INTERACTIVE 1
 #define YY_NO_INPUT 1
+#define YY_NO_UNISTD_H 1
   
 // Toggle for some debugging info
 //#define DBG_CTX(x) fprintf x
@@ -68,7 +71,6 @@ static bool       g_startCode = FALSE;
 static QCString   g_PrevString;
 static QCString   g_CurrClass;
 static QDict<QCString>g_vhdlKeyDict;   
-static QCString   g_tempClass;
 static QCString   g_tempComp;
 static QCString   g_PortMapComp;
 static MemberDef *g_vhdlMember;
@@ -77,7 +79,6 @@ static QCString   g_FuncProto;
 //-----------------------------------------------------------
   
 static CodeOutputInterface * g_code;
-static QCString      g_curClassName;
 static QCString      g_parmType;
 static QCString      g_parmName;
 static const char *  g_inputString;     //!< the code fragment as text
@@ -87,12 +88,10 @@ static int           g_yyLineNr;        //!< current line number
 static bool          g_needsTermination;
 static Definition   *g_searchCtx;
 
+static bool          g_exampleBlock;
 static QCString      g_exampleName;
 static QCString      g_exampleFile;
 
-static QCString      g_type;
-static QCString      g_name;
-static QCString      g_args;
 static QCString      g_classScope;
    
 static QCString      g_CurrScope;
@@ -186,7 +185,6 @@ static void startCodeLine()
   //if (g_currentFontClass) { g_code->endFontClass(); }
   if (g_sourceFileDef)
   {
-    g_startCode=TRUE;
     //QCString lineNumber,lineAnchor;
     //lineNumber.sprintf("%05d",g_yyLineNr);
     //lineAnchor.sprintf("l%05d",g_yyLineNr);
@@ -234,13 +232,13 @@ static void startCodeLine()
     }
   }
   g_code->startCodeLine(g_sourceFileDef); 
+  g_startCode=TRUE;
   if (g_currentFontClass)
   {
     g_code->startFontClass(g_currentFontClass);
   }
 }
 
-static void endFontClass();
 static void endCodeLine()
 {
   endFontClass();
@@ -399,7 +397,7 @@ static void writeMultiLineCodeLink(CodeOutputInterface &ol,
                   Definition *d,
                   const char *text)
 {
-  static bool sourceTooltips = Config_getBool("SOURCE_TOOLTIPS");
+  static bool sourceTooltips = Config_getBool(SOURCE_TOOLTIPS);
   TooltipManager::instance()->addTooltip(d);
   QCString ref  = d->getReference();
   QCString file = d->getOutputFileBase();
@@ -620,7 +618,7 @@ static void appStringLower(QCString& qcs,const char* text)
 static QCString g_temp;
 
 /* writes and links a port map statement */
-static void codifyMapLines(char *text)
+static void codifyMapLines(const char *text)
 {
   if (text==0) return;
   g_temp.resize(0);       
@@ -628,7 +626,7 @@ static void codifyMapLines(char *text)
   int wordCounter=0;
   QCString ctemp;
   //printf("codifyLines(%d,\"%s\")\n",g_yyLineNr,text);
-  char *p=text; //,*sp=p;
+  const char *p=text; //,*sp=p;
   char c;
   bool done=FALSE;
   while (!done)
@@ -1055,7 +1053,6 @@ XILINX      "INST"|"NET"|"PIN"|"BLKNM"|"BUFG"|"COLLAPSE"|"CPLD"|"COMPGRP"|"CONFI
 
 
 <ClassesName>{FUNCNAME} {
-                         QDict<QCString> mem;
                          appStringLower(g_PrevString,vhdlcodeYYtext);
                          g_CurrClass.resize(0);
                          g_CurrClass.append(vhdlcodeYYtext);
@@ -1470,7 +1467,7 @@ XILINX      "INST"|"NET"|"PIN"|"BLKNM"|"BUFG"|"COLLAPSE"|"CPLD"|"COMPGRP"|"CONFI
 			   QCString text(vhdlcodeYYtext);
 			   int i=text.find("--");
 			   if (text.mid(i,3)=="--!" && // hide special comment
-                               Config_getBool("STRIP_CODE_COMMENTS")) 
+                               Config_getBool(STRIP_CODE_COMMENTS)) 
 			   { 
 			     g_yyLineNr++; // skip complete line
 			   }  
@@ -1485,7 +1482,7 @@ XILINX      "INST"|"NET"|"PIN"|"BLKNM"|"BUFG"|"COLLAPSE"|"CPLD"|"COMPGRP"|"CONFI
 			   QCString text(vhdlcodeYYtext);
 			   int i=text.find("--");
 			   if (text.mid(i,3)=="--!" &&
-                               Config_getBool("STRIP_CODE_COMMENTS")) 
+                               Config_getBool(STRIP_CODE_COMMENTS)) 
 			   { 
 			      // hide special comment
 			   }  
@@ -1510,7 +1507,7 @@ void resetVhdlCodeParserState()
 }
 
 void parseVhdlCode(CodeOutputInterface &od,const char *className,const QCString &s, 
-                  bool /*exBlock*/, const char *exName,FileDef *fd,
+                  bool exBlock, const char *exName,FileDef *fd,
                   int startLine,int endLine,bool inlineFragment,
                   MemberDef *memberDef,bool,Definition *searchCtx,
                   bool /* collectXRefs */)
@@ -1533,23 +1530,24 @@ void parseVhdlCode(CodeOutputInterface &od,const char *className,const QCString 
   g_needsTermination = FALSE;
   g_searchCtx = searchCtx;
 
-  if (endLine!=-1)
-    g_inputLines  = endLine+1;
-  else
-    g_inputLines  = countLines();
-
   if (startLine!=-1)
     g_yyLineNr    = startLine;
   else
     g_yyLineNr    = 1;
 
+  if (endLine!=-1)
+    g_inputLines  = endLine+1;
+  else
+    g_inputLines  = g_yyLineNr + countLines() - 1;
+
 
   // g_theCallContext.clear();
   g_classScope    = className;
+  g_exampleBlock  = exBlock; 
   g_exampleName   = exName;
   g_sourceFileDef = fd;
   bool cleanupSourceDef = FALSE;
-  if (fd==0)
+  if (exBlock && fd==0)
   {
     // create a dummy filedef for the example
     g_sourceFileDef = new FileDef("",exName);
@@ -1619,7 +1617,7 @@ void codeFreeVhdlScanner()
 extern "C" { // some bogus code to keep the compiler happy
   void vhdlcodeYYdummy() { yy_flex_realloc(0,0); } 
 }
-#elif YY_FLEX_SUBMINOR_VERSION<33
+#elif YY_FLEX_MAJOR_VERSION<=2 && YY_FLEX_MINOR_VERSION<=5 && YY_FLEX_SUBMINOR_VERSION<33
 #error "You seem to be using a version of flex newer than 2.5.4 but older than 2.5.33. These versions do NOT work with doxygen! Please use version <=2.5.4 or >=2.5.33 or expect things to be parsed wrongly!"
 #endif
 

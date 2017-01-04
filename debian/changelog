@@ -1,3 +1,118 @@
+doxygen (1.8.13-4) unstable; urgency=medium
+
+  * Fix segfault generating XML. Issue #776791. Closes: #849991.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 04 Jan 2017 10:44:49 +0100
+
+doxygen (1.8.13-3) unstable; urgency=medium
+
+  * Build-depend on zlib1g-dev.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 02 Jan 2017 06:00:43 +0100
+
+doxygen (1.8.13-2) unstable; urgency=medium
+
+  * Build using clang on armel, mips64el, sparc64.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 02 Jan 2017 04:38:29 +0100
+
+doxygen (1.8.13-1) experimental; urgency=medium
+
+  * doxygen 1.8.13 release.
+  * Use json-c instead of the osmium source for the autopkg test.
+  * Configure with build_search again. Closes: #822204.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 30 Dec 2016 05:26:43 +0100
+
+doxygen (1.8.12-1) unstable; urgency=medium
+
+  * doxygen 1.8.12 release.
+  * Stop using llvm/clang on armel and kfreebsd-*.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 08 Sep 2016 18:22:12 +0200
+
+doxygen (1.8.11-3) unstable; urgency=medium
+
+  * Applied upstream commit 9a2c7bbfb0c53b4532db7280e6804c7ce76d70a3:
+    Use UTC timezone when displaying QDateTimes parsed from SOURCE_DATE_EPOCH
+    Closes: #792201
+
+ -- Matthias Klose <doko@debian.org>  Fri, 24 Jun 2016 15:57:26 +0200
+
+doxygen (1.8.11-2) unstable; urgency=medium
+
+  * Fix python version number extraction for python release candidate builds.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 15 Jun 2016 08:44:59 +0200
+
+doxygen (1.8.11-1) unstable; urgency=medium
+
+  * Upload to unstable.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 07 Feb 2016 17:53:44 +0100
+
+doxygen (1.8.11-1~exp2) experimental; urgency=medium
+
+  * Revert an upstream change which lets to file names with whitespace,
+    exceeding 256 characters.
+    See https://bugzilla.gnome.org/show_bug.cgi?id=759241.
+  * Fix build with unreleased python versions.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 15 Jan 2016 14:43:43 +0100
+
+doxygen (1.8.11-1~exp1) experimental; urgency=medium
+
+  * doxygen 1.8.11 release.
+  * Build using cmake, Qt5.
+  * Fix some lintian warnings.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 01 Jan 2016 20:13:39 +0100
+
+doxygen (1.8.9.1-6) unstable; urgency=medium
+
+  * Only depend on unversioned libclang. (Closes: #803646)
+  * Add build profile annotations to Build-Depends. (Closes: #738263)
+  * Build doc/language.doc from source. (Closes: #794758)
+  * Clean more generated files. Fix twice-FTBFS. (Closes: #794745)
+
+ -- Helmut Grohne <helmut@subdivi.de>  Tue, 01 Dec 2015 00:00:54 +0100
+
+doxygen (1.8.9.1-5) unstable; urgency=medium
+
+  * Don't configure --with-sqlite3, still experimental according to upstream.
+    Closes: #758975.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 12 Aug 2015 22:01:28 +0200
+
+doxygen (1.8.9.1-4) unstable; urgency=high
+
+  * Rebuild for GCC 5 / xapian-core.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 03 Aug 2015 09:58:38 +0200
+
+doxygen (1.8.9.1-3) unstable; urgency=medium
+
+  * Upload to unstable.
+  * Disable HTML timestamps in Doxygen's own documentation.
+    (no-timestamps.diff).
+  * Default to not generating HTML timestamps: Upstream commit
+    3f2e8a3067712b025623e4420e6eb161febfd42b default-no-timestamps.diff.
+    (Closes: #780617)
+
+ -- Helmut Grohne <helmut@subdivi.de>  Wed, 29 Apr 2015 17:14:31 +0200
+
+doxygen (1.8.9.1-2) experimental; urgency=medium
+
+  * Removed \backmatter in case of COMPACT_LATEX. Issue #742427.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 09 Mar 2015 20:17:33 +0100
+
+doxygen (1.8.9.1-1) experimental; urgency=medium
+
+  * doxygen 1.8.9.1 release.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 19 Jan 2015 20:38:08 +0100
+
 doxygen (1.8.8-5) unstable; urgency=medium
 
   * Cherry pick c83db38ea83499be19d9ff242bfa22ae534ee80c. (Closes: #762272)

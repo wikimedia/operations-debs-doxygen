@@ -5,8 +5,8 @@ set -e
 WORKDIR=$(mktemp -d)
 trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
 cd $WORKDIR
-apt-get source osmium 2>&1
-cd osmium-*
+apt-get source json-c 2>&1
+cd json-c-*
 doxygen 2>&1
 cd /
 rm -Rf "$WORKDIR"
