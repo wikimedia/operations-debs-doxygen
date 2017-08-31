@@ -2,7 +2,6 @@ Source: doxygen
 Section: devel
 Priority: optional
 Maintainer: Matthias Klose <doko@debian.org>
-Uploaders: Helmut Grohne <helmut@subdivi.de>
 Build-Depends: debhelper (>= 9.20141010),
   dpkg-dev (>= 1.17.14),
   qtbase5-dev <!stage1>,
@@ -13,8 +12,8 @@ Build-Depends: debhelper (>= 9.20141010),
   cmake,
   yui-compressor,
   ruby-compass,
-  llvm-3.9-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64],
-  libclang-3.9-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64]
+  llvm-5.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64],
+  libclang-5.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64]
 Build-Depends-Indep: texlive-fonts-recommended,
   texlive-generic-recommended,
   texlive-latex-extra,
@@ -23,9 +22,8 @@ Build-Depends-Indep: texlive-fonts-recommended,
   texlive-font-utils,
   ghostscript,
   graphviz,
-  latex-xcolor,
   rdfind
-Standards-Version: 3.9.8
+Standards-Version: 4.1.0
 Homepage: http://www.stack.nl/~dimitri/doxygen/
 XS-Testsuite: autopkgtest
 
@@ -52,7 +50,7 @@ Depends: doxygen (>= ${source:Version}),
   ${misc:Depends},
   texlive-extra-utils,
   texlive-latex-extra,
-  latex-xcolor,
+  texlive-latex-recommended,
   texlive-font-utils,
   ghostscript,
   texlive-fonts-recommended,

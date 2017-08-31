@@ -1,3 +1,37 @@
+doxygen (1.8.13-9) unstable; urgency=medium
+
+  * Build using LLVM 5.0.
+  * Build using LLVM on armel again.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 31 Aug 2017 13:36:41 +0200
+
+doxygen (1.8.13-8) unstable; urgency=medium
+
+  * Build using LLVM 4.0.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 26 Jul 2017 18:31:33 +0200
+
+doxygen (1.8.13-7) unstable; urgency=medium
+
+  * Don't build using llvm on armel for now.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 01 Jul 2017 21:20:50 +0200
+
+doxygen (1.8.13-6) unstable; urgency=medium
+
+  * Replace latex-xcolor with texlive-latex-recommended in Depends. The
+    previous upload only removed it from Build-Depends.
+    Really Closes: #865232.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Tue, 20 Jun 2017 16:57:58 +0200
+
+doxygen (1.8.13-5) unstable; urgency=medium
+
+  * Drop latex-xcolor dependency. Adresses: #865232.
+  * Remove myself from uploaders: No longer using doxygen.
+
+ -- Helmut Grohne <helmut@subdivi.de>  Tue, 20 Jun 2017 06:39:44 +0200
+
 doxygen (1.8.13-4) unstable; urgency=medium
 
   * Fix segfault generating XML. Issue #776791. Closes: #849991.
