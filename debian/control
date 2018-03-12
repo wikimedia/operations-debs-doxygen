@@ -1,7 +1,7 @@
 Source: doxygen
 Section: devel
 Priority: optional
-Maintainer: Matthias Klose <doko@debian.org>
+Maintainer: Debian QA Group <packages@qa.debian.org>
 Build-Depends: debhelper (>= 9.20141010),
   dpkg-dev (>= 1.17.14),
   qtbase5-dev <!stage1>,
@@ -11,9 +11,9 @@ Build-Depends: debhelper (>= 9.20141010),
   libxapian-dev (>= 1.2.21-1.2),
   cmake,
   yui-compressor,
-  ruby-compass,
-  llvm-5.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64],
-  libclang-5.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64]
+  llvm-6.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64],
+  libclang-6.0-dev [alpha amd64 armel armhf arm64 i386 mips mipsel mips64el powerpc powerpcspe ppc64 ppc64el s390x sparc64],
+  sassc,
 Build-Depends-Indep: texlive-fonts-recommended,
   texlive-generic-recommended,
   texlive-latex-extra,
@@ -23,7 +23,7 @@ Build-Depends-Indep: texlive-fonts-recommended,
   ghostscript,
   graphviz,
   rdfind
-Standards-Version: 4.1.0
+Standards-Version: 4.1.3
 Homepage: http://www.stack.nl/~dimitri/doxygen/
 XS-Testsuite: autopkgtest
 
@@ -98,18 +98,3 @@ Description: GUI configuration tool for doxygen
  or compressed HTML.  The documentation is extracted directly from the sources. 
  .
  This package contains doxywizard, a GUI configuration tool for doxygen.
-
-Package: doxygen-dbg
-Section: debug
-Priority: extra
-Architecture: any
-Depends: doxygen (= ${binary:Version}), ${misc:Depends}
-Description: Debug symbols for doxygen
- Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
- and to some extent PHP, C#, and D.  It can generate an on-line class browser
- (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
- documented source files. There is also support for generating man pages
- and for converting the generated output into Postscript, hyperlinked PDF
- or compressed HTML.  The documentation is extracted directly from the sources.
- .
- This package contains the debug symbols for doxygen.
