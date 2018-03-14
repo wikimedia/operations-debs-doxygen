@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -42,7 +42,7 @@
  Translator class (by the local maintainer) when the localized
  translator is made up-to-date again.
 */
-class TranslatorEsperanto : public Translator
+class TranslatorEsperanto : public TranslatorAdapter_1_8_4
 {
   public:
 
@@ -74,12 +74,6 @@ class TranslatorEsperanto : public Translator
     virtual QCString latexLanguageSupportCommand()
     {
       return "\\usepackage[esperanto]{babel}\n";
-    }
-
-    /*! return the language charset. This will be used for the HTML output */
-    virtual QCString idLanguageCharset()
-    {
-      return "utf-8";
     }
 
     // --- Language translation methods -------------------
@@ -425,12 +419,6 @@ class TranslatorEsperanto : public Translator
     { return "Difinoj"; }
 
     /*! This is used in the documentation of a file as a header before the
-     *  list of function prototypes
-     */
-    virtual QCString trFuncProtos()
-    { return "Funkciaj Prototipoj"; }
-
-    /*! This is used in the documentation of a file as a header before the
      *  list of typedefs
      */
     virtual QCString trTypedefs()
@@ -465,12 +453,6 @@ class TranslatorEsperanto : public Translator
      */
     virtual QCString trDefineDocumentation()
     { return "Difina Dokumentado"; }
-
-    /*! This is used in the documentation of a file/namespace before the list
-     *  of documentation blocks for function prototypes
-     */
-    virtual QCString trFunctionPrototypeDocumentation()
-    { return "Dokumentado de Funkciaj Prototipoj"; }
 
     /*! This is used in the documentation of a file/namespace before the list
      *  of documentation blocks for typedefs
@@ -520,12 +502,6 @@ class TranslatorEsperanto : public Translator
       if (projName) result+=(QCString)" por "+projName;
       result+=(QCString)" de";
       return result;
-    }
-    /*! This is part of the sentence used in the standard footer of each page.
-     */
-    virtual QCString trWrittenBy()
-    {
-      return "skribita de";
     }
 
     /*! this text is put before a class diagram */
@@ -623,6 +599,7 @@ class TranslatorEsperanto : public Translator
         case ClassDef::Protocol:   result+="protokolo "; break;
         case ClassDef::Category:   result+="kategorio "; break;
         case ClassDef::Exception:  result+="escepto "; break;
+        default: break;
       }
       result+=(QCString)clName;
       return result;
@@ -780,18 +757,13 @@ class TranslatorEsperanto : public Translator
         case ClassDef::Protocol:   result+="protokolo"; break;
         case ClassDef::Category:   result+="kategorio"; break;
         case ClassDef::Exception:  result+="escepto"; break;
+        default: break;
       }
       result+=" generitas el la ";
       if (single) result+="sekva dosiero:";
       else result+="sekvaj dosieroj:";
       return result;
     }
-
-    /*! This is in the (quick) index as a link to the alphabetical compound
-     * list.
-     */
-    virtual QCString trAlphabeticalList()
-    { return "Alfabeta Listo"; }
 
 //////////////////////////////////////////////////////////////////////////
 // new since 0.49-990901
@@ -1090,16 +1062,6 @@ class TranslatorEsperanto : public Translator
     virtual QCString trTestList()
     {
       return "Testa Listo";
-    }
-
-//////////////////////////////////////////////////////////////////////////
-// new since 1.2.1
-//////////////////////////////////////////////////////////////////////////
-
-    /*! Used as a section header for KDE-2 IDL methods */
-    virtual QCString trDCOPMethods()
-    {
-      return "DCOP Membraj Funkcioj";
     }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1445,14 +1407,6 @@ class TranslatorEsperanto : public Translator
 // new since 1.3.3
 //////////////////////////////////////////////////////////////////////////
 
-    /*! When the search engine is enabled this text is put in the header
-     *  of each page before the field where one can enter the text to search
-     *  for.
-     */
-    virtual QCString trSearchForIndex()
-    {
-      return "Serĉi";
-    }
     /*! This string is used as the title for the page listing the search
      *  results.
      */
@@ -1679,6 +1633,7 @@ class TranslatorEsperanto : public Translator
         case ClassDef::Protocol:   result+="protokolo "; break;
         case ClassDef::Category:   result+="kategorio "; break;
         case ClassDef::Exception:  result+="escepto "; break;
+        default: break;
       }
       result+=(QCString)clName;
       return result;
@@ -1745,6 +1700,7 @@ class TranslatorEsperanto : public Translator
         case ClassDef::Protocol:   result+="protokolo"; break;
         case ClassDef::Category:   result+="kategorio"; break;
         case ClassDef::Exception:  result+="escepto"; break;
+        default: break;
       }
       result+=" kreiĝis el la ";
       if (single) result+="sekva dosiero:"; else result+="sekvaj dosieroj:";
@@ -1814,12 +1770,6 @@ class TranslatorEsperanto : public Translator
 //////////////////////////////////////////////////////////////////////////
 // new since 1.6.3 (missing items for the directory pages)
 //////////////////////////////////////////////////////////////////////////
-
-    /*! introduction text for the directory dependency graph */
-    virtual QCString trDirDependency(const char *name)
-    {
-      return (QCString)"Diagramo de dependecoj dosierujaj por "+name;
-    }
 
     /*! when clicking a directory dependency label, a page with a
      *  table is shown. The heading for the first column mentions the
@@ -1927,6 +1877,69 @@ class TranslatorEsperanto : public Translator
      */
     virtual QCString trAdditionalInheritedMembers()
     { return "Kromaj Hereditaj Membroj"; }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.2
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Used as a tooltip for the toggle button that appears in the
+     *  navigation tree in the HTML output when GENERATE_TREEVIEW is
+     *  enabled. This tooltip explains the meaning of the button.
+     */
+    virtual QCString trPanelSynchronisationTooltip(bool enable)
+    {
+      QCString opt = enable ? "aktivigi" : "malaktivigi";
+      return "klaku por "+opt+" panelan sinkronigon";
+    }
+
+    /*! Used in a method of an Objective-C class that is declared in a
+     *  a category. Note that the @1 marker is required and is replaced
+     *  by a link.
+     */
+    virtual QCString trProvidedByCategory()
+    {
+      return "Provizita de kategorio @1.";
+    }
+
+    /*! Used in a method of an Objective-C category that extends a class.
+     *  Note that the @1 marker is required and is replaced by a link to
+     *  the class method.
+     */
+    virtual QCString trExtendsClass()
+    {
+      return "Etendi klason @1.";
+    }
+
+    /*! Used as the header of a list of class methods in Objective-C.
+     *  These are similar to static public member functions in C++.
+     */
+    virtual QCString trClassMethods()
+    {
+      return "Klasaj Metodoj";
+    }
+
+    /*! Used as the header of a list of instance methods in Objective-C.
+     *  These are similar to public member functions in C++.
+     */
+    virtual QCString trInstanceMethods()
+    {
+      return "Aperaj Metodoj";
+    }
+
+    /*! Used as the header of the member functions of an Objective-C class.
+     */
+    virtual QCString trMethodDocumentation()
+    {
+      return "Dokumentaro de la Metodo";
+    }
+
+    /*! Used as the title of the design overview picture created for the
+     *  VHDL output.
+     */
+    virtual QCString trDesignOverview()
+    {
+      return "Fasona Superrigardo";
+    }
 
 //////////////////////////////////////////////////////////////////////////
 

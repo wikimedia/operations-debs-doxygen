@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: declinfo.h,v 1.1 1998/09/09 21:32:19 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,10 +18,8 @@
 #ifndef DEFARGS_H
 #define DEFARGS_H
 
-#include "qtbc.h"
-#include <stdio.h>
-
 class ArgumentList;
+class QCString;
 
 extern void stringToArgumentList(const char *argsString,ArgumentList* argList,
                                  QCString *extraTypeChars=0);

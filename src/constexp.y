@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: constexp.y,v 1.6 2001/03/19 19:27:40 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -31,14 +31,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int cppExpYYerror(const char *s)
+int constexpYYerror(const char *s)
 {
   warn(g_constExpFileName,g_constExpLineNr,
-       "warning: preprocessing issue while doing constant expression evaluation: %s",s);
+       "preprocessing issue while doing constant expression evaluation: %s",s);
   return 0;
 }
 
-int cppExpYYlex();
+int constexpYYlex();
 
 %}
 

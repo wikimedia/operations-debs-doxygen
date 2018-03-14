@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: latexgen.h,v 1.50 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -45,7 +45,7 @@ class LatexGenerator : public OutputGenerator
     bool isEnabled(OutputType o) { return (o==Latex && active); } 
     OutputGenerator *get(OutputType o) { return (o==Latex) ? this : 0; }
 
-    void printDoc(DocNode *,const char *);
+    void writeDoc(DocNode *,Definition *ctx,MemberDef *);
 
     void startFile(const char *name,const char *manName,const char *title);
     void writeSearchInfo() {}
@@ -87,6 +87,9 @@ class LatexGenerator : public OutputGenerator
     void writeCodeLink(const char *ref, const char *file,
                        const char *anchor,const char *name,
                        const char *tooltip);
+    void writeTooltip(const char *, const DocLinkInfo &, const char *,
+                      const char *, const SourceLinkInfo &, const SourceLinkInfo &
+                     ) {}
     void startTextLink(const char *,const char *);
     void endTextLink();
     void startHtmlLink(const char *url);
@@ -117,7 +120,7 @@ class LatexGenerator : public OutputGenerator
     void startMemberItem(const char *,int,const char *);
     void endMemberItem();
     void startMemberTemplateParams();
-    void endMemberTemplateParams(const char *);
+    void endMemberTemplateParams(const char *,const char *);
 
     void startMemberGroupHeader(bool);
     void endMemberGroupHeader();
@@ -148,8 +151,6 @@ class LatexGenerator : public OutputGenerator
     void endMemberDoc(bool);
     void startDoxyAnchor(const char *,const char *,const char *,const char *,const char *);
     void endDoxyAnchor(const char *,const char *);
-    void startCodeAnchor(const char *);
-    void endCodeAnchor();
     void writeChar(char c);
     void writeLatexSpacing() { t << "\\hspace{0.3cm}"; }
     void writeStartAnnoItem(const char *type,const char *file, 
@@ -165,6 +166,8 @@ class LatexGenerator : public OutputGenerator
     void endSmall()         { t << "\\normalsize "; }
     void startMemberDescription(const char *,const char *);
     void endMemberDescription();
+    void startMemberDeclaration() {} 
+    void endMemberDeclaration(const char *,const char *) {}
     void writeInheritedSectionTitle(const char *,const char *,const char *,
                       const char *,const char *,const char *) {}
     void startDescList(SectionTypes)     { t << "\\begin{Desc}\n\\item["; }
@@ -196,10 +199,15 @@ class LatexGenerator : public OutputGenerator
     void endContents() {}
     void writeNonBreakableSpace(int);
     
-    void startDescTable()
-    { t << "\\begin{description}" << endl; }
+    void startDescTable(const char *title)
+    { startSimpleSect(EnumValues,0,0,title);
+      startDescForItem();
+      t << "\\begin{description}" << endl; }
     void endDescTable()
-    { t << "\\end{description}" << endl; }
+    { t << "\\end{description}" << endl; 
+      endDescForItem();
+      endSimpleSect();
+    }
     void startDescTableTitle()
     { t << "\\item[{\\em " << endl; }
     void endDescTableTitle()
@@ -233,6 +241,7 @@ class LatexGenerator : public OutputGenerator
     void endParameterName(bool,bool,bool);
     void startParameterList(bool);
     void endParameterList();
+    void exceptionEntry(const char*,bool);
 
     void startConstraintList(const char *);
     void startConstraintParam();
@@ -260,7 +269,9 @@ class LatexGenerator : public OutputGenerator
     void endFontClass(); // {}
 
     void writeCodeAnchor(const char *) {}
-    void linkableSymbol(int,const char *,Definition *,Definition *) {}
+    void setCurrentDoc(Definition *,const char *,bool) {}
+    void addWord(const char *,bool) {}
+
 
   private:
     LatexGenerator(const LatexGenerator &);

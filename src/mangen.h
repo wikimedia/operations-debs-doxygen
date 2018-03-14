@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: htmlgen.h,v 1.15 1998/11/28 11:33:19 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -41,7 +41,7 @@ class ManGenerator : public OutputGenerator
     bool isEnabled(OutputType o) { return (o==Man && active); } 
     OutputGenerator *get(OutputType o) { return (o==Man) ? this : 0; }
 
-    void printDoc(DocNode *,const char *);
+    void writeDoc(DocNode *,Definition *,MemberDef *);
 
     static void init();
     void startFile(const char *name,const char *manName,const char *title);
@@ -84,6 +84,9 @@ class ManGenerator : public OutputGenerator
     void writeCodeLink(const char *ref,const char *file,
                        const char *anchor,const char *name,
                        const char *tooltip);
+    void writeTooltip(const char *, const DocLinkInfo &, const char *,
+                      const char *, const SourceLinkInfo &, const SourceLinkInfo &
+                     ) {}
     void startTextLink(const char *,const char *) {}
     void endTextLink() {}
     void startHtmlLink(const char *url);
@@ -95,7 +98,7 @@ class ManGenerator : public OutputGenerator
     void startMemberSections() {}
     void endMemberSections() {}
     void startHeaderSection() {}
-    void endHeaderSection() {}
+    void endHeaderSection();
     void startMemberHeader(const char *);
     void endMemberHeader();
     void insertMemberAlign(bool) {}
@@ -115,7 +118,7 @@ class ManGenerator : public OutputGenerator
     void startMemberItem(const char *,int,const char *);
     void endMemberItem();
     void startMemberTemplateParams() {}
-    void endMemberTemplateParams(const char *) {}
+    void endMemberTemplateParams(const char *,const char *) {}
 
     void startMemberGroupHeader(bool);
     void endMemberGroupHeader();
@@ -145,8 +148,6 @@ class ManGenerator : public OutputGenerator
     void endMemberDoc(bool);
     void startDoxyAnchor(const char *,const char *,const char *,const char *,const char *);
     void endDoxyAnchor(const char *,const char *) {}
-    void startCodeAnchor(const char *) {}
-    void endCodeAnchor() {}
     void writeLatexSpacing() {}
     void writeStartAnnoItem(const char *type,const char *file,
                             const char *path,const char *name);
@@ -161,6 +162,8 @@ class ManGenerator : public OutputGenerator
     void endSmall()           {}
     void startMemberDescription(const char *,const char *) { t << "\n.RI \"\\fI"; firstCol=FALSE; }
     void endMemberDescription()   { t << "\\fP\""; firstCol=FALSE; }
+    void startMemberDeclaration() {} 
+    void endMemberDeclaration(const char *,const char *) {}
     void writeInheritedSectionTitle(const char *,const char *,const char *,
                       const char *,const char *,const char *) {}
     void startDescList(SectionTypes);
@@ -193,8 +196,9 @@ class ManGenerator : public OutputGenerator
     void endContents() {}
     void writeNonBreakableSpace(int n) { int i; for (i=0;i<n;i++) t << " "; }
     
-    void startDescTable() {}
-    void endDescTable() {}
+    void startDescTable(const char *t) 
+    { startSimpleSect(EnumValues,0,0,t); startDescForItem(); }
+    void endDescTable() { endDescForItem(); endSimpleSect(); }
     void startDescTableTitle() { startItemListItem(); startBold(); startEmphasis(); endItemListItem(); }
     void endDescTableTitle() { endEmphasis(); endBold(); }
     void startDescTableData() { t << endl; firstCol=TRUE; }
@@ -226,6 +230,7 @@ class ManGenerator : public OutputGenerator
     void endParameterName(bool,bool,bool) {}
     void startParameterList(bool) {}
     void endParameterList() {}
+    void exceptionEntry(const char*,bool) {}
 
     void startFontClass(const char *) {}
     void endFontClass() {}
@@ -253,7 +258,8 @@ class ManGenerator : public OutputGenerator
     void endLabels();
 
     void writeCodeAnchor(const char *) {}
-    void linkableSymbol(int,const char *,Definition *,Definition *) {}
+    void setCurrentDoc(Definition *,const char *,bool) {}
+    void addWord(const char *,bool) {}
 
   private:
     bool firstCol;

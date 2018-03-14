@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id:$
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -162,7 +162,7 @@ int Store::write(const char *buf,uint size)
 #else
     portable_off_t curPos = m_cur;
 #endif
-    int bytesInBlock = BLOCK_SIZE - BLOCK_POINTER_SIZE - (curPos & (BLOCK_SIZE-1));
+    int bytesInBlock = (int)(BLOCK_SIZE - BLOCK_POINTER_SIZE - (curPos & (BLOCK_SIZE-1)));
     int bytesLeft    = bytesInBlock<(int)size ? (int)size-bytesInBlock : 0;
     int numBytes     = size - bytesLeft;
     STORE_ASSERT(bytesInBlock>=0);
@@ -254,7 +254,7 @@ void Store::end()
 #else
   portable_off_t curPos = m_cur;
 #endif
-  int bytesInBlock = BLOCK_SIZE - (curPos & (BLOCK_SIZE-1));
+  int bytesInBlock = (int)(BLOCK_SIZE - (curPos & (BLOCK_SIZE-1)));
   //printf("%x: Store::end erasing %x bytes\n",(int)curPos&~(BLOCK_SIZE-1),bytesInBlock);
   //printf("end: bytesInBlock=%x\n",bytesInBlock);
   // zero out rest of the block
@@ -327,7 +327,7 @@ int Store::read(char *buf,uint size)
 #else
     portable_off_t curPos = m_cur;
 #endif
-    int bytesInBlock = BLOCK_SIZE - BLOCK_POINTER_SIZE - (curPos & (BLOCK_SIZE-1));
+    int bytesInBlock = (int)(BLOCK_SIZE - BLOCK_POINTER_SIZE - (curPos & (BLOCK_SIZE-1)));
     int bytesLeft    = bytesInBlock<(int)size ? (int)size-bytesInBlock : 0;
     int numBytes     = size - bytesLeft;
     //printf("  Store::read: pos=%x num=%d left=%d\n",(int)curPos,numBytes,bytesLeft);
@@ -402,21 +402,23 @@ void Store::dumpBlock(portable_off_t s,portable_off_t e)
   portable_fseek(m_file,s,SEEK_SET);
   int size = (int)(e-s);
   uchar *buf = new uchar[size];
-  (void)fread(buf,size,1,m_file);
-  int i,j;
-  for (i=0;i<size;i+=16)
+  if (fread(buf,size,1,m_file)==(size_t)size)
   {
-    printf("%08x: ",(int)s+i);
-    for (j=i;j<QMIN(size,i+16);j++)
+    int i,j;
+    for (i=0;i<size;i+=16)
     {
-      printf("%02x ",buf[i+j]);
+      printf("%08x: ",(int)s+i);
+      for (j=i;j<QMIN(size,i+16);j++)
+      {
+        printf("%02x ",buf[i+j]);
+      }
+      printf("  ");
+      for (j=i;j<QMIN(size,i+16);j++)
+      {
+        printf("%c",(buf[i+j]>=32 && buf[i+j]<128)?buf[i+j]:'.');
+      }
+      printf("\n");
     }
-    printf("  ");
-    for (j=i;j<QMIN(size,i+16);j++)
-    {
-      printf("%c",(buf[i+j]>=32 && buf[i+j]<128)?buf[i+j]:'.');
-    }
-    printf("\n");
   }
   delete[] buf;
   portable_fseek(m_file,m_cur,SEEK_SET);

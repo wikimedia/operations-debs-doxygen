@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: searchindex.h,v 1.7 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,7 +18,6 @@
 #ifndef _SEARCHINDEX_H
 #define _SEARCHINDEX_H
 
-#include "qtbc.h"
 #include <qintdict.h>
 #include <qlist.h>
 #include <qdict.h>
@@ -26,6 +25,13 @@
 #include <qvector.h>
 
 class FTextStream;
+class Definition;
+class MemberDef;
+
+/*! Initialize the search indexer */
+void initSearchIndexer();
+/*! Cleanup the search indexer */
+void finializeSearchIndexer();
 
 //------- server side search index ----------------------
 
@@ -57,18 +63,48 @@ class IndexWord
     QIntDict<URLInfo> m_urls;
 };
 
-class SearchIndex
+class SearchIndexIntf
+{
+  public:
+    enum Kind { Internal, External };
+    SearchIndexIntf(Kind k) : m_kind(k) {}
+    virtual ~SearchIndexIntf() {}
+    virtual void setCurrentDoc(Definition *ctx,const char *anchor,bool isSourceFile) = 0;
+    virtual void addWord(const char *word,bool hiPriority) = 0;
+    virtual void write(const char *file) = 0;
+    Kind kind() const { return m_kind; }
+  private:
+    Kind m_kind;
+};
+
+class SearchIndex : public SearchIndexIntf
 {
   public:
     SearchIndex();
-    void setCurrentDoc(const char *name,const char *baseName,const char *anchor=0);
-    void addWord(const char *word,bool hiPriority,bool recurse=FALSE);
+    void setCurrentDoc(Definition *ctx,const char *anchor,bool isSourceFile);
+    void addWord(const char *word,bool hiPriority);
     void write(const char *file);
   private:
+    void addWord(const char *word,bool hiPrio,bool recurse);
     QDict<IndexWord> m_words;
     QVector< QList<IndexWord> > m_index;
-    QIntDict<URL>  m_urls;
+    QDict<int> m_url2IdMap;
+    QIntDict<URL> m_urls;
     int m_urlIndex;
+};
+
+
+class SearchIndexExternal : public SearchIndexIntf
+{
+    struct Private;
+  public:
+    SearchIndexExternal();
+   ~SearchIndexExternal();
+    void setCurrentDoc(Definition *ctx,const char *anchor,bool isSourceFile);
+    void addWord(const char *word,bool hiPriority);
+    void write(const char *file);
+  private:
+    Private *p;
 };
 
 //------- client side search index ----------------------

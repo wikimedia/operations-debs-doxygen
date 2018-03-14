@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: image.cpp,v 1.14 2001/03/19 19:27:40 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -16,7 +16,6 @@
  *
  */
 
-#include "qtbc.h"
 #include "image.h"
 #include <qfile.h>
 #include <math.h>

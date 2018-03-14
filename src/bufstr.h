@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: bufstr.h,v 1.85 2000/11/18 12:58:19 root Exp $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,8 +18,8 @@
 #ifndef _BUFSTR_H
 #define _BUFSTR_H
 
-#include "qtbc.h"
-#include <stdio.h>
+#include <qglobal.h>
+#include <qcstring.h>
 #include <stdlib.h>
 
 /*! @brief Buffer used to store strings
@@ -33,7 +33,7 @@ class BufStr
     BufStr(int size) 
       : m_size(size), m_writeOffset(0), m_spareRoom(10240), m_buf(0) 
     {
-      m_buf = (char *)malloc(size);
+      m_buf = (char *)calloc(size,1);
     }
     ~BufStr()
     {
@@ -62,12 +62,17 @@ class BufStr
     }
     void resize( uint newlen )
     {
+      uint oldsize = m_size;
       m_size=newlen;
       if (m_writeOffset>=m_size) // offset out of range -> enlarge
       {
         m_size=m_writeOffset+m_spareRoom;
       }
       m_buf = (char *)realloc(m_buf,m_size);
+      if (m_size>oldsize)
+      {
+        memset(m_buf+oldsize,0,m_size-oldsize);
+      }
     }
     int size() const
     {

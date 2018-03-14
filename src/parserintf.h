@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: parserintf.h,v 1.15 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -19,11 +19,15 @@
 #define PARSERINTF_H
 
 #include <qdict.h>
+#include <qstrlist.h>
+
+#include "types.h"
 
 class Entry;
 class FileDef;
 class CodeOutputInterface;
 class MemberDef;
+class Definition;
 
 /** \brief Abstract interface for programming language parsers.
  *
@@ -35,15 +39,37 @@ class ParserInterface
 {
   public:
     virtual ~ParserInterface() {}
+
+    /** Starts processing a translation unit (source files + headers).
+     *  After this call parseInput() is called with sameTranslationUnit
+     *  set to FALSE. If parseInput() returns additional include files,
+     *  these are also processed using parseInput() with 
+     *  sameTranslationUnit set to TRUE. After that
+     *  finishTranslationUnit() is called.
+     */
+    virtual void startTranslationUnit(const char *fileName) = 0;
+
+    /** Called after all files in a translation unit have been 
+     *  processed.
+     */
+    virtual void finishTranslationUnit() = 0;
+
     /** Parses a single input file with the goal to build an Entry tree. 
      *  @param[in] fileName    The full name of the file.
      *  @param[in] fileBuf     The contents of the file (zero terminated).
      *  @param[in,out] root    The root of the tree of Entry *nodes 
      *             representing the information extracted from the file.
+     *  @param[in] sameTranslationUnit TRUE if this file was found in the same
+     *             translation unit (in the filesInSameTranslationUnit list
+     *             returned for another file).
+     *  @param[in,out] filesInSameTranslationUnit other files expected to be
+     *              found in the same translation unit (used for libclang)
      */
     virtual void parseInput(const char *fileName,
                             const char *fileBuf,
-                            Entry *root) = 0;
+                            Entry *root,
+                            bool sameTranslationUnit,
+                            QStrList &filesInSameTranslationUnit) = 0;
 
     /** Returns TRUE if the language identified by \a extension needs
      *  the C preprocessor to be run before feed the result to the input
@@ -55,6 +81,7 @@ class ParserInterface
     /** Parses a source file or fragment with the goal to produce
      *  highlighted and cross-referenced output.
      *  @param[in] codeOutIntf Abstract interface for writing the result.
+     *  @param[in] lang The programming language of the code fragment.
      *  @param[in] scopeName Name of scope to which the code belongs.
      *  @param[in] input Actual code in the form of a string
      *  @param[in] isExampleBlock TRUE iff the code is part of an example.
@@ -70,10 +97,13 @@ class ParserInterface
      *             for a member).
      *  @param[in] showLineNumbers if set to TRUE and also fileDef is not 0,
      *             line numbers will be added to the source fragement
+     *  @param[in] searchCtx context under which search data has to be stored.
+     *  @param[in] collectXRefs collect cross-reference relations.
      */
     virtual void parseCode(CodeOutputInterface &codeOutIntf,
                            const char *scopeName,
                            const QCString &input,
+                           SrcLangExt lang,
                            bool isExampleBlock,
                            const char *exampleName=0,
                            FileDef *fileDef=0,
@@ -81,7 +111,9 @@ class ParserInterface
                            int endLine=-1,
                            bool inlineFragment=FALSE,
                            MemberDef *memberDef=0,
-                           bool showLineNumbers=TRUE
+                           bool showLineNumbers=TRUE,
+                           Definition *searchCtx=0,
+                           bool collectXRefs=TRUE
                           ) = 0;
 
     /** Resets the state of the code parser.
@@ -116,17 +148,19 @@ class ParserManager
     ParserManager()
       : m_defaultParser(0) { m_parsers.setAutoDelete(TRUE); }
 
+    void registerDefaultParser(ParserInterface *parser)
+    {
+      m_defaultParser = parser;
+    }
+
     /** Registers an additional parser.
      *  @param[in] name      A symbolic name of the parser, i.e. "c",
      *                       "python", "fortran", "vhdl", ...
      *  @param[in] parser    The parser that is to be used for the
      *                       given name.
-     *  @param[in] defParser Use this parser as the default parser, used
-     *                       for unregistered file extensions.
      */
-    void registerParser(const char *name,ParserInterface *parser,bool defParser=FALSE)
+    void registerParser(const char *name,ParserInterface *parser)
     {
-      if (defParser && m_defaultParser==0) m_defaultParser=parser;
       m_parsers.insert(name,parser);
     }
 
@@ -152,8 +186,8 @@ class ParserManager
      */
     ParserInterface *getParser(const char *extension)
     {
-      if (extension==0) return m_defaultParser;
       QCString ext = QCString(extension).lower();
+      if (ext.isEmpty()) ext=".no_extension";
       ParserInterface *intf = m_extensions.find(ext);
       if (intf==0 && ext.length()>4)
       {

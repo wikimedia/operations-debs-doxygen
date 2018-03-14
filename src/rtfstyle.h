@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -19,7 +19,6 @@
 #ifndef RTFSTYLE_H
 #define RTFSTYLE_H
 
-#include "qtbc.h"
 #include <qregexp.h>
 #include <qdict.h>
 

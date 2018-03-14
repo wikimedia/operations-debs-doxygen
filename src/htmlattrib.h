@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: htmlattrib.h,v 1.2 2001/01/01 10:15:18 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -14,6 +14,9 @@
 
 #ifndef _HTMLATTRIB_H
 #define _HTMLATTRIB_H
+
+#include <qcstring.h>
+#include <qlist.h>
 
 /*! A Html option. A name, value pair */
 struct HtmlAttrib
@@ -37,33 +40,31 @@ class HtmlAttribList : public QList<HtmlAttrib>
     { clear(); QList<HtmlAttrib>::operator=(l); return *this; }
     QCString find(const QCString name) const
     {
-      HtmlAttribList *that = (HtmlAttribList *)this;
+      QListIterator<HtmlAttrib> it(*this);
       QCString result;
-      HtmlAttrib *attr=that->first();
-      while (attr)
+      HtmlAttrib *attr;
+      for (;(attr=it.current());++it)
       {
         if (attr->name==name) return attr->value;
-        attr=that->next();
       }
       return result;
     }
     QCString toString() const
     {
-      HtmlAttribList *that = (HtmlAttribList *)this;
+      QListIterator<HtmlAttrib> it(*this);
       QCString result;
-      HtmlAttrib *attr=that->first();
-      while (attr)
+      HtmlAttrib *attr;
+      for (;(attr=it.current());++it)
       {
         result+=" "+attr->name+"=\""+attr->value+"\"";
-        attr=that->next();
       }
       return result;
     }
   private:
-    QCollection::Item newItem( QCollection::Item d ) 
-    { return (QCollection::Item)new HtmlAttrib(*(HtmlAttrib *)d); }
-    void deleteItem(QCollection::Item d) 
-    { delete (HtmlAttrib *)d; }
+    HtmlAttrib *newValue( HtmlAttrib *v ) const
+    { return new HtmlAttrib(*v); }
+    void deleteValue(HtmlAttrib *v) const
+    { delete v;  }
 };
 
 /*! @brief Html attribute list iterator */

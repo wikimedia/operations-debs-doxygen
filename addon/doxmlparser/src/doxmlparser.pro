@@ -1,5 +1,5 @@
 #
-# This file was generated from doxmlparser.pro.in on Thu Jul 12 20:08:34 CEST 2012
+# This file was generated from doxmlparser.pro.in on Thu Aug 21 10:48:35 CEST 2014
 #
 
 TEMPLATE     =	lib.t
@@ -24,9 +24,11 @@ win32-msvc:TMAKE_LFLAGS    += /LIBPATH:....\\..\lib
 win32-borland:LIBS         += qtools.lib doxycfg.lib shell32.lib
 win32-borland:TMAKE_LFLAGS += -L..\..\..\lib
 win32:TMAKE_CXXFLAGS       += -DQT_NODLL
-DESTDIR                     = ../lib
-OBJECTS_DIR                =  ../objects
+DESTDIR                     = ../../../lib
+OBJECTS_DIR                 = ../../../objects/doxmlparser
 TARGET                      = doxmlparser
 INCLUDEPATH                += ../../../qtools ../include
 
 TMAKE_MOC = /usr/bin/moc
+LIBS += -L/opt/local/lib
+INCLUDEPATH += /opt/local/include

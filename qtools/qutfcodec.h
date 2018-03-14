@@ -1,5 +1,5 @@
 /****************************************************************************
-** $Id: qt/src/tools/qutfcodec.h   2.3.2   edited 2001-01-26 $
+** 
 **
 ** Definition of QEucCodec class
 **

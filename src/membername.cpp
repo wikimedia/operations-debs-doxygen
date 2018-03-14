@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: membername.cpp,v 1.16 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -30,18 +30,16 @@ MemberName::~MemberName()
 {
 }
 
-int MemberName::compareItems(GCI item1, GCI item2)
+int MemberName::compareValues(const MemberDef *m1, const MemberDef *m2) const
 {
-  MemberDef *m1=(MemberDef *)item1;
-  MemberDef *m2=(MemberDef *)item2;
   ClassDef *c1=m1->getClassDef();
   ClassDef *c2=m2->getClassDef();
   FileDef  *f1=m1->getFileDef();
   FileDef  *f2=m2->getFileDef();
   if (c1 && c2)
-    return strcmp(c1->name(),c2->name());
+    return qstrcmp(c1->name(),c2->name());
   else if (f1 && f2)
-    return strcmp(f1->name(),f2->name());
+    return qstrcmp(f1->name(),f2->name());
   else 
     return 0;
 }
@@ -52,18 +50,16 @@ MemberNameInfo::MemberNameInfo(const char *n) : QList<MemberInfo>()
   setAutoDelete(TRUE);
 }
 
-int MemberNameInfo::compareItems(GCI item1, GCI item2)
+int MemberNameInfo::compareValues(const MemberInfo *m1,const MemberInfo *m2) const
 {
-  MemberInfo *m1=(MemberInfo *)item1;
-  MemberInfo *m2=(MemberInfo *)item2;
   ClassDef *c1=m1->memberDef->getClassDef();
   ClassDef *c2=m2->memberDef->getClassDef();
   FileDef  *f1=m1->memberDef->getFileDef();
   FileDef  *f2=m2->memberDef->getFileDef();
   if (c1 && c2)
-    return strcmp(c1->name(),c2->name());
+    return qstrcmp(c1->name(),c2->name());
   else if (f1 && f2)
-    return strcmp(f1->name(),f2->name());
+    return qstrcmp(f1->name(),f2->name());
   else 
     return 0;
 }
@@ -72,12 +68,10 @@ MemberNameIterator::MemberNameIterator(const MemberName &mnlist) :
 {
 }
 
-int MemberNameSDict::compareItems(GCI item1, GCI item2)
+int MemberNameSDict::compareValues(const MemberName *n1,const MemberName *n2) const
 {
-  MemberName *n1=(MemberName *)item1;
-  MemberName *n2=(MemberName *)item2;
-  return stricmp(n1->memberName()+getPrefixIndex(n1->memberName()),
-                 n2->memberName()+getPrefixIndex(n2->memberName())
-                );
+  return qstricmp(n1->memberName()+getPrefixIndex(n1->memberName()),
+                  n2->memberName()+getPrefixIndex(n2->memberName())
+                 );
 }
 

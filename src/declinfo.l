@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: declinfo.l,v 1.26 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -28,6 +28,8 @@
 #include "declinfo.h"
 #include "util.h"
 #include "message.h"
+
+#define YY_NO_INPUT 1
   
 /* -----------------------------------------------------------------
  *
@@ -229,6 +231,7 @@ ID	"$"?([a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF]*)|(@[0-9]+)
 void parseFuncDecl(const QCString &decl,bool objC,QCString &cl,QCString &t,
                    QCString &n,QCString &a,QCString &ftl,QCString &exc)
 {
+  printlex(yy_flex_debug, TRUE, __FILE__, NULL);
   inputString   = decl;
   //printf("Input=`%s'\n",inputString);
   if (inputString==0) return;
@@ -305,6 +308,7 @@ void parseFuncDecl(const QCString &decl,bool objC,QCString &cl,QCString &t,
   //printf("type=`%s' class=`%s' name=`%s' args=`%s'\n",
   //        t.data(),cl.data(),n.data(),a.data());
 
+  printlex(yy_flex_debug, FALSE, __FILE__, NULL);
   return;
   
   

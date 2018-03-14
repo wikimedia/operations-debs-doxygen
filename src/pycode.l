@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: pycode.h,v 1.9 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -37,8 +37,19 @@
 #include "util.h"
 #include "membername.h"
 #include "searchindex.h"
+#include "config.h"
+#include "groupdef.h"
+#include "classlist.h"
+#include "filedef.h"
+#include "namespacedef.h"
+#include "tooltip.h"
+
+// Toggle for some debugging info
+//#define DBG_CTX(x) fprintf x
+#define DBG_CTX(x) do { } while(0)
 
 #define YY_NEVER_INTERACTIVE 1
+#define YY_NO_INPUT 1
 
 static ClassSDict    g_codeClassSDict(17);
 static QCString      g_curClassName;
@@ -50,6 +61,8 @@ static const char *  g_inputString;     //!< the code fragment as text
 static int	     g_inputPosition;   //!< read offset during parsing 
 static const char *  g_currentFontClass;
 static bool          g_needsTermination;
+static Definition   *g_searchCtx;
+static bool          g_collectXRefs;
 static int           g_inputLines;      //!< number of line in the code fragment
 static int	     g_yyLineNr;        //!< current line number
 static FileDef *     g_sourceFileDef;
@@ -279,11 +292,18 @@ static int countLines()
   return count;
 }
 
-static void setCurrentDoc(const QCString &name,const QCString &base,const QCString &anchor="")
+static void setCurrentDoc(const QCString &anchor)
 {
   if (Doxygen::searchIndex)
   {
-    Doxygen::searchIndex->setCurrentDoc(name,base,anchor);
+    if (g_searchCtx)
+    {
+      Doxygen::searchIndex->setCurrentDoc(g_searchCtx,g_searchCtx->anchor(),FALSE);
+    }
+    else
+    {
+      Doxygen::searchIndex->setCurrentDoc(g_sourceFileDef,anchor,TRUE);
+    }
   }
 }
 
@@ -359,20 +379,14 @@ static void startCodeLine()
         g_code->writeLineNumber(g_currentMemberDef->getReference(),
 	                        g_currentMemberDef->getOutputFileBase(),
 	                        g_currentMemberDef->anchor(),g_yyLineNr);
-        setCurrentDoc(
-                                g_currentMemberDef->qualifiedName(),
-	                        g_sourceFileDef->getSourceFileBase(),
-	                        lineAnchor);
+        setCurrentDoc(lineAnchor);
       }
       else
       {
         g_code->writeLineNumber(d->getReference(),
 	                        d->getOutputFileBase(),
 	                        0,g_yyLineNr);
-        setCurrentDoc(
-                                d->qualifiedName(),
-	                        g_sourceFileDef->getSourceFileBase(),
-	                        lineAnchor);
+        setCurrentDoc(lineAnchor);
       }
     }
     else
@@ -417,10 +431,19 @@ static void nextCodeLine()
  * split into multiple links with the same destination, one for each line.
  */
 static void writeMultiLineCodeLink(CodeOutputInterface &ol,
-                  const char *ref,const char *file,
-                  const char *anchor,const char *text,
-                  const char *tooltip)
+                  Definition *d,
+                  const char *text)
 {
+  static bool sourceTooltips = Config_getBool("SOURCE_TOOLTIPS");
+  TooltipManager::instance()->addTooltip(d);
+  QCString ref  = d->getReference();
+  QCString file = d->getOutputFileBase();
+  QCString anchor = d->anchor();
+  QCString tooltip; 
+  if (!sourceTooltips) // fall back to simple "title" tooltips
+  {
+    tooltip = d->briefDescriptionAsTooltip();
+  }
   bool done=FALSE;
   char *p=(char *)text;
   while (!done)
@@ -471,25 +494,6 @@ static void codifyLines(char *text)
   }
 }
 
-static void addDocCrossReference(MemberDef *src,MemberDef *dst)
-{
-  static bool referencedByRelation = Config_getBool("REFERENCED_BY_RELATION");
-  static bool callerGraph =  Config_getBool("CALLER_GRAPH");
-  static bool referencesRelation = Config_getBool("REFERENCES_RELATION");
-  static bool callGraph = Config_getBool("CALL_GRAPH");
-  if (dst->isTypedef() || dst->isEnumerate()) return; // don't add types
-  //printf("addDocCrossReference src=%s,dst=%s\n",src->name().data(),dst->name().data());
-  if ((referencedByRelation || callerGraph) && (src->isFunction() || src->isSlot()))
-  {
-    dst->addSourceReferencedBy(src);
-  }
-  if ((referencesRelation || callGraph) && (src->isFunction() || src->isSlot()))
-  {
-    src->addSourceReferences(dst);
-  }
-}
-
-
 
 static bool getLinkInScope(const QCString &c,  // scope
                            const QCString &m,  // member
@@ -521,17 +525,13 @@ static bool getLinkInScope(const QCString &c,  // scope
       //        g_currentDefinition,g_currentMemberDef);
 
       if (g_currentDefinition && g_currentMemberDef &&
-	  md!=g_currentMemberDef)
+	  md!=g_currentMemberDef && g_collectXRefs)
       {
 	addDocCrossReference(g_currentMemberDef,md);
       }
       //printf("d->getReference()=`%s' d->getOutputBase()=`%s' name=`%s' member name=`%s'\n",d->getReference().data(),d->getOutputFileBase().data(),d->name().data(),md->name().data());
      
-      writeMultiLineCodeLink(ol,md->getReference(),
-	                        md->getOutputFileBase(),
-	                        md->anchor(),
-				text ? text : memberText,
-                                md->briefDescriptionAsTooltip());
+      writeMultiLineCodeLink(ol,md, text ? text : memberText);
       addToSearchIndex(text ? text : memberText);
       return TRUE;
     } 
@@ -572,7 +572,7 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
   // Don't do anything for empty text
   if (className.isEmpty()) return;
 
-  //fprintf(stderr,"generateClassOrGlobalLink(className=%s)\n",className.data());
+  DBG_CTX((stderr,"generateClassOrGlobalLink(className=%s)\n",className.data()));
 
   ClassDef *cd=0,*lcd=0;  /** Class def that we may find */
   MemberDef *md=0;        /** Member def that we may find */
@@ -585,17 +585,17 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
 
     cd = getResolvedClass(d,g_sourceFileDef,substitute(className,".","::"),&md);
 
-    //fprintf(stderr,"d=%s g_sourceFileDef=%s\n",
-    //	d?d->displayName().data():"<null>",
-    //	g_currentDefinition?g_currentDefinition->displayName().data():"<null>");
-    //fprintf(stderr,"is found as a type %s\n",cd?cd->name().data():"<null>");
+    DBG_CTX((stderr,"d=%s g_sourceFileDef=%s\n",
+        d?d->displayName().data():"<null>",
+        g_currentDefinition?g_currentDefinition->displayName().data():"<null>"));
+    DBG_CTX((stderr,"is found as a type %s\n",cd?cd->name().data():"<null>"));
 
     if (cd==0 && md==0) // also see if it is variable or enum or enum value
     {
       NamespaceDef *nd = getResolvedNamespace(scope);
       if (nd)
       {
-        writeMultiLineCodeLink(ol,nd->getReference(),nd->getOutputFileBase(),nd->anchor(),clName,nd->briefDescriptionAsTooltip());
+        writeMultiLineCodeLink(ol,nd,clName);
         addToSearchIndex(className);
         return;
       }
@@ -612,19 +612,20 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
       g_theCallContext.setClass(lcd);
     }
     //isLocal=TRUE;
-    //fprintf(stderr,"is a local variable cd=%p!\n",cd);
+    DBG_CTX((stderr,"is a local variable cd=%p!\n",cd));
   }
 
   if (cd && cd->isLinkable()) // is it a linkable class
   {
-    writeMultiLineCodeLink(ol,cd->getReference(),cd->getOutputFileBase(),cd->anchor(),clName,cd->briefDescriptionAsTooltip());
+    writeMultiLineCodeLink(ol,cd,clName);
     addToSearchIndex(className);
     if (md)
     {
       Definition *d = md->getOuterScope()==Doxygen::globalScope ?
                       md->getBodyDef() : md->getOuterScope();
       if (md->getGroupDef()) d = md->getGroupDef();
-      if (d && d->isLinkable() && md->isLinkable() && g_currentMemberDef)
+      if (d && d->isLinkable() && md->isLinkable() && 
+          g_currentMemberDef && g_collectXRefs)
       {
         addDocCrossReference(g_currentMemberDef,md);
       }
@@ -638,19 +639,20 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
       QCString scope = substitute(className.left(scopeEnd),".","::");
       QCString locName = className.right(className.length()-scopeEnd-1);
       ClassDef *mcd = getClass(scope);
-      //fprintf(stderr,"scope=%s locName=%s mcd=%p\n",scope.data(),locName.data(),mcd);
+      DBG_CTX((stderr,"scope=%s locName=%s mcd=%p\n",scope.data(),locName.data(),mcd));
       if (mcd)
       {
 	MemberDef *md = mcd->getMemberByName(locName);
 	if (md)
 	{
           g_theCallContext.setClass(stripClassName(md->typeString(),md->getOuterScope()));
-          writeMultiLineCodeLink(ol,md->getReference(),md->getOutputFileBase(),md->anchor(),clName,md->briefDescriptionAsTooltip());
+          writeMultiLineCodeLink(ol,md,clName);
           addToSearchIndex(className);
 	  Definition *d = md->getOuterScope()==Doxygen::globalScope ?
 	                  md->getBodyDef() : md->getOuterScope();
 	  if (md->getGroupDef()) d = md->getGroupDef();
-	  if (d && d->isLinkable() && md->isLinkable() && g_currentMemberDef)
+	  if (d && d->isLinkable() && md->isLinkable() && 
+              g_currentMemberDef && g_collectXRefs)
 	  {
 	    addDocCrossReference(g_currentMemberDef,md);
 	  }
@@ -667,12 +669,13 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
           {
 	    //printf("name=%s scope=%s\n",locName.data(),scope.data());
 	    g_theCallContext.setClass(stripClassName(md->typeString(),md->getOuterScope()));
-            writeMultiLineCodeLink(ol,md->getReference(),md->getOutputFileBase(),md->anchor(),clName,md->briefDescriptionAsTooltip());
+            writeMultiLineCodeLink(ol,md,clName);
             addToSearchIndex(className);
 	    Definition *d = md->getOuterScope()==Doxygen::globalScope ?
 	                    md->getBodyDef() : md->getOuterScope();
 	    if (md->getGroupDef()) d = md->getGroupDef();
-	    if (d && d->isLinkable() && md->isLinkable() && g_currentMemberDef)
+	    if (d && d->isLinkable() && md->isLinkable() && 
+                g_currentMemberDef && g_collectXRefs)
 	    {
 	      addDocCrossReference(g_currentMemberDef,md);
 	    }
@@ -701,7 +704,7 @@ static void generateFunctionLink(CodeOutputInterface &ol,char *funcName)
   ClassDef *ccd=0;
   QCString locScope=g_classScope.copy();
   QCString locFunc=removeRedundantWhiteSpace(funcName);
-  //fprintf(stdout,"*** locScope=%s locFunc=%s\n",locScope.data(),locFunc.data());
+  DBG_CTX((stdout,"*** locScope=%s locFunc=%s\n",locScope.data(),locFunc.data()));
   int i=locFunc.findRev("::");
   if (i>0)
   {
@@ -743,25 +746,20 @@ static bool findMemberLink(CodeOutputInterface &ol,Definition *sym,const char *s
   {
     ClassDef *cd = (ClassDef*)sym->getOuterScope();
     ClassDef *thisCd = (ClassDef *)g_currentDefinition;
-    QCString anchor=sym->anchor();
     if (sym->definitionType()==Definition::TypeMember)
     {
-      if (g_currentMemberDef)
+      if (g_currentMemberDef && g_collectXRefs)
       {
 	addDocCrossReference(g_currentMemberDef,(MemberDef*)sym);
       }
     }
-    //fprintf(stderr,"cd=%s thisCd=%s\n",cd?cd->name().data():"<none>",thisCd?thisCd->name().data():"<none>");
+    DBG_CTX((stderr,"cd=%s thisCd=%s\n",cd?cd->name().data():"<none>",thisCd?thisCd->name().data():"<none>"));
 
     // TODO: find the nearest base class in case cd is a base class of
     // thisCd 
     if (cd==thisCd || (thisCd && thisCd->isBaseClass(cd,TRUE)))
     {
-      writeMultiLineCodeLink(ol,sym->getReference(),
-          sym->getOutputFileBase(),
-          anchor,
-          symName,
-          sym->briefDescriptionAsTooltip());
+      writeMultiLineCodeLink(ol,sym,symName);
       return TRUE;
     }
   }
@@ -837,8 +835,8 @@ B                 [ \t]*
 NEWLINE           \n
 
 DIGIT             [0-9]
-LETTER            [A-Za-z]
-NONEMPTY          [A-Za-z0-9_]
+LETTER            [A-Za-z\x80-\xFF]
+NONEMPTY          [A-Za-z0-9_\x80-\xFF]
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
@@ -1037,7 +1035,7 @@ TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUT
 
                                       // Push a class scope
 
-                                      ClassDef *classDefToAdd = new ClassDef("<code>",1,g_curClassName,ClassDef::Class,0,0,FALSE);
+                                      ClassDef *classDefToAdd = new ClassDef("<code>",1,1,g_curClassName,ClassDef::Class,0,0,FALSE);
                                       g_codeClassSDict.append(g_curClassName,classDefToAdd);
                                       char *s=g_curClassBases.first();
                                       while (s) 
@@ -1153,7 +1151,7 @@ TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUT
 					  codifyLines(yytext);
 		                          endFontClass();
 
-					  // No indentation necesary
+					  // No indentation necessary
 					  g_noSuiteFound = FALSE;
                                        }
 
@@ -1162,7 +1160,7 @@ TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUT
 					  codifyLines(yytext);
 		                          endFontClass();
 
-					  // No indentation necesary
+					  // No indentation necessary
 					  g_noSuiteFound = FALSE;
                                        }
     {IDENTIFIER}                       {
@@ -1214,7 +1212,7 @@ TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUT
                                  // should be improved.
 				 // (translate tabs to space, etc)
   		                 codifyLines(yytext);
-                                 adjustScopesAndSuites(yyleng);
+                                 adjustScopesAndSuites((int)yyleng);
                                }
 
     "\n"|({BB}"\n")            {
@@ -1429,18 +1427,22 @@ static void adjustScopesAndSuites(unsigned indentLength)
 void parsePythonCode(CodeOutputInterface &od,const char * /*className*/,
                  const QCString &s,bool exBlock, const char *exName,
 		 FileDef *fd,int startLine,int endLine,bool /*inlineFragment*/,
-		 MemberDef *,bool) 
+		 MemberDef *,bool,Definition *searchCtx,bool collectXRefs) 
 {
 
   //printf("***parseCode()\n");
   
   //--------------------------------------
   if (s.isEmpty()) return;
+  printlex(yy_flex_debug, TRUE, __FILE__, fd ? fd->fileName().data(): NULL);
+  TooltipManager::instance()->clearTooltips();
   g_code = &od;
   g_inputString   = s;
   g_inputPosition = 0;
   g_currentFontClass = 0;
   g_needsTermination = FALSE;
+  g_searchCtx=searchCtx;
+  g_collectXRefs=collectXRefs;
   if (endLine!=-1)
     g_inputLines  = endLine+1;
   else
@@ -1455,6 +1457,17 @@ void parsePythonCode(CodeOutputInterface &od,const char * /*className*/,
   g_exampleName   = exName;
   g_sourceFileDef = fd;
 
+  bool cleanupSourceDef = FALSE;
+  if (fd==0)
+  {
+    // create a dummy filedef for the example
+    g_sourceFileDef = new FileDef("",(exName?exName:"generated"));
+    cleanupSourceDef = TRUE;
+  }
+  if (g_sourceFileDef) 
+  {
+    setCurrentDoc("l00001");
+  }
 
   // Starts line 1 on the output  
   startCodeLine();
@@ -1472,6 +1485,17 @@ void parsePythonCode(CodeOutputInterface &od,const char * /*className*/,
   {
     endCodeLine();
   }
+  if (fd)
+  {
+    TooltipManager::instance()->writeTooltips(*g_code);
+  }
+  if (cleanupSourceDef)
+  {
+    // delete the temporary file definition used for this example
+    delete g_sourceFileDef;
+    g_sourceFileDef=0;
+  }
+  printlex(yy_flex_debug, FALSE, __FILE__, fd ? fd->fileName().data(): NULL);
   return;
 }
 

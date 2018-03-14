@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: rtfgen.h,v 1.13 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Parker Waechter & Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Parker Waechter & Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -41,7 +41,7 @@ class RTFGenerator : public OutputGenerator
     bool isEnabled(OutputType o) { return (o==RTF && active); } 
     OutputGenerator *get(OutputType o) { return (o==RTF) ? this : 0; }
 
-    void printDoc(DocNode *,const char *);
+    void writeDoc(DocNode *,Definition *,MemberDef *);
 
     void startFile(const char *name,const char *manName,const char *title);
     void writeSearchInfo() {}
@@ -84,6 +84,9 @@ class RTFGenerator : public OutputGenerator
     void writeCodeLink(const char *ref, const char *file,
                        const char *anchor,const char *name,
                        const char *tooltip);
+    void writeTooltip(const char *, const DocLinkInfo &, const char *,
+                      const char *, const SourceLinkInfo &, const SourceLinkInfo &
+                     ) {}
     void startTextLink(const char *f,const char *anchor);
     void endTextLink();
     void startHtmlLink(const char *url);
@@ -115,7 +118,7 @@ class RTFGenerator : public OutputGenerator
     void startMemberItem(const char *,int,const char *);
     void endMemberItem();
     void startMemberTemplateParams() {}
-    void endMemberTemplateParams(const char *) {}
+    void endMemberTemplateParams(const char *,const char *) {}
     void insertMemberAlign(bool) {}
 
     void writeRuler() { rtfwriteRuler_thin(); }
@@ -139,8 +142,6 @@ class RTFGenerator : public OutputGenerator
     void endMemberDoc(bool);
     void startDoxyAnchor(const char *,const char *,const char *,const char *,const char *);
     void endDoxyAnchor(const char *,const char *);
-    void startCodeAnchor(const char *) {};
-    void endCodeAnchor() {};
     void writeChar(char c);
     void writeLatexSpacing() {};//{ t << "\\hspace{0.3cm}"; }
     void writeStartAnnoItem(const char *type,const char *file, 
@@ -157,6 +158,8 @@ class RTFGenerator : public OutputGenerator
 
     void startMemberDescription(const char *,const char *);
     void endMemberDescription();
+    void startMemberDeclaration() {} 
+    void endMemberDeclaration(const char *,const char *) {}
     void writeInheritedSectionTitle(const char *,const char *,const char *,
                       const char *,const char *,const char *) {}
     void startDescList(SectionTypes);
@@ -188,7 +191,7 @@ class RTFGenerator : public OutputGenerator
     void endContents() {}
     void writeNonBreakableSpace(int);
 	
-    void startDescTable();
+    void startDescTable(const char *title);
     void endDescTable();
     void startDescTableTitle();
     void endDescTableTitle();
@@ -228,6 +231,7 @@ class RTFGenerator : public OutputGenerator
     void endParameterName(bool,bool,bool) {}
     void startParameterList(bool) {}
     void endParameterList() {}
+    void exceptionEntry(const char*,bool);
 
     void startConstraintList(const char  *);
     void startConstraintParam();
@@ -255,7 +259,8 @@ class RTFGenerator : public OutputGenerator
     void endFontClass() {}
 
     void writeCodeAnchor(const char *) {}
-    void linkableSymbol(int,const char *,Definition *,Definition *) {}
+    void setCurrentDoc(Definition *,const char *,bool) {}
+    void addWord(const char *,bool) {}
 
     static bool preProcessFileInplace(const char *path,const char *name);
     

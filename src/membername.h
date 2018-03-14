@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: membername.h,v 1.17 2001/03/19 19:27:41 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -24,14 +24,14 @@
 
 /** Class representing all MemberDef objects with the same name */
 class MemberName : public QList<MemberDef>
-{ 
+{
   public:
     MemberName(const char *name);
    ~MemberName();
     const char *memberName() const { return name; }
-   
-    int compareItems(GCI item1,GCI item2);
+
   private:
+    int compareValues(const MemberDef *item1,const MemberDef *item2) const;
     QCString name;
 };
 
@@ -49,7 +49,8 @@ class MemberNameSDict : public SDict<MemberName>
     MemberNameSDict(int size) : SDict<MemberName>(size) {}
    ~MemberNameSDict() {}
 
-   int compareItems(GCI item1,GCI item2);
+  private:
+   int compareValues(const MemberName *item1,const MemberName *item2) const;
 };
 
 /** Data associated with a MemberDef in an inheritance relation. */
@@ -74,8 +75,8 @@ class MemberNameInfo : public QList<MemberInfo>
     MemberNameInfo(const char *name);  
    ~MemberNameInfo() {}
     const char *memberName() const { return name; }
-    int compareItems(GCI item1,GCI item2);
   private:
+    int compareValues(const MemberInfo *item1,const MemberInfo *item2) const;
     QCString name;
 };
 
@@ -93,11 +94,10 @@ class MemberNameInfoSDict : public SDict<MemberNameInfo>
   public:
     MemberNameInfoSDict(int size) : SDict<MemberNameInfo>(size) {}
    ~MemberNameInfoSDict() {}
-    int compareItems(GCI item1,GCI item2) 
-    { return stricmp(
-                    ((MemberNameInfo *)item1)->memberName(),
-                    ((MemberNameInfo *)item2)->memberName()
-                   );
+  private:
+    int compareValues(const MemberNameInfo *item1,const MemberNameInfo *item2) const
+    {
+      return qstricmp(item1->memberName(), item2->memberName());
     }
 };
 

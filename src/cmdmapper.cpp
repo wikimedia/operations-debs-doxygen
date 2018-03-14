@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -63,6 +63,7 @@ CommandMap cmdMap[] =
   { "internal",      CMD_INTERNAL },
   { "invariant",     CMD_INVARIANT },
   { "javalink",      CMD_JAVALINK },
+  { "latexinclude",  CMD_LATEXINCLUDE },
   { "latexonly",     CMD_LATEXONLY },
   { "li",            CMD_LI },
   { "line",          CMD_LINE },
@@ -119,8 +120,10 @@ CommandMap cmdMap[] =
   { "_internalref",  CMD_INTERNALREF },
   { "dot",           CMD_DOT },
   { "msc",           CMD_MSC },
+  { "startuml",      CMD_STARTUML },
   { "enddot",        CMD_ENDDOT },
   { "endmsc",        CMD_ENDMSC },
+  { "enduml",        CMD_ENDUML },
   { "manonly",       CMD_MANONLY },
   { "endmanonly",    CMD_ENDMANONLY },
   { "includelineno", CMD_INCWITHLINES },
@@ -128,6 +131,15 @@ CommandMap cmdMap[] =
   { "mscfile",       CMD_MSCFILE },
   { "rtfonly",       CMD_RTFONLY },
   { "endrtfonly",    CMD_ENDRTFONLY },
+  { "vhdlflow",      CMD_VHDLFLOW },
+  { "docbookonly",   CMD_DBONLY },
+  { "enddocbookonly",CMD_ENDDBONLY },
+  { "endinternal",   CMD_ENDINTERNAL },
+  { "parblock",      CMD_PARBLOCK },
+  { "endparblock",   CMD_ENDPARBLOCK },
+  { "diafile",       CMD_DIAFILE },
+  { "--",            CMD_NDASH },
+  { "---",           CMD_MDASH },
   { 0,               0 },
 };
 

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,7 +18,6 @@
 #include <qdir.h>
 #include <qdict.h>
 
-#include "qtbc.h"
 #include "htags.h"
 #include "util.h"
 #include "message.h"
@@ -33,7 +32,7 @@ static QDict<QCString> g_symbolDict(10007);
 
 /*! constructs command line of htags(1) and executes it.
  *  \retval TRUE success
- *  \retval FALSE an error has occured.
+ *  \retval FALSE an error has occurred.
  */
 bool Htags::execute(const QCString &htmldir)
 {
@@ -44,7 +43,7 @@ bool Htags::execute(const QCString &htmldir)
   static QCString projectName = Config_getString("PROJECT_NAME");
   static QCString projectNumber = Config_getString("PROJECT_NUMBER");
 
-  QCString cwd = convertToQCString(QDir::currentDirPath());
+  QCString cwd = QDir::currentDirPath().utf8();
   if (inputSource.isEmpty())
   {
     g_inputDir.setPath(cwd);
@@ -53,14 +52,14 @@ bool Htags::execute(const QCString &htmldir)
   {
     g_inputDir.setPath(inputSource.first());
     if (!g_inputDir.exists())
-      err("error: Cannot find directory %s. "
+      err("Cannot find directory %s. "
           "Check the value of the INPUT tag in the configuration file.\n",
           inputSource.first()
          );
   }
   else
   {
-    err("error: If you use USE_HTAGS then INPUT should specific a single directory. \n");
+    err("If you use USE_HTAGS then INPUT should specific a single directory. \n");
     return FALSE;
   }
 
@@ -87,7 +86,7 @@ bool Htags::execute(const QCString &htmldir)
     commandLine += "\" ";
   }
   commandLine += " \"" + htmldir + "\"";
-  QCString oldDir = convertToQCString(QDir::currentDirPath());
+  QCString oldDir = QDir::currentDirPath().utf8();
   QDir::setCurrent(g_inputDir.absPath());
   //printf("CommandLine=[%s]\n",commandLine.data());
   portable_sysTimerStart();
@@ -146,7 +145,7 @@ bool Htags::loadFilemap(const QCString &htmlDir)
     }
     else
     {
-      err("error: file %s cannot be opened\n",fileMapName.data()); 
+      err("file %s cannot be opened\n",fileMapName.data()); 
     }
   }
   return FALSE;
@@ -159,7 +158,7 @@ bool Htags::loadFilemap(const QCString &htmlDir)
 QCString Htags::path2URL(const QCString &path)
 {
   QCString url,symName=path;
-  QCString dir = convertToQCString(g_inputDir.absPath());
+  QCString dir = g_inputDir.absPath().utf8();
   int dl=dir.length();
   if ((int)symName.length()>dl+1)
   {

@@ -1,11 +1,11 @@
 #ifndef FTEXTSTREAM_H
 #define FTEXTSTREAM_H
 
-#include "qtbc.h"
-#include "qiodevice.h"
-#include "qstring.h"
-#include "qgstring.h"
 #include <stdio.h>
+
+#include <qiodevice.h>
+#include <qstring.h>
+#include <qgstring.h>
 
 /** @brief Simplified and optimized version of QTextStream */
 class FTextStream
@@ -48,14 +48,14 @@ class FTextStream
 
 inline FTextStream &FTextStream::operator<<( char c)
 {
-  m_dev->putch(c);
+  if (m_dev) m_dev->putch(c);
   return *this;
 }
 
 inline FTextStream &FTextStream::operator<<( const char* s)
 {
   uint len = qstrlen( s );
-  m_dev->writeBlock( s, len );
+  if (m_dev) m_dev->writeBlock( s, len );
   return *this;
 }
 

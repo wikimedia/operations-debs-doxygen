@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: classlist.cpp,v 1.14 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -19,6 +19,9 @@
 #include <assert.h>
 #include <qglobal.h>
 #include "objcache.h"
+#if !defined(_OS_WIN32_) || defined(__MINGW32__)
+#include <stdint.h>
+#endif
 
 //----------------------------------------------------------------------
 
@@ -184,19 +187,19 @@ unsigned int ObjCache::hash(void *addr)
     key ^=  (key >> 15);
     key += ~(key << 27);
     key ^=  (key >> 31);
-    return key & (m_size-1);
+    return (unsigned int)(key & (m_size-1));
   }
   else
   {
     // Thomas Wang's 32 bit Mix Function
-    unsigned long key = (unsigned long)addr;
+    uintptr_t key = (uintptr_t)addr;
     key += ~(key << 15);
     key ^=  (key >> 10);
     key +=  (key << 3);
     key ^=  (key >> 6);
     key += ~(key << 11);
     key ^=  (key >> 16);
-    return key & (m_size-1);
+    return (unsigned int)(key & (m_size-1));
   }
 }
 

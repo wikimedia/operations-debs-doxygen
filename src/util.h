@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: util.h,v 1.49 2001/03/19 19:27:42 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -22,12 +22,11 @@
  *  \brief A bunch of utility functions.
  */
 
-#include "qtbc.h"
 #include <qlist.h>
-#include <qtextstream.h>
 #include <ctype.h>
-#include "sortdict.h"
 #include "types.h"
+#include "sortdict.h"
+#include "docparser.h"
 
 //--------------------------------------------------------------------
 
@@ -90,6 +89,32 @@ class TextGeneratorOLImpl : public TextGeneratorIntf
 
 //--------------------------------------------------------------------
 
+/** @brief maps a unicode character code to a list of T::ElementType's
+ */
+template<class T>
+class LetterToIndexMap : public SIntDict<T>
+{
+  public:
+    LetterToIndexMap() { SIntDict<T>::setAutoDelete(TRUE); }
+    void append(uint letter,typename T::ElementType *elem)
+    {
+      T *l = SIntDict<T>::find((int)letter);
+      if (l==0)
+      {
+        l = new T(letter);
+        SIntDict<T>::inSort((int)letter,l);
+      }
+      l->append(elem);
+    }
+  private:
+    int compareValues(const T *l1, const T *l2) const
+    {
+      return (int)l1->letter()-(int)l2->letter();
+    }
+};
+
+//--------------------------------------------------------------------
+
 QCString langToString(SrcLangExt lang);
 QCString getLanguageSpecificSeparator(SrcLangExt lang,bool classScope=FALSE);
 
@@ -106,7 +131,7 @@ void linkifyText(const TextGeneratorIntf &ol,
                  int indentLevel=0
                 );
 
-void setAnchors(ClassDef *cd,char id,MemberList *ml,int groupId=-1);
+void setAnchors(MemberList *ml);
 
 QCString fileToString(const char *name,bool filter=FALSE,bool isSourceCode=FALSE);
 
@@ -232,6 +257,9 @@ QCString replaceAnonymousScopes(const QCString &s,const char *replacement=0);
 void initClassHierarchy(ClassSDict *cl);
 
 bool hasVisibleRoot(BaseClassList *bcl);
+bool classHasVisibleChildren(ClassDef *cd);
+bool namespaceHasVisibleChild(NamespaceDef *nd,bool includeClasses);
+bool classVisibleInIndex(ClassDef *cd);
 
 int minClassDistance(const ClassDef *cd,const ClassDef *bcd,int level=0);
 Protection classInheritedProtectionLevel(ClassDef *cd,ClassDef *bcd,Protection prot=Public,int level=0);
@@ -261,12 +289,15 @@ void addMembersToMemberGroup(/* in */     MemberList *ml,
 int extractClassNameFromType(const QCString &type,int &pos,
                               QCString &name,QCString &templSpec,SrcLangExt=SrcLangExt_Unknown);
 
+QCString normalizeNonTemplateArgumentsInString(
+       const QCString &name,
+       Definition *context,
+       const ArgumentList *formalArgs);
+
 QCString substituteTemplateArgumentsInString(
        const QCString &name,
        ArgumentList *formalArgs,
        ArgumentList *actualArgs);
-
-ArgumentList *copyArgumentList(const ArgumentList *src);
 
 QList<ArgumentList> *copyArgumentLists(const QList<ArgumentList> *srcLists);
 
@@ -372,7 +403,8 @@ QCString convertCharEntitiesToUTF8(const QCString &s);
 
 void stackTrace();
 
-bool readInputFile(const char *fileName,BufStr &inBuf);
+bool readInputFile(const char *fileName,BufStr &inBuf,
+                   bool filter=TRUE,bool isSourceCode=FALSE);
 QCString filterTitle(const QCString &title);
 
 bool patternMatch(const QFileInfo &fi,const QStrList *patList);
@@ -380,6 +412,8 @@ bool patternMatch(const QFileInfo &fi,const QStrList *patList);
 QCString externalLinkTarget();
 QCString externalRef(const QCString &relPath,const QCString &ref,bool href);
 int nextUtf8CharPosition(const QCString &utf8Str,int len,int startPos);
+const char *writeUtf8Char(FTextStream &t,const char *s);
+
 
 /** Data associated with a HSV colored image. */
 struct ColoredImgDataItem
@@ -406,6 +440,23 @@ bool protectionLevelVisible(Protection prot);
 QCString stripIndentation(const QCString &s);
 
 bool fileVisibleInIndex(FileDef *fd,bool &genSourceFile);
+
+void addDocCrossReference(MemberDef *src,MemberDef *dst);
+
+uint getUtf8Code( const QCString& s, int idx );
+uint getUtf8CodeToLower( const QCString& s, int idx );
+uint getUtf8CodeToUpper( const QCString& s, int idx );
+
+QCString extractDirection(QCString &docs);
+
+void convertProtectionLevel(
+                   MemberListType inListType,
+                   Protection inProt,
+                   int *outListType1,
+                   int *outListType2
+                  );
+
+bool mainPageHasTitle();
 
 #endif
 

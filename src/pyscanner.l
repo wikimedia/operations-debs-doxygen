@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: pyscanner.l,v 1.9 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -32,7 +32,6 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "qtbc.h"
 #include <qarray.h>
 #include <qstack.h>
 #include <qregexp.h>
@@ -52,7 +51,12 @@
 #include "pycode.h"
 #include "arguments.h"
 
+// Toggle for some debugging info
+//#define DBG_CTX(x) fprintf x
+#define DBG_CTX(x) do { } while(0)
+
 #define YY_NEVER_INTERACTIVE 1
+#define YY_NO_INPUT 1
 
 /* -----------------------------------------------------------------
  *
@@ -226,7 +230,7 @@ static QCString findPackageScope(const char *fileName)
 
 static void lineCount()
 {
-  //fprintf(stderr,"yyLineNr=%d\n",yyLineNr);
+  DBG_CTX((stderr,"yyLineNr=%d\n",yyLineNr));
   for (const char *p = yytext; *p; ++p)
   {
     yyLineNr += (*p == '\n') ;
@@ -235,7 +239,7 @@ static void lineCount()
 
 static void incLineNr()
 {
-  //fprintf(stderr,"yyLineNr=%d\n",yyLineNr);
+  DBG_CTX((stderr,"yyLineNr=%d\n",yyLineNr));
   yyLineNr++;
 }
 
@@ -457,8 +461,8 @@ OCTNUMBER         "0"[0-7]+[lL]?
 NUMBER            {DIGIT}+[lLjJ]?
 INTNUMBER         {HEXNUMBER}|{OCTNUMBER}|{NUMBER}
 FLOATNUMBER       {DIGIT}+"."{DIGIT}+([eE][+\-]?{DIGIT}+)?[jJ]?
-LETTER            [A-Za-z]
-NONEMPTY          [A-Za-z0-9_]
+LETTER            [A-Za-z\x80-\xFF]
+NONEMPTY          [A-Za-z0-9_\x80-\xFF]
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
@@ -537,7 +541,7 @@ STARTDOCSYMS      "##"
 <Search>{
 
     ^{B}"def"{BB}       { // start of a function/method definition with indent
-      			  //fprintf(stderr,"Found def at %d\n",yyLineNr);
+      			  DBG_CTX((stderr,"Found def at %d\n",yyLineNr));
       			  g_indent=computeIndent(yytext);
 			  searchFoundDef();
 			  BEGIN( FunctionDec );
@@ -548,7 +552,7 @@ STARTDOCSYMS      "##"
                         }
 
      ^{B}"class"{BB}	{ // start of a class definition with indent
-       			  //fprintf(stderr,"Found class at %d\n",yyLineNr);
+       			  DBG_CTX((stderr,"Found class at %d\n",yyLineNr));
       			  g_indent=computeIndent(yytext);
 			  searchFoundClass();
 			  BEGIN( ClassDec ) ;
@@ -641,6 +645,8 @@ STARTDOCSYMS      "##"
 }
 
 <FromMod>{
+  "."                 { // python3 style imports
+                      }
   {IDENTIFIER}({B}"."{B}{IDENTIFIER})* { // from package import 
                         g_packageName=yytext;
 		      }
@@ -731,7 +737,7 @@ STARTDOCSYMS      "##"
 
 <SearchMemVars>{
     "self."{IDENTIFIER}/{B}"=" {
-                        //fprintf(stderr,"Found member variable %s in %s at %d\n",&yytext[5],current_root->name.data(),yyLineNr);
+                        DBG_CTX((stderr,"Found member variable %s in %s at %d\n",&yytext[5],current_root->name.data(),yyLineNr));
 			current->name=&yytext[5];
 			current->section=Entry::VARIABLE_SEC;
 			current->fileName  = yyFileName;
@@ -782,11 +788,11 @@ STARTDOCSYMS      "##"
 
 <FunctionBody>{
     \n{B}/{IDENTIFIER}{BB}  {
-                        //fprintf(stderr,"indent %d<=%d\n",computeIndent(&yytext[1]),g_indent);
+                        DBG_CTX((stderr,"indent %d<=%d\n",computeIndent(&yytext[1]),g_indent));
                         if (computeIndent(&yytext[1])<=g_indent) 
 			{
 			  int i;
-			  for (i=yyleng-1;i>=0;i--)
+			  for (i=(int)yyleng-1;i>=0;i--)
 			  {
 			    unput(yytext[i]);
 			  }
@@ -804,7 +810,7 @@ STARTDOCSYMS      "##"
                         if (computeIndent(&yytext[1])<=g_indent)
 			{
 			  int i;
-			  for (i=yyleng-1;i>=0;i--)
+			  for (i=(int)yyleng-1;i>=0;i--)
 			  {
 			    unput(yytext[i]);
 			  }
@@ -1002,7 +1008,7 @@ STARTDOCSYMS      "##"
       		      }
     ^{BB}	      { // something at indent >0
                         g_curIndent=computeIndent(yytext);
-			//fprintf(stderr,"g_curIndent=%d g_indent=%d\n",g_curIndent,g_indent);
+			DBG_CTX((stderr,"g_curIndent=%d g_indent=%d\n",g_curIndent,g_indent));
                         if (g_curIndent<=g_indent) 
 			  // jumped out of the class/method
 			{
@@ -1133,7 +1139,7 @@ STARTDOCSYMS      "##"
 			         //current->startLine = yyLineNr;
 				 g_curIndent=computeIndent(yytext);
 				 bodyEntry = current;
-				 //fprintf(stderr,"setting indent %d\n",g_curIndent);
+				 DBG_CTX((stderr,"setting indent %d\n",g_curIndent));
 				 //printf("current->program=[%s]\n",current->program.data());
 				 //g_hideClassDocs = TRUE;
 			         BEGIN(ClassBody);
@@ -1155,36 +1161,38 @@ STARTDOCSYMS      "##"
 <VariableDec>{
    "="                { // the assignment operator
                         //printf("====== VariableDec at line %d\n",yyLineNr);
+			current->initializer = yytext;
+			current->initializer += " ";
                       }
    {B}                { // spaces
 	              }
    {INTNUMBER}	      { // integer value
 			current->type = "int";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			BEGIN(VariableEnd);
 		      }
    {FLOATNUMBER}      { // floating point value
 			current->type = "float";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			BEGIN(VariableEnd);
 		      }
    {STRINGPREFIX}?"'" { // string
 			current->type = "string";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			g_copyString=&current->initializer;
        			g_stringContext=VariableEnd;
                         BEGIN( SingleQuoteString );
      		      }
    {STRINGPREFIX}?"\"" { // string
 			current->type = "string";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			g_copyString=&current->initializer;
        			g_stringContext=VariableEnd;
                         BEGIN( DoubleQuoteString );
      		      }
    {TRIDOUBLEQUOTE}   { // start of a comment block
 			current->type = "string";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			g_doubleQuote=TRUE;
 			g_copyString=&current->initializer;
        			g_stringContext=VariableEnd;
@@ -1193,7 +1201,7 @@ STARTDOCSYMS      "##"
 
    {TRISINGLEQUOTE}   { // start of a comment block
 			current->type = "string";
-			current->initializer = yytext;
+			current->initializer += yytext;
 			g_doubleQuote=FALSE;
 			g_copyString=&current->initializer;
        			g_stringContext=VariableEnd;
@@ -1350,11 +1358,11 @@ STARTDOCSYMS      "##"
 			  { // strip g_curIndent amount of whitespace
 			    int i;
 			    for (i=0;i<indent-g_curIndent;i++) docBlock+=' ';
-			    //fprintf(stderr,"stripping indent %d\n",g_curIndent);
+			    DBG_CTX((stderr,"stripping indent %d\n",g_curIndent));
 			  }
 			  else
 			  {
-			    //fprintf(stderr,"not stripping: %d<%d\n",indent,g_curIndent);
+			    DBG_CTX((stderr,"not stripping: %d<%d\n",indent,g_curIndent));
 			    docBlock += yytext;
 			  }
       			}
@@ -1504,7 +1512,7 @@ static void parseCompounds(Entry *rt)
       // init scanner state
       inputString = ce->program;
       inputPosition = 0;
-      pyscanYYrestart( pyscanYYin ) ;
+      pyscannerYYrestart( pyscannerYYin ) ;
       if (ce->section&Entry::COMPOUND_MASK)
       {
         current_root = ce ;
@@ -1525,7 +1533,7 @@ static void parseCompounds(Entry *rt)
 
       groupEnterCompound(yyFileName,yyLineNr,ce->name);
       
-      pyscanYYlex() ;
+      pyscannerYYlex() ;
       g_lexInit=TRUE;
       delete current; current=0;
       ce->program.resize(0);
@@ -1594,9 +1602,9 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     
     current->reset();
     initEntry();
-    pyscanYYrestart( pyscanYYin );
+    pyscannerYYrestart( pyscannerYYin );
     BEGIN( Search );
-    pyscanYYlex();
+    pyscannerYYlex();
     g_lexInit=TRUE;
 
     groupLeaveFile(yyFileName,yyLineNr);
@@ -1631,18 +1639,18 @@ static void parsePrototype(const QCString &text)
   
   // save scanner state
   orgState = YY_CURRENT_BUFFER;
-  yy_switch_to_buffer(yy_create_buffer(pyscanYYin, YY_BUF_SIZE));
+  yy_switch_to_buffer(yy_create_buffer(pyscannerYYin, YY_BUF_SIZE));
   orgInputString = inputString; 
   orgInputPosition = inputPosition;
 
   // set new string
   inputString = text;
   inputPosition = 0;
-  pyscanYYrestart( pyscanYYin );
+  pyscannerYYrestart( pyscannerYYin );
 
   BEGIN( FunctionDec );
 
-  pyscanYYlex();
+  pyscannerYYlex();
   g_lexInit=TRUE;
 
   current->name = current->name.stripWhiteSpace();
@@ -1666,17 +1674,23 @@ void pyscanFreeScanner()
 #if defined(YY_FLEX_SUBMINOR_VERSION) 
   if (g_lexInit)
   {
-    pyscanYYlex_destroy();
+    pyscannerYYlex_destroy();
   }
 #endif
 }
 
 //----------------------------------------------------------------------------
 
-void PythonLanguageScanner::parseInput(const char *fileName,const char *fileBuf,Entry *root)
+void PythonLanguageScanner::parseInput(const char *fileName,
+                                       const char *fileBuf,
+                                       Entry *root,
+                                       bool /*sameTranslationUnit*/,
+                                       QStrList & /*filesInSameTranslationUnit*/)
 {
   g_thisParser = this;
+  printlex(yy_flex_debug, TRUE, __FILE__, fileName);
   ::parseMain(fileName,fileBuf,root);
+  printlex(yy_flex_debug, FALSE, __FILE__, fileName);
 
   // May print the AST for debugging purposes
   // printAST(global_root);
@@ -1690,6 +1704,7 @@ bool PythonLanguageScanner::needsPreprocessing(const QCString &)
 void PythonLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
     const char *scopeName,
     const QCString &input,
+    SrcLangExt /*lang*/,
     bool isExampleBlock,
     const char *exampleName,
     FileDef *fileDef,
@@ -1697,12 +1712,14 @@ void PythonLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
     int endLine,
     bool inlineFragment,
     MemberDef *memberDef,
-    bool showLineNumbers
+    bool showLineNumbers,
+    Definition *searchCtx,
+    bool collectXRefs
     )
 {
   ::parsePythonCode(codeOutIntf,scopeName,input,isExampleBlock,exampleName,
                     fileDef,startLine,endLine,inlineFragment,memberDef,
-                    showLineNumbers);
+                    showLineNumbers,searchCtx,collectXRefs);
 }
 
 void PythonLanguageScanner::parsePrototype(const char *text)

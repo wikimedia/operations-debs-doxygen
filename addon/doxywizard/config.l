@@ -2,7 +2,7 @@
  *
  * $Id: config_templ.l,v 1.8 2001/01/01 10:15:16 root Exp $
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -408,7 +408,7 @@ static void substEnvVarsInStrList(QStringList &sl)
 
     if (!wasQuoted) /* as a result of the expansion, a single string
 		       may have expanded into a list, which we'll
-		       add to sl. If the orginal string already 
+		       add to sl. If the original string already
 		       contained multiple elements no further 
 		       splitting is done to allow quoted items with spaces! */
     {

@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: htmlgen.h,v 1.51 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -24,7 +24,6 @@
 #ifndef ECLIPSEHELP_H
 #define ECLIPSEHELP_H
 
-#include "qtbc.h"
 #include "index.h"
 #include "ftextstream.h"
 
@@ -52,7 +51,8 @@ class EclipseHelp : public IndexIntf
     virtual void addContentsItem(bool isDir, const char *name, const char *ref,
                                  const char *file, const char *anchor,bool separateIndex,bool addToNavIndex,
                                  Definition *def);
-    virtual void addIndexItem(Definition *context,MemberDef *md,const char *title);
+    virtual void addIndexItem(Definition *context,MemberDef *md,
+                              const char *sectionAnchor,const char *title);
     virtual void addIndexFile(const char *name);
     virtual void addImageFile(const char *name);
     virtual void addStyleSheetFile(const char *name);
@@ -60,6 +60,7 @@ class EclipseHelp : public IndexIntf
   private:
     int m_depth;
     bool m_endtag;
+    int m_openTags;
 
     QFile * m_tocfile;
     FTextStream m_tocstream;

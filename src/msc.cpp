@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: msc.cpp,v 1.14 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,18 +21,20 @@
 #include "message.h"
 #include "docparser.h"
 #include "doxygen.h"
+#include "util.h"
+#include "ftextstream.h"
 
 #include <qdir.h>
 
 static const int maxCmdLine = 40960;
 
-static bool convertMapFile(QTextStream &t,const char *mapName,const QCString relPath,
+static bool convertMapFile(FTextStream &t,const char *mapName,const QCString relPath,
                            const QCString &context)
 {
   QFile f(mapName);
   if (!f.open(IO_ReadOnly))
   {
-    err("error: failed to open map file %s for inclusion in the docs!\n"
+    err("failed to open map file %s for inclusion in the docs!\n"
         "If you installed Graphviz/dot after a previous failing run, \n"
         "try deleting the output directory and rerun doxygen.\n",mapName);
     return FALSE;
@@ -48,12 +50,12 @@ static bool convertMapFile(QTextStream &t,const char *mapName,const QCString rel
     int numBytes = f.readLine(buf,maxLineLen);
     buf[numBytes-1]='\0';
     //printf("ReadLine `%s'\n",buf);
-    if (strncmp(buf,"rect",4)==0)
+    if (qstrncmp(buf,"rect",4)==0)
     {
       // obtain the url and the coordinates in the order used by graphviz-1.5
       sscanf(buf,"rect %s %d,%d %d,%d",url,&x1,&y1,&x2,&y2);
 
-      if ( strcmp(url,"\\ref") == 0 )
+      if (qstrcmp(url,"\\ref")==0 || qstrcmp(url,"@ref")==0)
       {
         isRef = TRUE;
         sscanf(buf,"rect %s %s %d,%d %d,%d",ref,url,&x1,&y1,&x2,&y2);
@@ -94,22 +96,29 @@ void writeMscGraphFromFile(const char *inFile,const char *outDir,
   absOutFile+=outFile;
 
   // chdir to the output dir, so dot can find the font file.
-  QCString oldDir = convertToQCString(QDir::currentDirPath());
+  QCString oldDir = QDir::currentDirPath().utf8();
   // go to the html output directory (i.e. path)
   QDir::setCurrent(outDir);
   //printf("Going to dir %s\n",QDir::currentDirPath().data());
   QCString mscExe = Config_getString("MSCGEN_PATH")+"mscgen"+portable_commandExtension();
   QCString mscArgs;
   QCString extension;
-  if (format==MSC_BITMAP)
+  switch (format)
   {
-    mscArgs+="-T png";
-    extension=".png";
-  }
-  else if (format==MSC_EPS)
-  {
-    mscArgs+="-T eps";
-    extension=".eps";
+    case MSC_BITMAP:
+      mscArgs+="-T png";
+      extension=".png";
+      break;
+    case MSC_EPS:
+      mscArgs+="-T eps";
+      extension=".eps";
+      break;
+    case MSC_SVG:
+      mscArgs+="-T svg";
+      extension=".svg";
+      break;
+    default:
+      goto error; // I am not very fond of goto statements, but when in Rome...
   }
   mscArgs+=" -i \"";
   mscArgs+=inFile;
@@ -134,7 +143,7 @@ void writeMscGraphFromFile(const char *inFile,const char *outDir,
     portable_sysTimerStart();
     if (portable_system("epstopdf",epstopdfArgs)!=0)
     {
-      err("error: Problems running epstopdf. Check your TeX installation!\n");
+      err("Problems running epstopdf. Check your TeX installation!\n");
     }
     portable_sysTimerStop();
   }
@@ -151,7 +160,7 @@ QCString getMscImageMapFromFile(const QCString& inFile, const QCString& outDir,
 
   //printf("*** running:getMscImageMapFromFile \n");
   // chdir to the output dir, so dot can find the font file.
-  QCString oldDir = convertToQCString(QDir::currentDirPath());
+  QCString oldDir = QDir::currentDirPath().utf8();
   // go to the html output directory (i.e. path)
   QDir::setCurrent(outDir);
   //printf("Going to dir %s\n",QDir::currentDirPath().data());
@@ -173,8 +182,8 @@ QCString getMscImageMapFromFile(const QCString& inFile, const QCString& outDir,
   }
   portable_sysTimerStop();
   
-  QString result;
-  QTextOStream tmpout(&result);
+  QGString result;
+  FTextStream tmpout(&result);
   convertMapFile(tmpout, outFile, relPath, context);
   QDir().remove(outFile);
 
@@ -186,11 +195,28 @@ void writeMscImageMapFromFile(FTextStream &t,const QCString &inFile,
                               const QCString &outDir,
                               const QCString &relPath,
                               const QCString &baseName,
-                              const QCString &context)
+                              const QCString &context,
+			      MscOutputFormat format
+ 			    )
 {
   QCString mapName = baseName+".map";
   QCString mapFile = inFile+".map";
-  t << "<img src=\"" << relPath << baseName << ".png\" alt=\""
+  t << "<img src=\"" << relPath << baseName << ".";
+  switch (format)
+  {
+    case MSC_BITMAP:
+      t << "png";
+      break;
+    case MSC_EPS:
+      t << "eps";
+      break;
+    case MSC_SVG:
+      t << "svg";
+      break;
+    default:
+      t << "unknown";
+  }
+  t << "\" alt=\""
     << baseName << "\" border=\"0\" usemap=\"#" << mapName << "\"/>" << endl;
   QCString imap = getMscImageMapFromFile(inFile,outDir,relPath,context);
   t << "<map name=\"" << mapName << "\" id=\"" << mapName << "\">" << imap << "</map>" << endl;

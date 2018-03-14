@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -109,6 +109,8 @@ class XmlDocVisitor : public DocVisitor
 
     void visitPre(DocMscFile *);
     void visitPost(DocMscFile *);
+    void visitPre(DocDiaFile *);
+    void visitPost(DocDiaFile *);
     void visitPre(DocLink *);
     void visitPost(DocLink *);
     void visitPre(DocRef *);
@@ -133,6 +135,10 @@ class XmlDocVisitor : public DocVisitor
     void visitPost(DocText *);
     void visitPre(DocHtmlBlockQuote *);
     void visitPost(DocHtmlBlockQuote *);
+    void visitPre(DocVhdlFlow *);
+    void visitPost(DocVhdlFlow *);
+    void visitPre(DocParBlock *);
+    void visitPost(DocParBlock *);
 
   private:
 

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -15,7 +15,11 @@
 
 #include <stdlib.h>
 
-#include "qtbc.h"
+#include <qdir.h>
+#include <qfile.h>
+#include <qtextstream.h>
+#include <qintdict.h>
+
 #include "xmlgen.h"
 #include "doxygen.h"
 #include "message.h"
@@ -33,11 +37,15 @@
 #include "language.h"
 #include "parserintf.h"
 #include "arguments.h"
-
-#include <qdir.h>
-#include <qfile.h>
-#include <qtextstream.h>
-#include <qintdict.h>
+#include "memberlist.h"
+#include "groupdef.h"
+#include "memberdef.h"
+#include "namespacedef.h"
+#include "membername.h"
+#include "membergroup.h"
+#include "dirdef.h"
+#include "section.h"
+#include "htmlentity.h"
 
 // no debug info
 #define XML_DB(x) do {} while(0)
@@ -49,13 +57,13 @@
 //------------------
 
 static const char index_xsd[] =
-#include "index_xsd.h"
+#include "index.xsd.h"
 ;
 
 //------------------
 //
 static const char compound_xsd[] =
-#include "compound_xsd.h"
+#include "compound.xsd.h"
 ;
 
 //------------------
@@ -66,41 +74,43 @@ class XmlSectionMapper : public QIntDict<char>
   public:
     XmlSectionMapper() : QIntDict<char>(47)
     {
-      insert(MemberList::pubTypes,"public-type");
-      insert(MemberList::pubMethods,"public-func");
-      insert(MemberList::pubAttribs,"public-attrib");
-      insert(MemberList::pubSlots,"public-slot");
-      insert(MemberList::signals,"signal");
-      insert(MemberList::dcopMethods,"dcop-func");
-      insert(MemberList::properties,"property");
-      insert(MemberList::events,"event");
-      insert(MemberList::pubStaticMethods,"public-static-func");
-      insert(MemberList::pubStaticAttribs,"public-static-attrib");
-      insert(MemberList::proTypes,"protected-type");
-      insert(MemberList::proMethods,"protected-func");
-      insert(MemberList::proAttribs,"protected-attrib");
-      insert(MemberList::proSlots,"protected-slot");
-      insert(MemberList::proStaticMethods,"protected-static-func");
-      insert(MemberList::proStaticAttribs,"protected-static-attrib");
-      insert(MemberList::pacTypes,"package-type");
-      insert(MemberList::pacMethods,"package-func");
-      insert(MemberList::pacAttribs,"package-attrib");
-      insert(MemberList::pacStaticMethods,"package-static-func");
-      insert(MemberList::pacStaticAttribs,"package-static-attrib");
-      insert(MemberList::priTypes,"private-type");
-      insert(MemberList::priMethods,"private-func");
-      insert(MemberList::priAttribs,"private-attrib");
-      insert(MemberList::priSlots,"private-slot");
-      insert(MemberList::priStaticMethods,"private-static-func");
-      insert(MemberList::priStaticAttribs,"private-static-attrib");
-      insert(MemberList::friends,"friend");
-      insert(MemberList::related,"related");
-      insert(MemberList::decDefineMembers,"define");
-      insert(MemberList::decProtoMembers,"prototype");
-      insert(MemberList::decTypedefMembers,"typedef");
-      insert(MemberList::decEnumMembers,"enum");
-      insert(MemberList::decFuncMembers,"func");
-      insert(MemberList::decVarMembers,"var");
+      insert(MemberListType_pubTypes,"public-type");
+      insert(MemberListType_pubMethods,"public-func");
+      insert(MemberListType_pubAttribs,"public-attrib");
+      insert(MemberListType_pubSlots,"public-slot");
+      insert(MemberListType_signals,"signal");
+      insert(MemberListType_dcopMethods,"dcop-func");
+      insert(MemberListType_properties,"property");
+      insert(MemberListType_events,"event");
+      insert(MemberListType_interfaces,"interfaces");
+      insert(MemberListType_services,"services");
+      insert(MemberListType_pubStaticMethods,"public-static-func");
+      insert(MemberListType_pubStaticAttribs,"public-static-attrib");
+      insert(MemberListType_proTypes,"protected-type");
+      insert(MemberListType_proMethods,"protected-func");
+      insert(MemberListType_proAttribs,"protected-attrib");
+      insert(MemberListType_proSlots,"protected-slot");
+      insert(MemberListType_proStaticMethods,"protected-static-func");
+      insert(MemberListType_proStaticAttribs,"protected-static-attrib");
+      insert(MemberListType_pacTypes,"package-type");
+      insert(MemberListType_pacMethods,"package-func");
+      insert(MemberListType_pacAttribs,"package-attrib");
+      insert(MemberListType_pacStaticMethods,"package-static-func");
+      insert(MemberListType_pacStaticAttribs,"package-static-attrib");
+      insert(MemberListType_priTypes,"private-type");
+      insert(MemberListType_priMethods,"private-func");
+      insert(MemberListType_priAttribs,"private-attrib");
+      insert(MemberListType_priSlots,"private-slot");
+      insert(MemberListType_priStaticMethods,"private-static-func");
+      insert(MemberListType_priStaticAttribs,"private-static-attrib");
+      insert(MemberListType_friends,"friend");
+      insert(MemberListType_related,"related");
+      insert(MemberListType_decDefineMembers,"define");
+      insert(MemberListType_decProtoMembers,"prototype");
+      insert(MemberListType_decTypedefMembers,"typedef");
+      insert(MemberListType_decEnumMembers,"enum");
+      insert(MemberListType_decFuncMembers,"func");
+      insert(MemberListType_decVarMembers,"var");
     }
 };
 
@@ -119,10 +129,10 @@ inline void writeXMLCodeString(FTextStream &t,const char *s, int &col)
   {
     switch(c)
     {
-      case '\t': 
-      { 
+      case '\t':
+      {
         static int tabSize = Config_getInt("TAB_SIZE");
-	int spacesToNextTabStop = tabSize - (col%tabSize); 
+	int spacesToNextTabStop = tabSize - (col%tabSize);
 	col+=spacesToNextTabStop;
 	while (spacesToNextTabStop--) t << "<sp/>";
 	break;
@@ -131,11 +141,16 @@ inline void writeXMLCodeString(FTextStream &t,const char *s, int &col)
       case '<':  t << "&lt;"; col++;   break;
       case '>':  t << "&gt;"; col++;   break;
       case '&':  t << "&amp;"; col++;  break;
-      case '\'': t << "&apos;"; col++; break; 
+      case '\'': t << "&apos;"; col++; break;
       case '"':  t << "&quot;"; col++; break;
-      default:   t << c; col++;        break;         
+      case  1: case  2: case  3: case  4: case  5: case  6: case  7: case  8:
+      case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18:
+      case 19: case 20: case 21: case 22: case 23: case 24: case 25: case 26:
+      case 27: case 28: case 29: case 30: case 31:
+        break; // skip invalid XML characters (see http://www.w3.org/TR/2000/REC-xml-20001006#NT-Char)
+      default:   s=writeUtf8Char(t,s-1); col++; break;
     }
-  } 
+  }
 }
 
 
@@ -214,59 +229,6 @@ class TextGeneratorXMLImpl : public TextGeneratorIntf
     FTextStream &m_t;
 };
 
-/** Helper class representing a stack of objects stored by value */
-template<class T> class ValStack
-{
-  public:
-    ValStack() : m_values(10), m_sp(0), m_size(10) {}
-    virtual ~ValStack() {}
-    ValStack(const ValStack<T> &s)
-    {
-      m_values=s.m_values.copy();
-      m_sp=s.m_sp;
-      m_size=s.m_size;
-    }
-    ValStack &operator=(const ValStack<T> &s)
-    {
-      m_values=s.m_values.copy();
-      m_sp=s.m_sp;
-      m_size=s.m_size;
-      return *this;
-    }
-    void push(T v)
-    {
-      m_sp++;
-      if (m_sp>=m_size)
-      {
-        m_size+=10;
-        m_values.resize(m_size);
-      }
-      m_values[m_sp]=v;
-    }
-    T pop()
-    {
-      ASSERT(m_sp!=0);
-      return m_values[m_sp--];
-    }
-    T& top()
-    {
-      ASSERT(m_sp!=0);
-      return m_values[m_sp];
-    }
-    bool isEmpty()
-    {
-      return m_sp==0;
-    }
-    uint count() const
-    {
-      return m_sp;
-    }
-    
-  private:
-    QArray<T> m_values;
-    int m_sp;
-    int m_size;
-};
 
 /** Generator for producing XML formatted source code. */
 class XMLCodeGenerator : public CodeOutputInterface
@@ -299,7 +261,13 @@ class XMLCodeGenerator : public CodeOutputInterface
         m_normalHLNeedStartTag=FALSE;
       }
       writeXMLLink(m_t,ref,file,anchor,name,tooltip);
-      col+=strlen(name);
+      col+=qstrlen(name);
+    }
+    void writeTooltip(const char *, const DocLinkInfo &, const char *,
+                      const char *, const SourceLinkInfo &, const SourceLinkInfo &
+                     )
+    {
+      XML_DB(("(writeToolTip)\n"));
     }
     void startCodeLine(bool) 
     {
@@ -343,21 +311,6 @@ class XMLCodeGenerator : public CodeOutputInterface
       m_external.resize(0);
       m_insideCodeLine=FALSE;
     }
-    void startCodeAnchor(const char *id) 
-    {
-      XML_DB(("(startCodeAnchor)\n"));
-      if (m_insideCodeLine && !m_insideSpecialHL && m_normalHLNeedStartTag)
-      {
-        m_t << "<highlight class=\"normal\">";
-        m_normalHLNeedStartTag=FALSE;
-      }
-      m_t << "<anchor id=\"" << id << "\">";
-    }
-    void endCodeAnchor() 
-    {
-      XML_DB(("(endCodeAnchor)\n"));
-      m_t << "</anchor>";
-    }
     void startFontClass(const char *colorClass) 
     {
       XML_DB(("(startFontClass)\n"));
@@ -394,7 +347,10 @@ class XMLCodeGenerator : public CodeOutputInterface
         if (extRef) m_external=extRef;
       }
     }
-    void linkableSymbol(int, const char *,Definition *,Definition *) 
+    void setCurrentDoc(Definition *,const char *,bool)
+    {
+    }
+    void addWord(const char *,bool)
     {
     }
 
@@ -458,10 +414,10 @@ static void writeTemplateArgumentList(ArgumentList *al,
 
 static void writeMemberTemplateLists(MemberDef *md,FTextStream &t)
 {
-  LockingPtr<ArgumentList> templMd = md->templateArguments();
-  if (templMd!=0) // function template prefix
+  ArgumentList *templMd = md->templateArguments();
+  if (templMd) // function template prefix
   {
-    writeTemplateArgumentList(templMd.pointer(),t,md->getClassDef(),md->getFileDef(),8);
+    writeTemplateArgumentList(templMd,t,md->getClassDef(),md->getFileDef(),8);
   }
 }
 
@@ -480,7 +436,7 @@ static void writeXMLDocBlock(FTextStream &t,
   QCString stext = text.stripWhiteSpace();
   if (stext.isEmpty()) return;
   // convert the documentation string into an abstract syntax tree
-  DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,text+"\n",FALSE,FALSE);
+  DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,text,FALSE,FALSE);
   // create a code generator
   XMLCodeGenerator *xmlCodeGen = new XMLCodeGenerator(t);
   // create a parse tree visitor for XML
@@ -497,11 +453,13 @@ static void writeXMLDocBlock(FTextStream &t,
 void writeXMLCodeBlock(FTextStream &t,FileDef *fd)
 {
   ParserInterface *pIntf=Doxygen::parserManager->getParser(fd->getDefFileExtension());
+  SrcLangExt langExt = getLanguageFromFileName(fd->getDefFileExtension());
   pIntf->resetCodeParserState();
   XMLCodeGenerator *xmlGen = new XMLCodeGenerator(t);
   pIntf->parseCode(*xmlGen,  // codeOutIntf
                 0,           // scopeName
                 fileToString(fd->absFilePath(),Config_getBool("FILTER_SOURCE_FILES")),
+                langExt,     // lang
                 FALSE,       // isExampleBlock
                 0,           // exampleName
                 fd,          // fileDef
@@ -589,7 +547,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
   // - call graph
   
   // enum values are written as part of the enum
-  if (md->memberType()==MemberDef::EnumValue) return;
+  if (md->memberType()==MemberType_EnumValue) return;
   if (md->isHidden()) return;
   //if (md->name().at(0)=='@') return; // anonymous member
 
@@ -600,18 +558,20 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
   bool isFunc=FALSE;
   switch (md->memberType())
   {
-    case MemberDef::Define:      memType="define";    break;
-    case MemberDef::EnumValue:   ASSERT(0);           break;
-    case MemberDef::Property:    memType="property";  break;
-    case MemberDef::Event:       memType="event";     break;
-    case MemberDef::Variable:    memType="variable";  break;
-    case MemberDef::Typedef:     memType="typedef";   break;
-    case MemberDef::Enumeration: memType="enum";      break;
-    case MemberDef::Function:    memType="function";  isFunc=TRUE; break;
-    case MemberDef::Signal:      memType="signal";    isFunc=TRUE; break;
-    case MemberDef::Friend:      memType="friend";    isFunc=TRUE; break;
-    case MemberDef::DCOP:        memType="dcop";      isFunc=TRUE; break;
-    case MemberDef::Slot:        memType="slot";      isFunc=TRUE; break;
+    case MemberType_Define:      memType="define";    break;
+    case MemberType_Function:    memType="function";  isFunc=TRUE; break;
+    case MemberType_Variable:    memType="variable";  break;
+    case MemberType_Typedef:     memType="typedef";   break;
+    case MemberType_Enumeration: memType="enum";      break;
+    case MemberType_EnumValue:   ASSERT(0);           break;
+    case MemberType_Signal:      memType="signal";    isFunc=TRUE; break;
+    case MemberType_Slot:        memType="slot";      isFunc=TRUE; break;
+    case MemberType_Friend:      memType="friend";    isFunc=TRUE; break;
+    case MemberType_DCOP:        memType="dcop";      isFunc=TRUE; break;
+    case MemberType_Property:    memType="property";  break;
+    case MemberType_Event:       memType="event";     break;
+    case MemberType_Interface:   memType="interface"; break;
+    case MemberType_Service:     memType="service";   break;
   }
 
   ti << "    <member refid=\"" << memberOutputFileBase(md) 
@@ -653,7 +613,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
 
   if (isFunc)
   {
-    LockingPtr<ArgumentList> al = md->argumentList();
+    ArgumentList *al = md->argumentList();
     t << " const=\"";
     if (al!=0 && al->constSpecifier)    t << "yes"; else t << "no"; 
     t << "\"";
@@ -691,6 +651,11 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
       t << " required=\"yes\"";
     }
 
+    if (al && al->volatileSpecifier)
+    {
+      t << " volatile=\"yes\"";
+    }
+
     t << " virt=\"";
     switch (md->virtualness())
     {
@@ -702,7 +667,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
     t << "\"";
   }
 
-  if (md->memberType() == MemberDef::Variable)
+  if (md->memberType() == MemberType_Variable)
   {
     //ArgumentList *al = md->argumentList();
     //t << " volatile=\"";
@@ -716,9 +681,48 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
     {
       t << " initonly=\"yes\"";
     }
-    
+    if (md->isAttribute())
+    {
+      t << " attribute=\"yes\"";
+    }
+    if (md->isUNOProperty())
+    {
+      t << " property=\"yes\"";
+    }
+    if (md->isReadonly())
+    {
+      t << " readonly=\"yes\"";
+    }
+    if (md->isBound())
+    {
+      t << " bound=\"yes\"";
+    }
+    if (md->isRemovable())
+    {
+      t << " removable=\"yes\"";
+    }
+    if (md->isConstrained())
+    {
+      t << " constrained=\"yes\"";
+    }
+    if (md->isTransient())
+    {
+      t << " transient=\"yes\"";
+    }
+    if (md->isMaybeVoid())
+    {
+      t << " maybevoid=\"yes\"";
+    }
+    if (md->isMaybeDefault())
+    {
+      t << " maybedefault=\"yes\"";
+    }
+    if (md->isMaybeAmbiguous())
+    {
+      t << " maybeambiguous=\"yes\"";
+    }
   }
-  else if (md->memberType() == MemberDef::Property)
+  else if (md->memberType() == MemberType_Property)
   {
     t << " readable=\"";
     if (md->isReadable()) t << "yes"; else t << "no";
@@ -732,8 +736,24 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
     if (md->isGettable()) t << "yes"; else t << "no";
     t << "\"";
 
+    t << " privategettable=\"";
+    if (md->isPrivateGettable()) t << "yes"; else t << "no";
+    t << "\"";
+
+    t << " protectedgettable=\"";
+    if (md->isProtectedGettable()) t << "yes"; else t << "no";
+    t << "\"";
+
     t << " settable=\"";
     if (md->isSettable()) t << "yes"; else t << "no";
+    t << "\"";
+
+    t << " privatesettable=\"";
+    if (md->isPrivateSettable()) t << "yes"; else t << "no";
+    t << "\"";
+
+    t << " protectedsettable=\"";
+    if (md->isProtectedSettable()) t << "yes"; else t << "no";
     t << "\"";
 
     if (md->isAssign() || md->isCopy() || md->isRetain() || md->isStrong() || md->isWeak())
@@ -747,7 +767,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
       t << "\"";
     }
   }
-  else if (md->memberType() == MemberDef::Event)
+  else if (md->memberType() == MemberType_Event)
   {
     t << " add=\"";
     if (md->isAddable()) t << "yes"; else t << "no";
@@ -764,11 +784,11 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
 
   t << ">" << endl;
 
-  if (md->memberType()!=MemberDef::Define &&
-      md->memberType()!=MemberDef::Enumeration
+  if (md->memberType()!=MemberType_Define &&
+      md->memberType()!=MemberType_Enumeration
      )
   {
-    if (md->memberType()!=MemberDef::Typedef)
+    if (md->memberType()!=MemberType_Typedef)
     {
       writeMemberTemplateLists(md,t);
     }
@@ -783,14 +803,14 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
 
   t << "        <name>" << convertToXML(md->name()) << "</name>" << endl;
   
-  if (md->memberType() == MemberDef::Property)
+  if (md->memberType() == MemberType_Property)
   {
     if (md->isReadable())
       t << "        <read>" << convertToXML(md->getReadAccessor()) << "</read>" << endl;
     if (md->isWritable())
       t << "        <write>" << convertToXML(md->getWriteAccessor()) << "</write>" << endl;
   }
-  if (md->memberType()==MemberDef::Variable && md->bitfieldString())
+  if (md->memberType()==MemberType_Variable && md->bitfieldString())
   {
     QCString bitfield = md->bitfieldString();
     if (bitfield.at(0)==':') bitfield=bitfield.mid(1);
@@ -804,8 +824,8 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
       << memberOutputFileBase(rmd) << "_1" << rmd->anchor() << "\">"
       << convertToXML(rmd->name()) << "</reimplements>" << endl;
   }
-  LockingPtr<MemberList> rbml = md->reimplementedBy();
-  if (rbml!=0)
+  MemberList *rbml = md->reimplementedBy();
+  if (rbml)
   {
     MemberListIterator mli(*rbml);
     for (mli.toFirst();(rmd=mli.current());++mli)
@@ -818,9 +838,9 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
 
   if (isFunc) //function
   {
-    LockingPtr<ArgumentList> declAl = md->declArgumentList();
-    LockingPtr<ArgumentList> defAl = md->argumentList();
-    if (declAl!=0 && declAl->count()>0)
+    ArgumentList *declAl = md->declArgumentList();
+    ArgumentList *defAl = md->argumentList();
+    if (declAl && declAl->count()>0)
     {
       ArgumentListIterator declAli(*declAl);
       ArgumentListIterator defAli(*defAl);
@@ -877,7 +897,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
       }
     }
   }
-  else if (md->memberType()==MemberDef::Define && 
+  else if (md->memberType()==MemberType_Define && 
           md->argsString()) // define
   {
     if (md->argumentList()->count()==0) // special case for "foo()" to
@@ -895,9 +915,8 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
       }
     }
   }
-  // avoid that extremely large tables are written to the output. 
-  // todo: it's better to adhere to MAX_INITIALIZER_LINES.
-  if (!md->initializer().isEmpty() && md->initializer().length()<2000)
+
+  if (md->hasOneLineInitializer() || md->hasMultiLineInitializer())
   {
     t << "        <initializer>";
     linkifyText(TextGeneratorXMLImpl(t),def,md->getBodyDef(),md,md->initializer());
@@ -911,10 +930,10 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
     t << "</exceptions>" << endl;
   }
   
-  if (md->memberType()==MemberDef::Enumeration) // enum
+  if (md->memberType()==MemberType_Enumeration) // enum
   {
-    LockingPtr<MemberList> enumFields = md->enumFieldList();
-    if (enumFields!=0)
+    MemberList *enumFields = md->enumFieldList();
+    if (enumFields)
     {
       MemberListIterator emli(*enumFields);
       MemberDef *emd;
@@ -966,7 +985,8 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
   {
     t << "        <location file=\"" 
       << md->getDefFileName() << "\" line=\"" 
-      << md->getDefLine() << "\"";
+      << md->getDefLine() << "\"" << " column=\"" 
+      << md->getDefColumn() << "\"" ;
     if (md->getStartBodyLine()!=-1)
     {
       FileDef *bodyDef = md->getBodyDef();
@@ -981,8 +1001,8 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
   }
 
   //printf("md->getReferencesMembers()=%p\n",md->getReferencesMembers());
-  LockingPtr<MemberSDict> mdict = md->getReferencesMembers();
-  if (mdict!=0)
+  MemberSDict *mdict = md->getReferencesMembers();
+  if (mdict)
   {
     MemberSDict::Iterator mdi(*mdict);
     MemberDef *rmd;
@@ -992,7 +1012,7 @@ static void generateXMLForMember(MemberDef *md,FTextStream &ti,FTextStream &t,De
     }
   }
   mdict = md->getReferencedByMembers();
-  if (mdict!=0)
+  if (mdict)
   {
     MemberSDict::Iterator mdi(*mdict);
     MemberDef *rmd;
@@ -1220,6 +1240,7 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
   if (cd->isHidden())           return; // skip hidden classes.
   if (cd->name().find('@')!=-1) return; // skip anonymous compounds.
   if (cd->templateMaster()!=0)  return; // skip generated template instances.
+  if (cd->isArtificial())       return; // skip artificially created classes
 
   msg("Generating XML output for class %s\n",cd->name().data());
 
@@ -1249,6 +1270,9 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
     case Private:   t << "private";   break;
     case Package:   t << "package";   break;
   }
+  if (cd->isFinal()) t << "\" final=\"yes";
+  if (cd->isSealed()) t << "\" sealed=\"yes";
+  if (cd->isAbstract()) t << "\" abstract=\"yes";
   t << "\">" << endl;
   t << "    <compoundname>"; 
   writeXMLString(t,cd->name()); 
@@ -1358,7 +1382,7 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
   MemberList *ml;
   for (mli.toFirst();(ml=mli.current());++mli)
   {
-    if ((ml->listType()&MemberList::detailedLists)==0)
+    if ((ml->listType()&MemberListType_detailedLists)==0)
     {
       generateXMLSection(cd,ti,t,ml,g_xmlSectionMapper.find(ml->listType()));
     }
@@ -1417,7 +1441,8 @@ static void generateXMLForClass(ClassDef *cd,FTextStream &ti)
   }
   t << "    <location file=\"" 
     << cd->getDefFileName() << "\" line=\"" 
-    << cd->getDefLine() << "\"";
+    << cd->getDefLine() << "\"" << " column=\"" 
+    << cd->getDefColumn() << "\"" ;
     if (cd->getStartBodyLine()!=-1)
     {
       FileDef *bodyDef = cd->getBodyDef();
@@ -1489,7 +1514,7 @@ static void generateXMLForNamespace(NamespaceDef *nd,FTextStream &ti)
   MemberList *ml;
   for (mli.toFirst();(ml=mli.current());++mli)
   {
-    if ((ml->listType()&MemberList::declarationLists)!=0)
+    if ((ml->listType()&MemberListType_declarationLists)!=0)
     {
       generateXMLSection(nd,ti,t,ml,g_xmlSectionMapper.find(ml->listType()));
     }
@@ -1509,9 +1534,10 @@ static void generateXMLForNamespace(NamespaceDef *nd,FTextStream &ti)
   t << "    <detaileddescription>" << endl;
   writeXMLDocBlock(t,nd->docFile(),nd->docLine(),nd,0,nd->documentation());
   t << "    </detaileddescription>" << endl;
-  t << "    <location file=\"" 
-    << nd->getDefFileName() << "\" line=\"" 
-    << nd->getDefLine() << "\"/>" << endl;
+  t << "    <location file=\""
+    << nd->getDefFileName() << "\" line=\""
+    << nd->getDefLine() << "\"" << " column=\""
+    << nd->getDefColumn() << "\"/>" << endl ;
   t << "  </compounddef>" << endl;
   t << "</doxygen>" << endl;
 
@@ -1632,7 +1658,7 @@ static void generateXMLForFile(FileDef *fd,FTextStream &ti)
   MemberList *ml;
   for (mli.toFirst();(ml=mli.current());++mli)
   {
-    if ((ml->listType()&MemberList::declarationLists)!=0)
+    if ((ml->listType()&MemberListType_declarationLists)!=0)
     {
       generateXMLSection(fd,ti,t,ml,g_xmlSectionMapper.find(ml->listType()));
     }
@@ -1722,7 +1748,7 @@ static void generateXMLForGroup(GroupDef *gd,FTextStream &ti)
   MemberList *ml;
   for (mli.toFirst();(ml=mli.current());++mli)
   {
-    if ((ml->listType()&MemberList::declarationLists)!=0)
+    if ((ml->listType()&MemberListType_declarationLists)!=0)
     {
       generateXMLSection(gd,ti,t,ml,g_xmlSectionMapper.find(ml->listType()));
     }
@@ -1825,10 +1851,28 @@ static void generateXMLForPage(PageDef *pd,FTextStream &ti,bool isExample)
   t << "    <compoundname>" << convertToXML(pd->name()) 
     << "</compoundname>" << endl;
 
-  SectionInfo *si = Doxygen::sectionDict.find(pd->name());
-  if (si)
+  if (pd==Doxygen::mainPage) // main page is special
   {
-    t << "    <title>" << convertToXML(si->title) << "</title>" << endl;
+    QCString title;
+    if (!pd->title().isEmpty() && pd->title().lower()!="notitle")
+    {
+      title = filterTitle(convertCharEntitiesToUTF8(Doxygen::mainPage->title()));
+    }
+    else 
+    {
+      title = Config_getString("PROJECT_NAME");
+    }
+    t << "    <title>" << convertToXML(convertCharEntitiesToUTF8(title)) 
+      << "</title>" << endl;
+  }
+  else
+  {
+    SectionInfo *si = Doxygen::sectionDict->find(pd->name());
+    if (si)
+    {
+      t << "    <title>" << convertToXML(convertCharEntitiesToUTF8(filterTitle(si->title))) 
+        << "</title>" << endl;
+    }
   }
   writeInnerPages(pd->getSubPages(),t);
   t << "    <detaileddescription>" << endl;
@@ -1852,7 +1896,6 @@ static void generateXMLForPage(PageDef *pd,FTextStream &ti,bool isExample)
 
 void generateXML()
 {
-
   // + classes
   // + namespaces
   // + files
@@ -1861,42 +1904,6 @@ void generateXML()
   // - examples
   
   QCString outputDirectory = Config_getString("XML_OUTPUT");
-  if (outputDirectory.isEmpty())
-  {
-    outputDirectory=QDir::currentDirPath().utf8();
-  }
-  else
-  {
-    QDir dir(outputDirectory);
-    if (!dir.exists())
-    {
-      dir.setPath(QDir::currentDirPath());
-      if (!dir.mkdir(outputDirectory))
-      {
-        err("error: tag XML_OUTPUT: Output directory `%s' does not "
-            "exist and cannot be created\n",outputDirectory.data());
-        exit(1);
-      }
-      else if (!Config_getBool("QUIET"))
-      {
-        err("notice: Output directory `%s' does not exist. "
-            "I have created it for you.\n", outputDirectory.data());
-      }
-      dir.cd(outputDirectory);
-    }
-    outputDirectory=dir.absPath().utf8();
-  }
-
-  QDir dir(outputDirectory);
-  if (!dir.exists())
-  {
-    dir.setPath(QDir::currentDirPath());
-    if (!dir.mkdir(outputDirectory))
-    {
-      err("Cannot create directory %s\n",outputDirectory.data());
-      return;
-    }
-  }
   QDir xmlDir(outputDirectory);
   createSubDirs(xmlDir);
   QCString fileName=outputDirectory+"/index.xsd";
@@ -1906,7 +1913,7 @@ void generateXML()
     err("Cannot open file %s for writing!\n",fileName.data());
     return;
   }
-  f.writeBlock(index_xsd,strlen(index_xsd));
+  f.writeBlock(index_xsd,qstrlen(index_xsd));
   f.close();
 
   fileName=outputDirectory+"/compound.xsd";
@@ -1916,7 +1923,32 @@ void generateXML()
     err("Cannot open file %s for writing!\n",fileName.data());
     return;
   }
-  f.writeBlock(compound_xsd,strlen(compound_xsd));
+
+  // write compound.xsd, but replace special marker with the entities
+  const char *startLine = compound_xsd;
+  while (*startLine)
+  {
+    // find end of the line
+    const char *endLine = startLine+1;
+    while (*endLine && *(endLine-1)!='\n') endLine++; // skip to end of the line including \n
+    int len=endLine-startLine;
+    if (len>0)
+    {
+      QCString s(len+1);
+      qstrncpy(s.data(),startLine,len);
+      s[len]='\0';
+      if (s.find("<!-- Automatically insert here the HTML entities -->")!=-1)
+      {
+        FTextStream t(&f);
+        HtmlEntityMapper::instance()->writeXMLSchema(t);
+      }
+      else
+      {
+        f.writeBlock(startLine,len);
+      }
+    }
+    startLine=endLine;
+  }
   f.close();
 
   fileName=outputDirectory+"/index.xml";

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -15,7 +15,7 @@
 /******************************************************************************
  * Parser for VHDL subset
  * written by M. Kreis
- * supports VHDL-87/93/2002
+ * supports VHDL-87/93/2008
  * does not support VHDL-AMS
  ******************************************************************************/
 
@@ -27,7 +27,11 @@
 #include <qcstring.h>
 #include <qfileinfo.h>
 #include <qstringlist.h>
-#include "memberdef.h"
+
+//#ifdef DEBUGFLOW
+#include <qmap.h>
+//#endif
+
 /* --------------------------------------------------------------- */
 
 // local includes
@@ -43,26 +47,37 @@
 #include "searchindex.h"
 #include "outputlist.h"
 #include "parserintf.h"
-#include "vhdlscanner.h"
+
 #include "layout.h"
 #include "arguments.h"
 #include "portable.h"
+#include "memberlist.h"
+#include "memberdef.h"
+#include "groupdef.h"
+#include "classlist.h"
+#include "namespacedef.h"
+#include "filename.h"
+#include "membergroup.h"
+#include "memberdef.h"
 
+#include "vhdljjparser.h"
+#include "VhdlParser.h"
+
+#include "vhdlcode.h"
 #define theTranslator_vhdlType VhdlDocGen::trVhdlType
 
 static QDict<QCString> g_vhdlKeyDict0(17,FALSE);
 static QDict<QCString> g_vhdlKeyDict1(17,FALSE);
 static QDict<QCString> g_vhdlKeyDict2(17,FALSE);
-
+static QDict<QCString> g_vhdlKeyDict3(17,FALSE);
 static QDict<QCString> g_xilinxUcfDict(17,FALSE);
 
 static void initUCF(Entry* root,const char* type,QCString &  qcs,int line,QCString & fileName,QCString & brief);
 static void writeUCFLink(const MemberDef* mdef,OutputList &ol);
-static void assignConfiguration(VhdlConfNode* ,QCString);
-static void assignBinding(VhdlConfNode* conf,QCString label);
+static void assignBinding(VhdlConfNode* conf);
 static void addInstance(ClassDef* entity, ClassDef* arch, ClassDef *inst,Entry *cur,ClassDef* archBind=NULL);
 
-//---------- create svg ------------------------------------------------------------- 
+//---------- create svg -------------------------------------------------------------
 static void createSVG();
 static void startDot(FTextStream &t);
 static void startTable(FTextStream &t,const QCString &className);
@@ -73,40 +88,80 @@ static void writeTable(QList<MemberDef>* port,FTextStream & t);
 static void endTabel(FTextStream &t);
 static void writeClassToDot(FTextStream &t,ClassDef* cd);
 static void writeVhdlDotLink(FTextStream &t,const QCString &a,const QCString &b,const QCString &style);
-static void writeVhdlPortToolTip(FTextStream& t,QList<MemberDef>* port,ClassDef *cd);
+//static void writeVhdlPortToolTip(FTextStream& t,QList<MemberDef>* port,ClassDef *cd);
+static const MemberDef *flowMember=0;
 
+void VhdlDocGen::setFlowMember( const MemberDef* mem)
+{
+  flowMember=mem;
+}
 
+const MemberDef* VhdlDocGen::getFlowMember()
+{
+  return flowMember;
+}
 
 
 
 //--------------------------------------------------------------------------------------------------
 static void codify(FTextStream &t,const char *str)
 {
-
   if (str)
-  { 
+  {
     const char *p=str;
     char c;
-      while (*p)
+    while (*p)
     {
       c=*p++;
       switch(c)
       {
-        case '<':  t << "&lt;"; 
+        case '<':  t << "&lt;";
                    break;
-        case '>':  t << "&gt;"; 
+        case '>':  t << "&gt;";
                    break;
-        case '&':  t << "&amp;"; 
+        case '&':  t << "&amp;";
                    break;
         case '\'': t << "&#39;";
                    break;
-        case '"':  t << "&quot;"; 
+        case '"':  t << "&quot;";
                    break;
-        default:   t << c;                  
+        default:   t << c;
                    break;
       }
     }
   }
+}
+
+static void writeLink(const MemberDef* mdef,OutputList &ol)
+{
+  ol.writeObjectLink(mdef->getReference(),
+      mdef->getOutputFileBase(),
+      mdef->anchor(),
+      mdef->name());
+}
+
+static void startFonts(const QCString& q, const char *keyword,OutputList& ol)
+{
+  ol.startFontClass(keyword);
+  ol.docify(q.data());
+  ol.endFontClass();
+}
+
+static QCString splitString(QCString& str,char c)
+{
+  QCString n=str;
+  int i=str.find(c);
+  if (i>0)
+  {
+    n=str.left(i);
+    str=str.remove(0,i+1);
+  }
+  return n;
+}
+
+static int compareString(const QCString& s1,const QCString& s2)
+{
+  return qstricmp(s1.stripWhiteSpace(),s2.stripWhiteSpace());
 }
 
 static void createSVG()
@@ -130,12 +185,12 @@ void VhdlDocGen::writeOverview()
 {
   ClassSDict::Iterator cli(*Doxygen::classSDict);
   ClassDef *cd;
-  bool found=false;
+  bool found=FALSE;
   for ( ; (cd=cli.current()) ; ++cli )
   {
     if ((VhdlDocGen::VhdlClasses)cd->protection()==VhdlDocGen::ENTITYCLASS )
     {
-      found=true;
+      found=TRUE;
       break;
     }
   }
@@ -164,7 +219,7 @@ void VhdlDocGen::writeOverview()
     }
 
     QList<MemberDef>* port= getPorts(cd);
-    if (port==0) 
+    if (port==0)
     {
       continue;
     }
@@ -180,7 +235,7 @@ void VhdlDocGen::writeOverview()
     writeTable(port,t);
     endTabel(t);
 
-    writeVhdlPortToolTip(t,port,cd);
+   // writeVhdlPortToolTip(t,port,cd);
     writeVhdlEntityToolTip(t,cd);
     delete port;
 
@@ -191,7 +246,7 @@ void VhdlDocGen::writeOverview()
       BaseClassDef *bcd;
       for ( ; (bcd=bcli.current()) ; ++bcli )
       {
-        ClassDef *bClass=bcd->classDef; 
+        ClassDef *bClass=bcd->classDef;
         QCString dotn=cd->name()+":";
         dotn+=cd->name();
         QCString csc=bClass->name()+":";
@@ -212,20 +267,20 @@ void VhdlDocGen::writeOverview()
 
 static void startDot(FTextStream &t)
 {
-  t << " digraph G { \n"; 
+  t << " digraph G { \n";
   t << "rankdir=LR \n";
-  t << "concentrate=true\n";
+  t << "concentrate=TRUE\n";
   t << "stylesheet=\"doxygen.css\"\n";
 }
 
 static void endDot(FTextStream &t)
 {
-  t <<" } \n"; 
+  t <<" } \n";
 }
 
 static void startTable(FTextStream &t,const QCString &className)
 {
-  t << className <<" [ shape=none , fontname=\"arial\",  fontcolor=\"blue\" , \n"; 
+  t << className <<" [ shape=none , fontname=\"arial\",  fontcolor=\"blue\" , \n";
   t << "label=<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n";
 }
 
@@ -244,7 +299,7 @@ static void writeVhdlDotLink(FTextStream &t,
 static QCString formatBriefNote(const QCString &brief,ClassDef * cd)
 {
   QRegExp ep("[\n]");
-  QCString vForm;  
+  QCString vForm;
   QCString repl("<BR ALIGN=\"LEFT\"/>");
   QCString file=cd->getDefFileName();
 
@@ -263,13 +318,12 @@ static QCString formatBriefNote(const QCString &brief,ClassDef * cd)
   return vForm;
 }
 
-
+#if 0
 static void writeVhdlPortToolTip(FTextStream& t,QList<MemberDef>* port,ClassDef *cd)
 {
-
+/*
   uint len=port->count();
   MemberDef *md;
-  return; //????
 
   for (uint j=0;j<len;j++)
   {
@@ -288,15 +342,16 @@ static void writeVhdlPortToolTip(FTextStream& t,QList<MemberDef>* port,ClassDef 
     dotn+=md->name();
     //  writeVhdlDotLink(t,dotn,node,"dotted");
   }
+*/
 }
-
+#endif
 
 static void writeVhdlEntityToolTip(FTextStream& t,ClassDef *cd)
 {
 
   QCString brief=cd->briefDescription();
 
-  if (brief.isEmpty()) return;  
+  if (brief.isEmpty()) return;
 
   brief=formatBriefNote(brief,cd);
 
@@ -317,7 +372,7 @@ static void writeColumn(FTextStream &t,MemberDef *md,bool start)
   QCString toolTip;
 
   static QRegExp reg("[%]");
-  bool bidir=(md!=0 &&( stricmp(md->typeString(),"inout")==0));
+  bool bidir=(md!=0 &&( qstricmp(md->typeString(),"inout")==0));
 
   if (md)
   {
@@ -329,10 +384,10 @@ static void writeColumn(FTextStream &t,MemberDef *md,bool start)
         largs=largs.replace(reg," ");
       toolTip+=" [";
       toolTip+=largs;
-      toolTip+="]";	 
+      toolTip+="]";
     }
   }
-  if (start) 
+  if (start)
   {
     t <<"<TR>\n";
   }
@@ -346,11 +401,15 @@ static void writeColumn(FTextStream &t,MemberDef *md,bool start)
     t<<"\" ";
 
     t<<" TOOLTIP=\"";
-    if(!toolTip.isEmpty())
+    if (!toolTip.isEmpty())
+    {
       codify(t,toolTip.data());
-    else{
+    }
+    else
+    {
       QCString largs = md->argsString();
-      if(!largs.isEmpty()){ 
+      if (!largs.isEmpty())
+      {
         largs=largs.replace(reg," ");
         codify(t,largs.data());
       }
@@ -363,7 +422,7 @@ static void writeColumn(FTextStream &t,MemberDef *md,bool start)
   }
   if (!toolTip.isEmpty())
   {
-    // if (!toolTip.isEmpty()) 
+    // if (!toolTip.isEmpty())
 
     if (bidir)
       t << "BGCOLOR=\"orange\">";
@@ -397,7 +456,7 @@ static void writeColumn(FTextStream &t,MemberDef *md,bool start)
 static void endTabel(FTextStream &t)
 {
   t << "</TABLE>>\n";
-  t << "] \n"; 
+  t << "] \n";
 }
 
 static void writeClassToDot(FTextStream &t,ClassDef* cd)
@@ -411,14 +470,14 @@ static void writeClassToDot(FTextStream &t,ClassDef* cd)
   t << "\" ";
   t << ">";
   t << cd->name();
-  t << " </TD></TR>\n"; 
+  t << " </TD></TR>\n";
 }
 
 static QList<MemberDef>* getPorts(ClassDef *cd)
 {
   MemberDef* md;
   QList<MemberDef> *portList=new QList<MemberDef>;
-  MemberList *ml=cd->getMemberList(MemberList::variableMembers);
+  MemberList *ml=cd->getMemberList(MemberListType_variableMembers);
 
   if (ml==0) return NULL;
 
@@ -430,7 +489,7 @@ static QList<MemberDef>* getPorts(ClassDef *cd)
     {
       portList->append(md);
     }
-  } 
+  }
 
   return portList;
 }
@@ -465,7 +524,7 @@ static void writeTable(QList<MemberDef>* port,FTextStream & t)
   int outp = outPorts.count();
   int maxLen;
 
-  if (inp>=outp) 
+  if (inp>=outp)
   {
     maxLen=inp;
   }
@@ -481,23 +540,23 @@ static void writeTable(QList<MemberDef>* port,FTextStream & t)
     if (i<inp)
     {
       md=(MemberDef*)inPorts.at(i);
-      writeColumn(t,md,true);
+      writeColumn(t,md,TRUE);
     }
     else
     {
-      writeColumn(t,NULL,true);
+      writeColumn(t,NULL,TRUE);
     }
 
     if (i<outp)
     {
       md=(MemberDef*)outPorts.at(i);
-      writeColumn(t,md,false);
+      writeColumn(t,md,FALSE);
     }
     else
     {
-      writeColumn(t,NULL,false);
+      writeColumn(t,NULL,FALSE);
     }
-  }	
+  }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -540,6 +599,7 @@ const char* g_vhdlKeyWordMap0[] =
   0
 };
 
+
 // type
 const char* g_vhdlKeyWordMap1[] =
 {
@@ -555,12 +615,21 @@ const char* g_vhdlKeyWordMap2[] =
   "sll",0
 };
 
+// predefined attributes
+const char* g_vhdlKeyWordMap3[] =
+{
+"base","left","right","high","low","ascending",
+"image","value","pos","val","succ","pred","leftof","rightof","left","right","high","low",
+"range","reverse_range","length","ascending","delayed","stable","quiet","transaction","event",
+"active","last_event","last_active","last_value","driving","driving_value","simple_name","instance_name","path_name",0
+};
+
   int j=0;
   g_vhdlKeyDict0.setAutoDelete(TRUE);
   g_vhdlKeyDict1.setAutoDelete(TRUE);
   g_vhdlKeyDict2.setAutoDelete(TRUE);
+  g_vhdlKeyDict3.setAutoDelete(TRUE);
 
-  j=0;
   while (g_vhdlKeyWordMap0[j])
   {
     g_vhdlKeyDict0.insert(g_vhdlKeyWordMap0[j],
@@ -584,41 +653,45 @@ const char* g_vhdlKeyWordMap2[] =
     j++;
   }
 
+  j=0;
+  while (g_vhdlKeyWordMap3[j])
+  {
+    g_vhdlKeyDict3.insert(g_vhdlKeyWordMap3[j],
+	               new QCString(g_vhdlKeyWordMap3[j]));
+    j++;
+  }
+
 }// buildKeyMap
 
 /*!
  * returns the color of a keyword
  */
 
-QCString* VhdlDocGen::findKeyWord(const QCString& word)
+QCString* VhdlDocGen::findKeyWord(const QCString& tmp)
 {
-  static  QCString g_vhdlkeyword("vhdlkeyword");
-  static  QCString g_vhdltype("comment");
-  static  QCString g_vhdllogic("vhdllogic");
+  static  QCString vhdlkeyword("vhdlkeyword");
+  static  QCString vhdltype("comment");
+  static  QCString vhdllogic("vhdllogic");
+  static  QCString preprocessor("keywordflow");
+
+  QCString word=tmp.lower();
 
   if (word.isEmpty() || word.at(0)=='\0') return 0;
-  //printf("VhdlDocGen::findKeyWord(%s)\n",word.data());
 
-  if (g_vhdlKeyDict0.find(word.lower()))
-    return &g_vhdlkeyword;
+  if (g_vhdlKeyDict0.find(word))
+    return &preprocessor;
 
-  if (g_vhdlKeyDict1.find(word.lower()))
-    return &g_vhdltype;
+  if (g_vhdlKeyDict1.find(word))
+    return &vhdltype;
 
-  if (g_vhdlKeyDict2.find(word.lower()))
-    return &g_vhdllogic;
+  if (g_vhdlKeyDict2.find(word))
+    return &vhdllogic;
+
+   if (g_vhdlKeyDict3.find(word))
+    return &vhdlkeyword;
 
   return 0;
 }
-
-/*!
- * returns the parsed entry at line xxx
- */
-
-
-
-bool found =FALSE;
-static Entry eMerge;
 
 ClassDef *VhdlDocGen::getClass(const char *name)
 {
@@ -632,9 +705,6 @@ ClassDef *VhdlDocGen::getClass(const char *name)
   return cd;
 }
 
-
-
-
 ClassDef* VhdlDocGen::getPackageName(const QCString & name)
 {
   ClassDef* cd=0;
@@ -644,20 +714,22 @@ ClassDef* VhdlDocGen::getPackageName(const QCString & name)
   return cd;
 }
 
+static QMap<QCString,MemberDef*> varMap;
+static QList<ClassDef> qli;
+static QMap<ClassDef*,QList<ClassDef> > packages;
+
 MemberDef* VhdlDocGen::findMember(const QCString& className, const QCString& memName)
 {
-  QDict<QCString> packages(17,FALSE);
-  packages.setAutoDelete(TRUE);
-  ClassDef* cd;
+  ClassDef* cd,*ecd;
   MemberDef *mdef=0;
 
   cd=getClass(className);
   //printf("VhdlDocGen::findMember(%s,%s)=%p\n",className.data(),memName.data(),cd);
   if (cd==0) return 0;
 
-  mdef=VhdlDocGen::findMemberDef(cd,memName,MemberList::variableMembers);
+  mdef=VhdlDocGen::findMemberDef(cd,memName,MemberListType_variableMembers);
   if (mdef) return mdef;
-  mdef=VhdlDocGen::findMemberDef(cd,memName,MemberList::pubMethods);
+  mdef=VhdlDocGen::findMemberDef(cd,memName,MemberListType_pubMethods);
   if (mdef) return mdef;
 
   // nothing found so far
@@ -670,7 +742,7 @@ MemberDef* VhdlDocGen::findMember(const QCString& className, const QCString& mem
     // searching upper/lower case names
 
     QCString tt=d->name();
-    ClassDef *ecd =getClass(tt);
+    ecd =getClass(tt);
     if (!ecd)
     {
       tt=tt.upper();
@@ -685,17 +757,14 @@ MemberDef* VhdlDocGen::findMember(const QCString& className, const QCString& mem
     if (ecd) //d && d->definitionType()==Definition::TypeClass)
     {
       //ClassDef *ecd = (ClassDef*)d;
-      mdef=VhdlDocGen::findMemberDef(ecd,memName,MemberList::variableMembers);
+      mdef=VhdlDocGen::findMemberDef(ecd,memName,MemberListType_variableMembers);
       if (mdef) return mdef;
-      mdef=VhdlDocGen::findMemberDef(cd,memName,MemberList::pubMethods);
+      mdef=VhdlDocGen::findMemberDef(cd,memName,MemberListType_pubMethods);
       if (mdef) return mdef;
     }
-    //cd=getClass(getClassName(cd));
-    //if (!cd) return 0;
-  }
-  // nothing found , so we are now searching all included packages
-  VhdlDocGen::findAllPackages(className,packages);
-  //cd=getClass(className.data());
+   }
+
+
   if ((VhdlDocGen::VhdlClasses)cd->protection()==VhdlDocGen::ARCHITECTURECLASS ||
       (VhdlDocGen::VhdlClasses)cd->protection()==VhdlDocGen::PACKBODYCLASS)
   {
@@ -713,60 +782,88 @@ MemberDef* VhdlDocGen::findMember(const QCString& className, const QCString& mem
       tt=tt.lower();
       ecd =getClass(tt);
     }
-
     if (ecd) //d && d->definitionType()==Definition::TypeClass)
     {
-      VhdlDocGen::findAllPackages(ecd->className(),packages);
+      if(!packages.contains(ecd))
+      {
+        VhdlDocGen::findAllPackages(ecd);
+      }
     }
   }
-
-  QDictIterator<QCString> packli(packages);
-  QCString *curString;
-  for (packli.toFirst();(curString=packli.current());++packli)
+  else
   {
-    if (curString)
+    ecd=cd;
+    if (!packages.contains(ecd)) VhdlDocGen::findAllPackages(ecd);
+  }
+
+  uint len=packages.count();
+  for (uint j=0;j<len;j++)
+  {
+    for (QMap<ClassDef*,QList<ClassDef> >::Iterator cList=packages.begin();cList != packages.end();cList++)
     {
-      cd=VhdlDocGen::getPackageName(*curString);
-      if (!cd)
+      if (cList.key()==0) continue;
+      QList<ClassDef> mlist=cList.data();
+      for (uint j=0;j<mlist.count();j++)
       {
-        *curString=curString->upper();
-        cd=VhdlDocGen::getPackageName(*curString);
-      }
-      if (!cd)
-      {
-        *curString=curString->lower();
-        cd=VhdlDocGen::getPackageName(*curString);
+        mdef=VhdlDocGen::findMemberDef(mlist.at(j),memName,MemberListType_variableMembers);
+        if (mdef) return mdef;
+        mdef=VhdlDocGen::findMemberDef(mlist.at(j),memName,MemberListType_pubMethods);
+        if (mdef) return mdef;
       }
     }
-    if (cd)
-    {
-      mdef=VhdlDocGen::findMemberDef(cd,memName,MemberList::variableMembers);
-      if (mdef)  return mdef;
-      mdef=VhdlDocGen::findMemberDef(cd,memName,MemberList::pubMethods);
-      if (mdef) return mdef;
-    }
-  } // for
+  }
   return 0;
+
 }//findMember
 
 /**
  *  This function returns the entity|package
  *  in which the key (type) is found
  */
-
-MemberDef* VhdlDocGen::findMemberDef(ClassDef* cd,const QCString& key,MemberList::ListType type)
+MemberDef* VhdlDocGen::findMemberDef(ClassDef* cd,const QCString& key,MemberListType type)
 {
-  //    return cd->getMemberByName(key);//does not work
   MemberDef *md=0;
+  MemberList *ml=0;
+  QCString keyType=cd->symbolName()+"@"+key;
+  //printf("\n %s | %s | %s",cd->symbolName().data(),key.data(,),keyType.data());
 
-  MemberList *ml=    cd->getMemberList(type);
-  if (ml==0) return 0;
-
+  QMap<QCString, MemberDef*>::Iterator it =varMap.find(keyType);
+  if (it.key())
+  {
+    md=it.data();
+    if (md)
+    {
+      return md;
+    }
+  }
+  if (qli.contains(cd))
+  {
+    return 0;
+  }
+  ml=cd->getMemberList(type);
+  qli.append(cd);
+  if (!ml)
+  {
+    return 0;
+  }
   MemberListIterator fmni(*ml);
+  //int l=ml->count();
+  //	fprintf(stderr,"\n loading enity %s %s: %d",cd->symbolName().data(),keyType.data(),l);
 
   for (fmni.toFirst();(md=fmni.current());++fmni)
   {
-    if (stricmp(key.data(),md->name().data())==0)
+    QCString tkey=cd->symbolName()+"@"+md->name();
+    if (varMap.contains(tkey))
+    {
+      continue;
+    }
+    varMap.insert(tkey.data(),md);
+  }
+  it=varMap.find(keyType.data());
+  if (it.key())
+  {
+    md=it.data();
+    if (md)
     {
       return md;
     }
@@ -778,42 +875,30 @@ MemberDef* VhdlDocGen::findMemberDef(ClassDef* cd,const QCString& key,MemberList
  * finds all included packages of an Entity or Package
  */
 
-void VhdlDocGen::findAllPackages(const QCString& className,QDict<QCString>& qdict)
+void VhdlDocGen::findAllPackages( ClassDef *cdef)
 {
-  ClassDef *cdef=getClass(className);
-  if (cdef)
-  {
-    MemberList *mem=cdef->getMemberList(MemberList::variableMembers);
-    MemberDef *md;
+  QList<ClassDef> cList;
+  if (packages.contains(cdef)) return;
+  MemberList *mem=cdef->getMemberList(MemberListType_variableMembers);
+  MemberDef *md;
 
-    if (mem)
+  if (!mem) return;
+
+  MemberListIterator fmni(*mem);
+  for (fmni.toFirst();(md=fmni.current());++fmni)
+  {
+    if (VhdlDocGen::isPackage(md))
     {
-      MemberListIterator fmni(*mem);
-      for (fmni.toFirst();(md=fmni.current());++fmni)
+      ClassDef* cd=VhdlDocGen::getPackageName(md->name());
+      if (cd)
       {
-        if (VhdlDocGen::isPackage(md))
-        {
-          QCString *temp1=new QCString(md->name().data());
-          //*temp1=temp1->lower();
-          QCString p(md->name().data());
-          //p=p.lower();
-          ClassDef* cd=VhdlDocGen::getPackageName(*temp1);
-          if (cd)
-          {
-            QCString *ss=qdict.find(*temp1);
-            if (ss==0)
-            {
-              qdict.insert(p,temp1);
-              QCString tmp=cd->className();
-              VhdlDocGen::findAllPackages(tmp,qdict);
-            }
-            else delete temp1;
-          }
-          else delete temp1;
-        }
-      }//for
-    }//if
-  }//cdef
+        cList.append(cd);
+        VhdlDocGen::findAllPackages(cd);
+        packages.insert(cdef,cList);
+      }
+    }
+  }//for
+
 }// findAllPackages
 
 /*!
@@ -830,12 +915,7 @@ MemberDef* VhdlDocGen::findFunction(const QList<Argument> &ql,
   ClassDef *cdef=getClass(package.data());
   if (cdef==0) return 0;
 
-  //if (type)
-  //  funcType=VhdlDocGen::PROCEDURE;
-  //else
-  //  funcType=VhdlDocGen::FUNCTION;
-
-  MemberList *mem=cdef->getMemberList(MemberList::pubMethods);
+  MemberList *mem=cdef->getMemberList(MemberListType_pubMethods);
 
   if (mem)
   {
@@ -843,13 +923,13 @@ MemberDef* VhdlDocGen::findFunction(const QList<Argument> &ql,
     for (fmni.toFirst();(mdef=fmni.current());++fmni)
     {
       QCString mname=mdef->name();
-      if ((VhdlDocGen::isProcedure(mdef) || VhdlDocGen::isVhdlFunction(mdef)) && (VhdlDocGen::compareString(funcname,mname)==0))
+      if ((VhdlDocGen::isProcedure(mdef) || VhdlDocGen::isVhdlFunction(mdef)) && (compareString(funcname,mname)==0))
       {
-        LockingPtr<ArgumentList> alp = mdef->argumentList();
+        ArgumentList *alp = mdef->argumentList();
 
         //  ArgumentList* arg2=mdef->getArgumentList();
         if (alp==0) break;
-        ArgumentListIterator ali(*alp.pointer());
+        ArgumentListIterator ali(*alp);
         ArgumentListIterator ali1(ql);
 
         if (ali.count() != ali1.count()) break;
@@ -860,18 +940,18 @@ MemberDef* VhdlDocGen::findFunction(const QList<Argument> &ql,
         for (;(arg=ali.current());++ali)
         {
           arg1=ali1.current(); ++ali1;
-          equ+=abs(VhdlDocGen::compareString(arg->type,arg1->type));
+          equ+=abs(compareString(arg->type,arg1->type));
 
           QCString s1=arg->type;
           QCString s2=arg1->type;
           VhdlDocGen::deleteAllChars(s1,' ');
           VhdlDocGen::deleteAllChars(s2,' ');
-          equ+=abs(VhdlDocGen::compareString(s1,s2));
+          equ+=abs(compareString(s1,s2));
           s1=arg->attrib;
           s2=arg1->attrib;
           VhdlDocGen::deleteAllChars(s1,' ');
           VhdlDocGen::deleteAllChars(s2,' ');
-          equ+=abs(VhdlDocGen::compareString(s1,s2));
+          equ+=abs(compareString(s1,s2));
           // printf("\n 1. type [%s] name [%s] attrib [%s]",arg->type,arg->name,arg->attrib);
           // printf("\n 2. type [%s] name [%s] attrib [%s]",arg1->type,arg1->name,arg1->attrib);
         } // for
@@ -915,13 +995,7 @@ QCString VhdlDocGen::getClassName(const ClassDef* cd)
     temp.stripPrefix("_");
     return temp;
   }
-  //if ((VhdlDocGen::VhdlClasses)cd->protection()==VhdlDocGen::ARCHITECTURECLASS)
-  //{
-  //  QStringList qlist=QStringList::split("-",cd->className(),FALSE);
-  //  if (qlist.count()>1)
-  //    return (QCString)qlist[1];
-  //  return "";
-  //}
+
   return substitute(cd->className(),"::",".");
 }
 
@@ -1014,9 +1088,9 @@ void VhdlDocGen::findAllArchitectures(QList<QCString>& qll,const ClassDef *cd)
     {
       QStringList ql=QStringList::split("-",jj,FALSE);
       QCString temp=ql[1].utf8();
-      if (stricmp(cd->className().data(),temp.data())==0)
+      if (qstricmp(cd->className(),temp)==0)
       {
-        QCString *cl=new QCString(jj.data());
+        QCString *cl=new QCString(jj);
         qll.insert(0,cl);
       }
     }
@@ -1068,14 +1142,6 @@ void VhdlDocGen::writeVhdlLink(const ClassDef* ccd ,OutputList& ol,QCString& typ
   ol.lineBreak();
 }
 
-bool VhdlDocGen::compareString(const QCString& s1,const QCString& s2)
-{
-  QCString str1=s1.stripWhiteSpace();
-  QCString str2=s2.stripWhiteSpace();
-
-  return stricmp(str1.data(),str2.data());
-}
-
 
 /*!
  * strips the "--" prefixes of vhdl comments
@@ -1083,15 +1149,13 @@ bool VhdlDocGen::compareString(const QCString& s1,const QCString& s2)
 void VhdlDocGen::prepareComment(QCString& qcs)
 {
   const char* s="--!";
-  //const char *start="--!{";
-  //const char *end="--!}";
   int index=0;
 
   while (TRUE)
   {
     index=qcs.find(s,0,TRUE);
     if (index<0) break;
-    qcs=qcs.remove(index,strlen(s));
+    qcs=qcs.remove(index,qstrlen(s));
   }
   qcs=qcs.stripWhiteSpace();
 }
@@ -1189,7 +1253,7 @@ QCString VhdlDocGen::getProtectionName(int prot)
   return "";
 }
 
-QCString VhdlDocGen::trTypeString(int type)
+QCString VhdlDocGen::trTypeString(uint64 type)
 {
   switch(type)
   {
@@ -1308,16 +1372,16 @@ void VhdlDocGen::writeFormatString(const QCString& s,OutputList&ol,const MemberD
       find=find.left(j);
       buf[0]=temp[j];
       ss=VhdlDocGen::findKeyWord(find);
-      bool k=VhdlDocGen::isNumber(find); // is this a number
+      bool k=isNumber(find); // is this a number
       if (k)
       {
         ol.docify(" ");
-        VhdlDocGen::startFonts(find,"vhdldigit",ol);
+        startFonts(find,"vhdldigit",ol);
         ol.docify(" ");
       }
       else if (j != 0 && ss)
       {
-        VhdlDocGen::startFonts(find,ss->data(),ol);
+        startFonts(find,ss->data(),ol);
       }
       else
       {
@@ -1326,7 +1390,7 @@ void VhdlDocGen::writeFormatString(const QCString& s,OutputList&ol,const MemberD
           VhdlDocGen::writeStringLink(mdef,find,ol);
         }
       }
-      VhdlDocGen::startFonts(&buf[0],"vhdlchar",ol);
+      startFonts(&buf[0],"vhdlchar",ol);
 
       QCString st=temp.remove(0,j+1);
       find=st;
@@ -1336,7 +1400,7 @@ void VhdlDocGen::writeFormatString(const QCString& s,OutputList&ol,const MemberD
         if (ii>1)
         {
           QCString com=find.left(ii+1);
-          VhdlDocGen::startFonts(com,"keyword",ol);
+          startFonts(com,"keyword",ol);
           temp=find.remove(0,ii+1);
         }
       }
@@ -1349,7 +1413,7 @@ void VhdlDocGen::writeFormatString(const QCString& s,OutputList&ol,const MemberD
   }//if
   else
   {
-    VhdlDocGen::startFonts(find,"vhdlchar",ol);
+    startFonts(find,"vhdlchar",ol);
   }
   ol.endBold();
 }// writeFormatString
@@ -1357,7 +1421,6 @@ void VhdlDocGen::writeFormatString(const QCString& s,OutputList&ol,const MemberD
 /*!
  * returns TRUE if this string is a number
  */
-
 bool VhdlDocGen::isNumber(const QCString& s)
 {
   static QRegExp regg("[0-9][0-9eEfFbBcCdDaA_.#-+?xXzZ]*");
@@ -1370,12 +1433,6 @@ bool VhdlDocGen::isNumber(const QCString& s)
 
 }// isNumber
 
-void VhdlDocGen::startFonts(const QCString& q, const char *keyword,OutputList& ol)
-{
-  ol.startFontClass(keyword);
-  ol.docify(q.data());
-  ol.endFontClass();
-}
 
 /*!
  * inserts white spaces for  better readings
@@ -1465,16 +1522,18 @@ void VhdlDocGen::writeProcedureProto(OutputList& ol,const ArgumentList* al,const
     arg->defval+=" ";
     if (str)
     {
-      VhdlDocGen::startFonts(arg->defval,str->data(),ol);
+      startFonts(arg->defval,str->data(),ol);
     }
     else
     {
-      VhdlDocGen::startFonts(arg->defval,"vhdlchar",ol); // write type (variable,constant etc.)
+      startFonts(arg->defval,"vhdlchar",ol); // write type (variable,constant etc.)
     }
 
-    VhdlDocGen::startFonts(nn,"vhdlchar",ol); // write name
-    if (stricmp(arg->attrib.data(),arg->type.data()) != 0)
-      VhdlDocGen::startFonts(arg->attrib.lower(),"stringliteral",ol); // write in|out
+    startFonts(nn,"vhdlchar",ol); // write name
+    if (qstricmp(arg->attrib,arg->type) != 0)
+    {
+      startFonts(arg->attrib.lower(),"stringliteral",ol); // write in|out
+    }
     ol.docify(" ");
     VhdlDocGen::formatString(arg->type,ol,mdef);
     sem=TRUE;
@@ -1520,7 +1579,8 @@ void VhdlDocGen::writeFunctionProto(OutputList& ol,const ArgumentList* al,const 
       ol.docify(" , ");
     }
 
-    if (bGen) {
+    if (bGen)
+    {
       VhdlDocGen::formatString(QCString("generic "),ol,mdef);
     }
     if (!att.isEmpty())
@@ -1530,23 +1590,23 @@ void VhdlDocGen::writeFunctionProto(OutputList& ol,const ArgumentList* al,const 
       if (str)
         VhdlDocGen::formatString(att,ol,mdef);
       else
-        VhdlDocGen::startFonts(att,"vhdlchar",ol);
+        startFonts(att,"vhdlchar",ol);
     }
 
     QCString nn=arg->name;
     nn+=": ";
     QCString ss=arg->type.stripWhiteSpace(); //.lower();
     QCString w=ss.stripWhiteSpace();//.upper();
-    VhdlDocGen::startFonts(nn,"vhdlchar",ol);
-    VhdlDocGen::startFonts("in ","stringliteral",ol);
+    startFonts(nn,"vhdlchar",ol);
+    startFonts("in ","stringliteral",ol);
     QCString *str=VhdlDocGen::findKeyWord(ss);
     if (str)
       VhdlDocGen::formatString(w,ol,mdef);
     else
-      VhdlDocGen::startFonts(w,"vhdlchar",ol);
+      startFonts(w,"vhdlchar",ol);
 
     if (arg->attrib)
-      VhdlDocGen::startFonts(arg->attrib,"vhdlchar",ol);
+      startFonts(arg->attrib,"vhdlchar",ol);
 
 
     sem=TRUE;
@@ -1590,7 +1650,7 @@ void VhdlDocGen::writeProcessProto(OutputList& ol,const ArgumentList* al,const M
       ol.docify(" , ");
     }
     QCString nn=arg->name;
-    // VhdlDocGen::startFonts(nn,"vhdlchar",ol);
+    // startFonts(nn,"vhdlchar",ol);
     VhdlDocGen::writeFormatString(nn,ol,mdef);
     sem=TRUE;
   }
@@ -1603,13 +1663,13 @@ void VhdlDocGen::writeProcessProto(OutputList& ol,const ArgumentList* al,const M
  * writes a function|procedure documentation to the output
  */
 
-void VhdlDocGen::writeFuncProcDocu(
+bool VhdlDocGen::writeFuncProcDocu(
     const MemberDef *md,
     OutputList& ol,
     const ArgumentList* al,
     bool /*type*/)
 {
-  if (al==0) return;
+  if (al==0) return FALSE;
   //bool sem=FALSE;
   ol.enableAll();
 
@@ -1618,8 +1678,9 @@ void VhdlDocGen::writeFuncProcDocu(
   if (index==0)
   {
     ol.docify(" ( ) ");
-    return;
+    return FALSE;
   }
+  ol.endMemberDocName();
   ol.startParameterList(TRUE);
   //ol.startParameterName(FALSE);
   Argument *arg;
@@ -1643,7 +1704,6 @@ void VhdlDocGen::writeFuncProcDocu(
 
     ol.startParameterName(TRUE);
     VhdlDocGen::writeFormatString(arg->name,ol,md);
-    ol.docify(" : ");
 
     if (VhdlDocGen::isProcedure(md))
     {
@@ -1683,6 +1743,7 @@ void VhdlDocGen::writeFuncProcDocu(
     first=FALSE;
   }
   //ol.endParameterList();
+  return TRUE;
 
 } // writeDocFunProc
 
@@ -1773,27 +1834,27 @@ static void setGlobalType(MemberList *ml)
   {
     QCString l=mdd->typeString();
 
-    if (strcmp(mdd->argsString(),"package")==0)
+    if (qstrcmp(mdd->argsString(),"package")==0)
     {
  	mdd->setMemberSpecifiers(VhdlDocGen::INSTANTIATION);
     }
-    else if (strcmp(mdd->argsString(),"configuration")==0)
+    else if (qstrcmp(mdd->argsString(),"configuration")==0)
     {
       mdd->setMemberSpecifiers(VhdlDocGen::CONFIG);
     }
-    else if (strcmp(mdd->typeString(),"library")==0)
+    else if (qstrcmp(mdd->typeString(),"library")==0)
     {
       mdd->setMemberSpecifiers(VhdlDocGen::LIBRARY);
     }
-    else if (strcmp(mdd->typeString(),"use")==0)
+    else if (qstrcmp(mdd->typeString(),"use")==0)
     {
       mdd->setMemberSpecifiers(VhdlDocGen::USE);
     }
-    else if (stricmp(mdd->typeString(),"misc")==0)
+    else if (qstricmp(mdd->typeString(),"misc")==0)
     {
       mdd->setMemberSpecifiers(VhdlDocGen::MISCELLANEOUS);
     }
-    else if (stricmp(mdd->typeString(),"ucf_const")==0)
+    else if (qstricmp(mdd->typeString(),"ucf_const")==0)
     {
       mdd->setMemberSpecifiers(VhdlDocGen::UCF_CONST);
     }
@@ -1801,11 +1862,12 @@ static void setGlobalType(MemberList *ml)
 }
 
 /* writes a vhdl type documentation */
-void VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definition *d, OutputList &ol)
+bool VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definition *d, OutputList &ol)
 {
   ClassDef *cd=(ClassDef*)d;
+  bool hasParams = FALSE;
 
-  if (cd==0) return;
+  if (cd==0) return hasParams;
 
   QCString ttype=mdef->typeString();
   QCString largs=mdef->argsString();
@@ -1832,7 +1894,7 @@ void VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definit
       ol.docify(" ");
     }
     ol.docify(mdef->name());
-    VhdlDocGen::writeFuncProcDocu(mdef,ol, mdef->argumentList().pointer());
+    hasParams = VhdlDocGen::writeFuncProcDocu(mdef,ol, mdef->argumentList());
   }
 
 
@@ -1845,14 +1907,14 @@ void VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definit
 
       largs=largs.replace(QRegExp("#")," ");
       VhdlDocGen::formatString(largs,ol,mdef);
-      return;
+      return hasParams;
     }
     else
     {
       writeLink(mdef,ol);
       if (VhdlDocGen::isLibrary(mdef) || VhdlDocGen::isPackage(mdef))
       {
-        return;
+        return hasParams;
       }
       ol.docify(" ");
     }
@@ -1870,7 +1932,7 @@ void VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definit
       if (c)
 	  largs=ttype;
       VhdlDocGen::writeRecUnitDocu(mdef,ol,largs);
-      return;
+      return hasParams;
     }
 
     ol.docify(" ");
@@ -1881,6 +1943,7 @@ void VhdlDocGen::writeVHDLTypeDocumentation(const MemberDef* mdef, const Definit
       ol.docify(" ");
     }
   }
+  return hasParams;
 }
 
 /* writes a vhdl type declaration */
@@ -1890,21 +1953,9 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
     bool /*inGroup*/)
 {
   static QRegExp reg("[%]");
-  LockingPtr<MemberDef> lock(mdef,mdef);
 
   Definition *d=0;
 
-  /* some vhdl files contain only a configuration  description
-
-     library work;
-     configuration cfg_tb_jtag_gotoBackup of tb_jtag_gotoBackup is
-     for RTL
-     end for;
-     end cfg_tb_jtag_gotoBackup;
-
-     in this case library work does not belong to an entity, package ...
-
-   */
 
   ASSERT(cd!=0 || nd!=0 || fd!=0 || gd!=0 ||
       mdef->getMemberSpecifiers()==VhdlDocGen::LIBRARY ||
@@ -1949,9 +2000,9 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
     Doxygen::tagFile << "      <anchor>" << convertToXML(mdef->anchor()) << "</anchor>" << endl;
 
     if (VhdlDocGen::isVhdlFunction(mdef))
-      Doxygen::tagFile << "      <arglist>" << convertToXML(VhdlDocGen::convertArgumentListToString(mdef->argumentList().pointer(),TRUE)) << "</arglist>" << endl;
+      Doxygen::tagFile << "      <arglist>" << convertToXML(VhdlDocGen::convertArgumentListToString(mdef->argumentList(),TRUE)) << "</arglist>" << endl;
     else if (VhdlDocGen::isProcedure(mdef))
-      Doxygen::tagFile << "      <arglist>" << convertToXML(VhdlDocGen::convertArgumentListToString(mdef->argumentList().pointer(),FALSE)) << "</arglist>" << endl;
+      Doxygen::tagFile << "      <arglist>" << convertToXML(VhdlDocGen::convertArgumentListToString(mdef->argumentList(),FALSE)) << "</arglist>" << endl;
     else
       Doxygen::tagFile << "      <arglist>" << convertToXML(mdef->argsString()) << "</arglist>" << endl;
 
@@ -1963,7 +2014,7 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
   // write search index info
   if (Doxygen::searchIndex)
   {
-    Doxygen::searchIndex->setCurrentDoc(mdef->qualifiedName(),mdef->getOutputFileBase(),mdef->anchor());
+    Doxygen::searchIndex->setCurrentDoc(mdef,mdef->anchor(),FALSE);
     Doxygen::searchIndex->addWord(mdef->localName(),TRUE);
     Doxygen::searchIndex->addWord(mdef->qualifiedName(),FALSE);
   }
@@ -1979,9 +2030,13 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
   ClassDef *annoClassDef=mdef->getClassDefOfAnonymousType();
 
   // start a new member declaration
-  bool isAnonymous = annoClassDef; // || m_impl->annMemb || m_impl->annEnumType;
+  uint isAnonymous = (bool)(annoClassDef); // || m_impl->annMemb || m_impl->annEnumType;
   ///printf("startMemberItem for %s\n",name().data());
-  ol.startMemberItem( mdef->anchor(), isAnonymous ); //? 1 : m_impl->tArgList ? 3 : 0);
+  int mm=mdef->getMemberSpecifiers();
+  if (mm==VhdlDocGen::MISCELLANEOUS)
+      isAnonymous=3;
+
+   ol.startMemberItem( mdef->anchor(), isAnonymous ); //? 1 : m_impl->tArgList ? 3 : 0);
 
   // If there is no detailed description we need to write the anchor here.
   bool detailsVisible = mdef->isDetailedSectionLinkable();
@@ -2003,22 +2058,21 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
   /*VHDL CHANGE */
   bool bRec,bUnit;
   QCString ltype(mdef->typeString());
-  ltype=ltype.replace(reg," ");
+ // ltype=ltype.replace(reg," ");
   QCString largs(mdef->argsString());
-  largs=largs.replace(reg," ");
-  int mm=mdef->getMemberSpecifiers();
+ // largs=largs.replace(reg," ");
   mdef->setType(ltype.data());
   mdef->setArgsString(largs.data());
   //ClassDef * plo=mdef->getClassDef();
   ClassDef *kl=0;
-  LockingPtr<ArgumentList> alp = mdef->argumentList();
+  ArgumentList *alp = mdef->argumentList();
   QCString nn;
   //VhdlDocGen::adjustRecordMember(mdef);
   if (gd) gd=0;
-  switch(mm)
+  switch (mm)
   {
     case VhdlDocGen::MISCELLANEOUS:
-      VhdlDocGen::writeCodeFragment(mdef,ol);
+      VhdlDocGen::writeSource(mdef,ol,nn);
       break;
     case VhdlDocGen::PROCEDURE:
     case VhdlDocGen::FUNCTION:
@@ -2030,10 +2084,10 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
 
       writeLink(mdef,ol);
       if (alp!=0 && mm==VhdlDocGen::FUNCTION)
-        VhdlDocGen::writeFunctionProto(ol,alp.pointer(),mdef);
+        VhdlDocGen::writeFunctionProto(ol,alp,mdef);
 
       if (alp!=0 && mm==VhdlDocGen::PROCEDURE)
-        VhdlDocGen::writeProcedureProto(ol,alp.pointer(),mdef);
+        VhdlDocGen::writeProcedureProto(ol,alp,mdef);
 
       break;
     case VhdlDocGen::USE:
@@ -2096,7 +2150,7 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
     case VhdlDocGen::PROCESS:
       writeLink(mdef,ol);
       ol.insertMemberAlign();
-      VhdlDocGen::writeProcessProto(ol,alp.pointer(),mdef);
+      VhdlDocGen::writeProcessProto(ol,alp,mdef);
       break;
     case VhdlDocGen::PACKAGE:
     case VhdlDocGen::ENTITY:
@@ -2192,17 +2246,17 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
       bRec=largs.stripPrefix("record") ;
       bUnit=largs.stripPrefix("units") ;
       ol.startBold();
-      if (bRec)
-        ol.docify("record: ");
-      if (bUnit)
-        ol.docify("units: ");
+      if (bRec)  ol.docify("record: ");
+      if (bUnit) ol.docify("units: ");
       writeLink(mdef,ol);
       ol.insertMemberAlign();
-      if (!bRec)
-        VhdlDocGen::formatString(ltype,ol,mdef);
+      if (!bRec && !bUnit) VhdlDocGen::formatString(ltype,ol,mdef);
       if (bUnit) ol.lineBreak();
       if (bRec || bUnit)
+      {
         writeRecorUnit(largs,ol,mdef);
+        mdef->setType("");
+      }
       ol.endBold();
       break;
 
@@ -2226,13 +2280,13 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
     ol.endDoxyAnchor(cfname,mdef->anchor());
   }
 
-  //printf("endMember %s annoClassDef=%p annEnumType=%p\n",
   //    name().data(),annoClassDef,annEnumType);
+ // if(mm!=VhdlDocGen::MISCELLANEOUS)
   ol.endMemberItem();
   if (!mdef->briefDescription().isEmpty() &&   Config_getBool("BRIEF_MEMBER_DESC") /* && !annMemb */)
   {
     ol.startMemberDescription(mdef->anchor());
-    ol.parseDoc(mdef->briefFile(),mdef->briefLine(),
+    ol.generateDoc(mdef->briefFile(),mdef->briefLine(),
         mdef->getOuterScope()?mdef->getOuterScope():d,
         mdef,mdef->briefDescription(),TRUE,FALSE,0,TRUE,FALSE);
     if (detailsVisible)
@@ -2261,22 +2315,12 @@ void VhdlDocGen::writeVHDLDeclaration(MemberDef* mdef,OutputList &ol,
 }// end writeVhdlDeclaration
 
 
-void VhdlDocGen::writeLink(const MemberDef* mdef,OutputList &ol)
-{
-  ol.writeObjectLink(mdef->getReference(),
-      mdef->getOutputFileBase(),
-      mdef->anchor(),
-      mdef->name());
-}
-
 void VhdlDocGen::writePlainVHDLDeclarations(
     MemberList* mlist,OutputList &ol,
     ClassDef *cd,NamespaceDef *nd,FileDef *fd,GroupDef *gd,int specifier)
 {
 
   SDict<QCString> pack(1009);
-
-  ol.pushGeneratorState();
 
   bool first=TRUE;
   MemberDef *md;
@@ -2286,7 +2330,7 @@ void VhdlDocGen::writePlainVHDLDeclarations(
     int mems=md->getMemberSpecifiers();
     if (md->isBriefSectionVisible() && (mems==specifier) && (mems!=VhdlDocGen::LIBRARY) )
     {
-      if (first) {ol.startMemberList();first=FALSE;}
+      if (first) { ol.startMemberList();first=FALSE; }
       VhdlDocGen::writeVHDLDeclaration(md,ol,cd,nd,fd,gd,FALSE);
     } //if
     else if (md->isBriefSectionVisible() && (mems==specifier))
@@ -2303,7 +2347,7 @@ void VhdlDocGen::writePlainVHDLDeclarations(
   pack.clear();
 }//plainDeclaration
 
-bool VhdlDocGen::membersHaveSpecificType(MemberList *ml,int type)
+static bool membersHaveSpecificType(MemberList *ml,uint64 type)
 {
   if (ml==0) return FALSE;
   MemberDef *mdd=0;
@@ -2348,7 +2392,7 @@ void VhdlDocGen::writeVHDLDeclarations(MemberList* ml,OutputList &ol,
   if (subtitle && subtitle[0]!=0)
   {
     ol.startMemberSubtitle();
-    ol.parseDoc("[generated]",-1,0,0,subtitle,FALSE,FALSE,0,TRUE,FALSE);
+    ol.generateDoc("[generated]",-1,0,0,subtitle,FALSE,FALSE,0,TRUE,FALSE);
     ol.endMemberSubtitle();
   } //printf("memberGroupList=%p\n",memberGroupList);
 
@@ -2374,7 +2418,7 @@ void VhdlDocGen::writeVHDLDeclarations(MemberList* ml,OutputList &ol,
         {
           //printf("Member group has docs!\n");
           ol.startMemberGroupDocs();
-          ol.parseDoc("[generated]",-1,0,0,mg->documentation()+"\n",FALSE,FALSE);
+          ol.generateDoc("[generated]",-1,0,0,mg->documentation()+"\n",FALSE,FALSE);
           ol.endMemberGroupDocs();
         }
         ol.startMemberGroup();
@@ -2387,29 +2431,10 @@ void VhdlDocGen::writeVHDLDeclarations(MemberList* ml,OutputList &ol,
   }
 }// writeVHDLDeclarations
 
-#if 0
-/* strips the prefix for record and unit members*/
-void VhdlDocGen::adjustRecordMember(MemberDef *mdef)
-{ //,OutputList & ol) {
-  QRegExp regg("[_a-zA-Z\"]");
-  QCString nn=mdef->name();
-  int j=nn.find(regg,0);
-  if (j>0)
-  {
-    nn=nn.mid(j,nn.length());
-    mdef->setName(nn.data());
-  }
-}//adjustRecordMember
-#endif
-/* strips the prefix for package and package body */
 
 bool VhdlDocGen::writeClassType( ClassDef *& cd,
     OutputList &ol ,QCString & cname)
 {
-  //static ClassDef *prev = 0;
-  //if (prev == cd)  return TRUE;
-  //if (cd != prev) prev=cd;
-
   int id=cd->protection();
   QCString qcs = VhdlDocGen::trTypeString(id+2);
   cname=VhdlDocGen::getClassName(cd);
@@ -2421,7 +2446,7 @@ bool VhdlDocGen::writeClassType( ClassDef *& cd,
   return FALSE;
 }// writeClassLink
 
-QCString VhdlDocGen::trVhdlType(int type,bool sing)
+QCString VhdlDocGen::trVhdlType(uint64 type,bool sing)
 {
   switch(type)
   {
@@ -2544,26 +2569,6 @@ QCString VhdlDocGen::trFunctionAndProc()
 }
 
 
-
-
-
-/* do not insert the same component twice */
-
-bool VhdlDocGen::foundInsertedComponent(const QCString & name,Entry* root)
-{
-  QListIterator<BaseInfo> bii(*root->extends);
-  BaseInfo *bi=0;
-  for (bii.toFirst();(bi=bii.current());++bii)
-  {
-    if (bi->name==name)
-    {
-      return TRUE; //
-    }
-  }
-
-  return FALSE;
-}// found component
-
 /*! writes a link if the string is linkable else a formatted string */
 
 void VhdlDocGen::writeStringLink(const MemberDef *mdef,QCString mem, OutputList& ol)
@@ -2585,65 +2590,63 @@ void VhdlDocGen::writeStringLink(const MemberDef *mdef,QCString mem, OutputList&
       }
     }
   }
-  VhdlDocGen::startFonts(mem,"vhdlchar",ol);
+  startFonts(mem,"vhdlchar",ol);
 }// found component
 
-void VhdlDocGen::writeCodeFragment( MemberDef *mdef,OutputList& ol)
-{
-  //  Definition d=(Definition)mdef;
-  //	QCString fdd=mdef->getDefFileExtension();
-  //	QCString scope=mdef->getScopeString();
-  QCString codeFragment=mdef->documentation();
-  //FileDef *fd=mdef->getFileDef();
 
-  //int start=mdef->getStartBodyLine();
-  //int end=mdef->getEndBodyLine();
-  QStringList qsl=QStringList::split("\n",codeFragment);
-  writeLink(mdef,ol);
-  ol.docify(" ");
-  ol.insertMemberAlign();
-  int len= qsl.count();
-  for(int j=0;j<len;j++)
-  {
-    QCString q=qsl[j].utf8();
-    VhdlDocGen::writeFormatString(q,ol,mdef);
-    ol.lineBreak();
-    if (j==2) // only the first three lines are shown
-    {
-      q = "...";
-      VhdlDocGen::writeFormatString(q,ol,mdef);
-      break;
-    }
-  }
-}
 
 void VhdlDocGen::writeSource(MemberDef *mdef,OutputList& ol,QCString & cname)
 {
+  ParserInterface *pIntf = Doxygen::parserManager->getParser(".vhd");
+ // pIntf->resetCodeParserState();
+
   QCString codeFragment=mdef->documentation();
-  int start=mdef->getStartBodyLine();
-  QStringList qsl=QStringList::split("\n",codeFragment);
-  ol.startCodeFragment();
-  int len = qsl.count();
-  QCString lineNumber;
-  int j;
-  for (j=0;j<len;j++)
+
+  if (cname.isEmpty())
   {
-    lineNumber.sprintf("%05d",start++);
-    lineNumber+=" ";
-    ol.startBold();
-    ol.docify(lineNumber.data());
-    ol.endBold();
-    ol.insertMemberAlign();
-    QCString q=qsl[j].utf8();
-    VhdlDocGen::writeFormatString(q,ol,mdef);
-    ol.lineBreak();
+    writeLink(mdef,ol);
+    int fi=0;
+    int j=0;
+    do
+    {
+     fi=codeFragment.find("\n",++fi);
+    } while(fi>=0 && j++ <3);
+
+    // show only the first four lines
+    if (j==4)
+    {
+      codeFragment=codeFragment.left(fi);
+      codeFragment.append("\n    ....    ");
+    }
   }
+
+  codeFragment.prepend("\n");
+  ol.pushGeneratorState();
+  ol.startCodeFragment();
+  pIntf->parseCode(ol,                   // codeOutIntf
+                       0,                // scope
+                       codeFragment,     // input
+                       SrcLangExt_VHDL,  // lang
+                       FALSE,            // isExample
+                       0,                // exampleName
+                       mdef->getFileDef(),            // fileDef
+                       mdef->getStartBodyLine(),      // startLine
+                       mdef->getEndBodyLine(),        // endLine
+                       TRUE,             // inlineFragment
+                       mdef,             // memberDef
+                       TRUE              // show line numbers
+                      );
+
   ol.endCodeFragment();
+  ol.popGeneratorState();
+
+  if (cname.isEmpty()) return;
 
   mdef->writeSourceDef(ol,cname);
   mdef->writeSourceRefs(ol,cname);
   mdef->writeSourceReffedBy(ol,cname);
 }
+
 
 
 QCString VhdlDocGen::convertFileNameToClassName(QCString name)
@@ -2675,7 +2678,7 @@ void VhdlDocGen::parseUCF(const char*  input,  Entry* entity,QCString fileName,b
   QCString comment("#!");
   QCString brief;
 
-  while(!ucFile.isEmpty())
+  while (!ucFile.isEmpty())
   {
     int i=ucFile.find("\n");
     if (i<0) break;
@@ -2697,7 +2700,9 @@ void VhdlDocGen::parseUCF(const char*  input,  Entry* entity,QCString fileName,b
         {
           int i=temp.find("-name");
           if (i>0)
+          {
             temp=temp.remove(0,i+5);
+          }
 
           temp.stripPrefix("set_location_assignment");
 
@@ -2728,7 +2733,7 @@ static void initUCF(Entry* root,const char*  type,QCString &  qcs,int line,QCStr
   QRegExp sp("\\s");
   QRegExp reg("[\\s=]");
   QCString n;
-  // bool bo=(stricmp(type,qcs.data())==0);
+  // bool bo=(qstricmp(type,qcs.data())==0);
 
   VhdlDocGen::deleteAllChars(qcs,';');
   qcs=qcs.stripWhiteSpace();
@@ -2756,8 +2761,6 @@ static void initUCF(Entry* root,const char*  type,QCString &  qcs,int line,QCStr
   current->bodyLine=line;
   current->fileName=fileName;
   current->type="ucf_const";
-  //if (!bo)
-  //current->args=type;
   current->args+=qcs;
   current->lang=  SrcLangExt_VHDL ;
 
@@ -2787,7 +2790,7 @@ static void writeUCFLink(const MemberDef* mdef,OutputList &ol)
 {
 
   QCString largs(mdef->argsString());
-  QCString n= VhdlDocGen::splitString(largs, '#');
+  QCString n= splitString(largs, '#');
   // VhdlDocGen::adjustRecordMember(mdef);
   bool equ=(n.length()==largs.length());
 
@@ -2799,30 +2802,22 @@ static void writeUCFLink(const MemberDef* mdef,OutputList &ol)
   }
 
   if (mdef->name().contains("dummy")==0)
-    VhdlDocGen::writeLink(mdef,ol);
+  {
+    writeLink(mdef,ol);
+  }
   if (equ)
+  {
     ol.insertMemberAlign();
+  }
   ol.docify(" ");
   VhdlDocGen::formatString(largs,ol,mdef);
 }
 
-QCString VhdlDocGen::splitString(QCString& str,  char c)
-{
-  QCString n=str;
-  int i=str.find(c);
-  if (i>0)
-  {
-    n=str.left(i);
-    str=str.remove(0,i+1);
-  }
-  return n;
-}
-
 bool VhdlDocGen::findConstraintFile(LayoutNavEntry *lne)
 {
-  FileName *fn=Doxygen::inputNameList->first();
+  FileName *fn=Doxygen::inputNameList->getFirst();
   //LayoutNavEntry *cc = LayoutDocManager::instance().rootNavEntry()->find(LayoutNavEntry::Files);
-
+  uint count=Doxygen::inputNameList->count();
   LayoutNavEntry *kk = lne->parent();//   find(LayoutNavEntry::Files);
   // LayoutNavEntry *kks = kk->parent();//   find(LayoutNavEntry::Files);
   QCString file;
@@ -2830,15 +2825,16 @@ bool VhdlDocGen::findConstraintFile(LayoutNavEntry *lne)
 
   if (Config_getBool("HAVE_DOT") && Config_getEnum("DOT_IMAGE_FORMAT")=="svg")
   {
-     QCString ov("Design Overview"); // TODO: translate me
-     QCString ofile("vhdl_design_overview");
-     LayoutNavEntry *oo=new LayoutNavEntry( lne,LayoutNavEntry::MainPage,true,ofile,ov,"");  
-     kk->addChild(oo); 
+    QCString ov = theTranslator->trDesignOverview();
+    QCString ofile("vhdl_design_overview");
+    LayoutNavEntry *oo=new LayoutNavEntry( lne,LayoutNavEntry::MainPage,TRUE,ofile,ov,"");
+    kk->addChild(oo);
   }
 
-  while (fn)
+  uint i=0;
+  while (i<count)
   {
-    FileDef *fd=fn->first();
+	FileDef *fd=fn->at(i);
     if (fd->name().contains(".ucf") || fd->name().contains(".qsf"))
     {
       file = convertNameToFile(fd->name().data(),FALSE,FALSE);
@@ -2846,29 +2842,10 @@ bool VhdlDocGen::findConstraintFile(LayoutNavEntry *lne)
       kk->addChild(ucf);
       break;
     }
-    fn=Doxygen::inputNameList->next();
+   i++;
   }
   return  FALSE;
 }
-
-void VhdlDocGen::writeAlphbeticalClass(OutputList& ol,const ClassDef* cd,const QCString & cname)
-{
-  if (cname.contains("::")==0)
-  {
-    ClassDef*oo=	VhdlDocGen::findArchitecture(cd);
-    ol.writeObjectLink(cd->getReference(),
-        cd->getOutputFileBase(),0,cname);
-    if (oo)
-    {
-      ol.docify(" [");
-      ol.writeObjectLink(oo->getReference(),
-          oo->getOutputFileBase(),0,"arch");
-      ol.docify("] ");
-    }
-  }
-}
-
-
 
 
 //        for cell_inst : [entity] work.proto [ (label|expr) ]
@@ -2895,11 +2872,12 @@ QCString  VhdlDocGen::parseForConfig(QCString & entity,QCString & arch)
     arch= ql[2].utf8();
     ql=QStringList::split(exp,arch,FALSE);
     if (ql.count()>1) // expression
+    {
       arch="";
+    }
   }
   return label; // label
 }
-
 
 //        use (configuration|entity|open) work.test [(cellfor)];
 
@@ -2912,24 +2890,42 @@ QCString  VhdlDocGen::parseForBinding(QCString & entity,QCString & arch)
   QStringList ql=QStringList::split(exp,entity,FALSE);
 
   if (ql.contains("open"))
+  {
     return "open";
+  }
 
   label=ql[0].utf8();
 
   entity = ql[1].utf8();
   if ((index=entity.findRev("."))>=0)
+  {
     entity.remove(0,index+1);
+  }
 
   if (ql.count()==3)
+  {
     arch=ql[2].utf8();
+  }
   return label;
 }
 
-ClassDef*  VhdlDocGen::findArchitecture(QCString identifier, QCString entity_name)
-{
-  QCString archName=entity_name+"::"+identifier;
-  return  Doxygen::classSDict->find(archName.data());
-}
+
+
+ // find class with upper/lower letters
+ ClassDef* VhdlDocGen::findVhdlClass(const char *className )
+ {
+
+  ClassSDict::Iterator cli(*Doxygen::classSDict);
+  ClassDef *cd;
+  for (;(cd=cli.current());++cli)
+  {
+    if (qstricmp(className,cd->name().data())==0)
+    {
+      return cd;
+    }
+  }
+  return 0;
+ }
 
 
 //@param arch bit0:flipflop
@@ -2941,107 +2937,126 @@ ClassDef*  VhdlDocGen::findArchitecture(QCString identifier, QCString entity_nam
 //@param isInlineConf
 //@param confN List of configurations
 
-void assignBinding(VhdlConfNode * conf,QCString label)
+void assignBinding(VhdlConfNode * conf)
 {
-  QList<Entry> instList= getVhdlInstList();
+  QList<Entry> instList=getVhdlInstList();
   QListIterator<Entry> eli(instList);
-  Entry *cur;
-  ClassDef *archClass;
+  Entry *cur=0;
+  ClassDef *archClass=0,*entClass=0;
   QCString archName,entityName;
-  bool allOthers=FALSE;
+  QCString arcBind,entBind;
 
-  if (conf->isInlineConf)
+  bool others,all;
+  entBind=conf->binding;
+  QCString conf2=VhdlDocGen::parseForBinding(entBind,arcBind);
+
+  if (qstricmp(conf2,"configuration")==0)
   {
-    archClass=Doxygen::classSDict->find(conf->confVhdl.data());
+    QList<VhdlConfNode> confList =  getVhdlConfiguration();
+    VhdlConfNode* vconf;
+    //  bool found=false;
+    for (uint iter=0;iter<confList.count(); iter++)
+    {
+      vconf= (VhdlConfNode *)confList.at(iter);
+      QCString n=VhdlDocGen::getIndexWord(vconf->confVhdl.data(),0);
+      if (n==entBind)
+      {
+        // found=true;
+        entBind=VhdlDocGen::getIndexWord(vconf->confVhdl.data(),1);
+        QCString a=VhdlDocGen::getIndexWord(conf->compSpec.data(),0);
+        QCString e=VhdlDocGen::getIndexWord(conf->confVhdl.data(),1);
+        a=e+"::"+a;
+        archClass= VhdlDocGen::findVhdlClass(a.data());//Doxygen::classSDict->find(a.data());
+        entClass= VhdlDocGen::findVhdlClass(e.data());//Doxygen::classSDict->find(e.data());
+        break;
+      }
+    }
   }
-  else
+  else  // conf2!=configuration
   {
-    archName= VhdlDocGen::getIndexWord(label.data(),0);
-    entityName= VhdlDocGen::getIndexWord(conf->confVhdl.data(),1);
-    archClass=VhdlDocGen::findArchitecture(archName,entityName);
+    QCString a,c,e;
+    if (conf->isInlineConf)
+    {
+      c=conf->confVhdl;
+      e=VhdlDocGen::getIndexWord(conf->confVhdl.data(),0);
+    }
+    else
+    {
+      a=VhdlDocGen::getIndexWord(conf->compSpec.data(),0);
+      e=VhdlDocGen::getIndexWord(conf->confVhdl.data(),1);
+      c=e+"::"+a;
+    }
+    archClass= VhdlDocGen::findVhdlClass(c.data());//Doxygen::classSDict->find(a.data());
+    entClass= VhdlDocGen::findVhdlClass(e.data()); //Doxygen::classSDict->find(e.data());
   }
+
+  QCString label=conf->compSpec.lower();
+  //label.prepend("|");
 
   if (!archClass)
   {
-    fprintf(stderr,"\n architecture %s not found ! ",conf->confVhdl.data());
+ //   err("architecture %s not found ! ",conf->confVhdl.data());
     return;
   }
 
   archName=archClass->name();
-
   QCString allOt=VhdlDocGen::getIndexWord(conf->arch.data(),0);
-
-  if (allOt=="all" || allOt=="others")
-    allOthers=TRUE;
+  all=allOt.lower()=="all" ;
+  others= allOt.lower()=="others";
 
   for (;(cur=eli.current());++eli)
   {
-    if (conf->isInlineConf &&  (conf->confVhdl!=cur->args))
-      continue;
-
-    if (!conf->isInlineConf &&  (archName!=cur->args))
-      continue;
-
-    if (cur->exception==label || conf->isInlineConf)
+    if (cur->exception.lower()==label || conf->isInlineConf)
     {
       QCString sign,archy;
 
-      if (allOthers==FALSE)
+      if (all || others)
       {
-        archy=conf->arch;
-        sign=cur->name+":"+cur->type;
+        archy=VhdlDocGen::getIndexWord(conf->arch.data(),1);
       }
       else
       {
-        sign=cur->type;
-        archy=VhdlDocGen::getIndexWord(conf->arch.data(),1);
+        archy=conf->arch;
       }
 
+      QCString	  inst1=VhdlDocGen::getIndexWord(archy.data(),0).lower();
+      QCString	  comp=VhdlDocGen::getIndexWord(archy.data(),1).lower();
 
-      if (archy==sign && !cur->stat)
+      QStringList ql=QStringList::split(",",inst1);
+
+      for (uint j=0;j<ql.count();j++)
       {
-        // fprintf(stderr," \n label [%s] [%s] [%s]",cur->exception.data(),cur->type.data(),cur->name.data());
-        QCString ent1=conf->binding;
-        QCString arch1;
-        QCString rr=VhdlDocGen::parseForBinding(ent1,arch1);
-        arch1=ent1+"::"+arch1;
-        //ClassDef *archBind=Doxygen::classSDict->find(arch1.data());
-        ClassDef *ent=Doxygen::classSDict->find(ent1.data());
-        QCString	  inst=VhdlDocGen::getIndexWord(cur->args.data(),0);
-        ClassDef *cd=Doxygen::classSDict->find(inst.data());
+        QCString archy1,sign1;
+        if (all || others)
+        {
+          archy1=VhdlDocGen::getIndexWord(conf->arch.data(),1);
+          sign1=cur->type;
+        }
+        else
+        {
+          archy1=comp+":"+ql[j].utf8();
+          sign1=cur->type+":"+cur->name;
+        }
 
-        if (cd==0 || ent==0)
-          continue;
+        if (archy1==sign1.lower() && !cur->stat)
+        {
+          // fprintf(stderr," \n label [%s] [%s] [%s]",cur->exception.data(),cur->type.data(),cur->name.data());
+          ClassDef *ent= VhdlDocGen::findVhdlClass(entBind.data());//Doxygen::classSDict->find(entBind.data());
 
-        addInstance(ent,archClass,cd,cur);
-        cur->stat=TRUE;
-      }
+          if (entClass==0 || ent==0)
+          {
+            continue;
+          }
+
+          addInstance(ent,archClass,entClass,cur);
+          cur->stat=TRUE;
+          break;
+        }
+      }// for
     }
-  }//for
+  }//for each element in instList
+
 }//assignBinding
-
-
-void assignConfiguration(VhdlConfNode* rootNode,QCString label)
-{
-  if (rootNode==NULL) return;
-  uint iter;
-
-  if (!rootNode->isBinding())
-  {
-    //   printf("\n ARCH %s  BIND %s \n",rootNode->arch.data(),rootNode->binding.data());
-    assignBinding(rootNode,label);
-    return;
-  }
-  else
-    label+="|"+rootNode->arch;
-
-
-  for(iter=0;iter<rootNode->confN.count();iter++)
-  {
-    VhdlConfNode* conf= (VhdlConfNode *)rootNode->confN.at(iter);
-    assignConfiguration(conf,label);
-  }
-}
 
 /*
 
@@ -3055,17 +3070,21 @@ void assignConfiguration(VhdlConfNode* rootNode,QCString label)
 //          ........
 //  end architecture
 
- */
+*/
 void VhdlDocGen::computeVhdlComponentRelations()
 {
 
-  QCString entity,inst,arch,vhd;
-
+  QCString entity,arch,inst;
   QList<VhdlConfNode> confList =  getVhdlConfiguration();
+
   for (uint iter=0;iter<confList.count(); iter++)
   {
     VhdlConfNode* conf= (VhdlConfNode *)confList.at(iter);
-    assignConfiguration(conf,"");
+    if (!(conf->isInlineConf || conf->isLeaf))
+    {
+      continue;
+    }
+    assignBinding(conf);
   }
 
   QList<Entry> qsl= getVhdlInstList();
@@ -3075,7 +3094,9 @@ void VhdlDocGen::computeVhdlComponentRelations()
   for (eli.toFirst();(cur=eli.current());++eli)
   {
     if (cur->stat ) //  was bind
+    {
       continue;
+    }
 
     if (cur->includeName=="entity" || cur->includeName=="component" )
     {
@@ -3086,27 +3107,44 @@ void VhdlDocGen::computeVhdlComponentRelations()
     {
       entity=cur->type;
     }
-    ClassDef *classEntity=Doxygen::classSDict->find(entity);
+
+    ClassDef *classEntity= VhdlDocGen::findVhdlClass(entity.data());//Doxygen::classSDict->find(entity);
     inst=VhdlDocGen::getIndexWord(cur->args.data(),0);
     ClassDef *cd=Doxygen::classSDict->find(inst);
     ClassDef *ar=Doxygen::classSDict->find(cur->args);
 
-    if (cd==0 || classEntity==0 )
+    if (cd==0)
+    {
       continue;
+    }
+
+    // if (classEntity==0)
+    //   err("%s:%d:Entity:%s%s",cur->fileName.data(),cur->startLine,entity.data()," could not be found");
 
     addInstance(classEntity,ar,cd,cur);
-
   }
+
 }
 
 static void addInstance(ClassDef* classEntity, ClassDef* ar,
                         ClassDef *cd , Entry *cur,ClassDef* /*archBind*/)
 {
+
+  QCString bName,n1;
+  if (ar==0) return;
+
+  if (classEntity==0)
+  {
+    //add component inst
+    n1=cur->type;
+    goto ferr;
+  }
+
   if (classEntity==cd) return;
 
-  QCString bName=classEntity->name();
-  //printf("addInstance %s to %s\n", cd->name().data(), classEntity->name().data());
-  QCString n1=cur->type;
+  bName=classEntity->name();
+  // fprintf(stderr,"\naddInstance %s to %s %s %s\n", classEntity->name().data(),cd->name().data(),ar->name().data(),cur->name);
+  n1=classEntity->name().data();
 
   if (!cd->isBaseClass(classEntity, true, 0))
   {
@@ -3120,20 +3158,20 @@ static void addInstance(ClassDef* classEntity, ClassDef* ar,
   if (!VhdlDocGen::isSubClass(classEntity,cd,true,0))
   {
     classEntity->insertSubClass(cd,Public,Normal,0);
+    classEntity->setLanguage(SrcLangExt_VHDL);
   }
 
-  if (ar==0) return;
-
+ferr:
   QCString uu=cur->name;
   MemberDef *md=new MemberDef(
-      ar->getDefFileName(), cur->startLine,
-      cur->type,uu,uu, 0,
+      ar->getDefFileName(), cur->startLine,cur->startColumn,
+      n1,uu,uu, 0,
       Public, Normal, cur->stat,Member,
-      MemberDef::Variable,
+      MemberType_Variable,
       0,
       0);
 
-  if (ar->getOutputFileBase()) 
+  if (ar->getOutputFileBase())
   {
     TagInfo tg;
     tg.anchor = 0;
@@ -3148,11 +3186,23 @@ static void addInstance(ClassDef* classEntity, ClassDef* ar,
   md->setMemberSpecifiers(VhdlDocGen::INSTANTIATION);
   md->setBriefDescription(cur->brief,cur->briefFile,cur->briefLine);
   md->setBodySegment(cur->startLine,-1) ;
-  md->setDocumentation(cur->doc.data(),cur->docFile.data(),cur->docLine); 
+  md->setDocumentation(cur->doc.data(),cur->docFile.data(),cur->docLine);
   FileDef *fd=ar->getFileDef();
   md->setBodyDef(fd);
+
+
+  QCString info="Info: Elaborating entity "+n1;
+  fd=ar->getFileDef();
+  info+=" for hierarchy ";
+  QRegExp epr("[|]");
+  QCString label=cur->type+":"+cur->write+":"+cur->name;
+  label.replace(epr,":");
+  info+=label;
+  fprintf(stderr,"\n[%s:%d:%s]\n",fd->fileName().data(),cur->startLine,info.data());
+
+
   ar->insertMember(md);
-  //    printf("\nMemberreference [%p]",md);
+
 }
 
 
@@ -3172,18 +3222,20 @@ void  VhdlDocGen::writeRecorUnit(QCString & largs,OutputList& ol ,const MemberDe
 void VhdlDocGen::writeRecUnitDocu(
     const MemberDef *md,
     OutputList& ol,
-    QCString largs
-    )
+    QCString largs)
 {
 
   QStringList ql=QStringList::split("#",largs,FALSE);
   uint len=ql.count();
   ol.startParameterList(TRUE);
   bool first=TRUE;
+
   for(uint i=0;i<len;i++)
   {
     QCString n=ql[i].utf8();
     ol.startParameterType(first,"");
+    ol.endParameterType();
+    ol.startParameterName(TRUE);
     VhdlDocGen::formatString(n,ol,md);
     if ((len-i)>1)
     {
@@ -3196,29 +3248,10 @@ void VhdlDocGen::writeRecUnitDocu(
 
     first=FALSE;
   }
+
 }//#
 
-void VhdlDocGen::writeCodeFragment(OutputList& ol,int start, QCString & codeFragment,const MemberDef* mdef)
-{
-  QStringList qsl=QStringList::split("\n",codeFragment);
-  ol.startCodeFragment();
-  int len = qsl.count();
-  QCString lineNumber;
-  int j;
-  for (j=0;j<len;j++)
-  {
-    lineNumber.sprintf("%05d",start++);
-    lineNumber+=" ";
-    ol.startBold();
-    ol.docify(lineNumber.data());
-    ol.endBold();
-    ol.insertMemberAlign();
-    QCString q=qsl[j].utf8();
-    VhdlDocGen::writeFormatString(q,ol,mdef);
-    ol.docify("\n");
-  }
-  ol.endCodeFragment();
-}
+
 
 bool VhdlDocGen::isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int level)
 {
@@ -3233,8 +3266,6 @@ bool VhdlDocGen::isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int
 
   if (cd->subClasses())
   {
-    // Beware: trying to optimise the iterator away using ->first() & ->next()
-    // causes bug 625531
     BaseClassListIterator bcli(*cd->subClasses());
     for ( ; bcli.current() && !found ; ++bcli)
     {
@@ -3245,7 +3276,7 @@ bool VhdlDocGen::isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int
       {
         found=TRUE;
       }
-      else 
+      else
       {
         if (level <256)
         {
@@ -3265,7 +3296,7 @@ void VhdlDocGen::addBaseClass(ClassDef* cd,ClassDef *ent)
     for ( ; bcli.current()  ; ++bcli)
     {
       ClassDef *ccd=bcli.current()->classDef;
-      if (ccd==ent) 
+      if (ccd==ent)
       {
         QCString n = bcli.current()->usedName;
         int i = n.find('(');
@@ -3290,3 +3321,1163 @@ void VhdlDocGen::addBaseClass(ClassDef* cd,ClassDef *ent)
   }
 }
 
+
+static QList<MemberDef> mdList;
+
+static MemberDef* findMemFlow(const MemberDef* mdef)
+{
+  for(uint j=0;j<mdList.count();j++)
+  {
+    MemberDef* md=(MemberDef*)mdList.at(j);
+    if (md->name()==mdef->name() &&  md->getStartBodyLine()==mdef->getStartBodyLine())
+      return md;
+  }
+  return 0;
+}
+
+void VhdlDocGen::createFlowChart(const MemberDef *mdef)
+{
+  if (mdef==0) return;
+
+  QCString codeFragment;
+  MemberDef* mm=0;
+  if((mm=findMemFlow(mdef))!=0)
+  {
+    // don't create the same flowchart twice
+    VhdlDocGen::setFlowMember(mm);
+    return;
+  }
+  else
+  {
+    mdList.append(mdef);
+  }
+
+  //fprintf(stderr,"\n create flow mem %s %p\n",mdef->name().data(),mdef);
+
+  int actualStart= mdef->getStartBodyLine();
+  int actualEnd=mdef->getEndBodyLine();
+  FileDef* fd=mdef->getFileDef();
+  bool b=readCodeFragment( fd->absFilePath().data(), actualStart,actualEnd,codeFragment);
+  if (!b) return;
+
+  VHDLLanguageScanner *pIntf =(VHDLLanguageScanner*) Doxygen::parserManager->getParser(".vhd");
+  VhdlDocGen::setFlowMember(mdef);
+  Entry root;
+  QStrList filesInSameTu;
+  pIntf->startTranslationUnit("");
+  pIntf->parseInput("",codeFragment.data(),&root,FALSE,filesInSameTu);
+  pIntf->finishTranslationUnit();
+}
+
+void VhdlDocGen::resetCodeVhdlParserState()
+{
+  varMap.clear();
+  qli.clear();
+  packages.clear();
+}
+
+bool VhdlDocGen::isConstraint(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::UCF_CONST; }
+bool VhdlDocGen::isConfig(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::CONFIG; }
+bool VhdlDocGen::isAlias(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::ALIAS; }
+bool VhdlDocGen::isLibrary(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::LIBRARY; }
+bool VhdlDocGen::isGeneric(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::GENERIC; }
+bool VhdlDocGen::isPort(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::PORT; }
+bool VhdlDocGen::isComponent(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::COMPONENT; }
+bool VhdlDocGen::isPackage(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::USE; }
+bool VhdlDocGen::isEntity(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::ENTITY; }
+bool VhdlDocGen::isConstant(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::CONSTANT; }
+bool VhdlDocGen::isVType(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::TYPE; }
+bool VhdlDocGen::isSubType(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::SUBTYPE; }
+bool VhdlDocGen::isVhdlFunction(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::FUNCTION; }
+bool VhdlDocGen::isProcess(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::PROCESS; }
+bool VhdlDocGen::isSignal(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::SIGNAL; }
+bool VhdlDocGen::isAttribute(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::ATTRIBUTE; }
+bool VhdlDocGen::isSignals(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::SIGNAL; }
+bool VhdlDocGen::isProcedure(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::PROCEDURE; }
+bool VhdlDocGen::isRecord(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::RECORD; }
+bool VhdlDocGen::isArchitecture(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::ARCHITECTURE; }
+bool VhdlDocGen::isUnit(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::UNITS; }
+bool VhdlDocGen::isPackageBody(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::PACKAGE_BODY; }
+bool VhdlDocGen::isVariable(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::SHAREDVARIABLE; }
+bool VhdlDocGen::isFile(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::VFILE; }
+bool VhdlDocGen::isGroup(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::GROUP; }
+bool VhdlDocGen::isCompInst(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::INSTANTIATION; }
+bool VhdlDocGen::isMisc(const MemberDef *mdef)
+{ return mdef->getMemberSpecifiers()==VhdlDocGen::MISCELLANEOUS; }
+
+
+
+//############################## Flowcharts #################################################
+
+#define STARTL   (FlowChart::WHILE_NO     | FlowChart::IF_NO    | \
+                  FlowChart::FOR_NO       | FlowChart::CASE_NO  | \
+                  FlowChart::LOOP_NO      | WHEN_NO)
+#define DECLN    (FlowChart::WHEN_NO      | \
+                  FlowChart::ELSIF_NO     | FlowChart::IF_NO    | \
+                  FlowChart::FOR_NO       | FlowChart::WHILE_NO | \
+                  FlowChart::CASE_NO      | FlowChart::LOOP_NO )
+#define STARTFIN (FlowChart::START_NO     | FlowChart::END_NO)
+#define LOOP     (FlowChart::FOR_NO       | FlowChart::WHILE_NO | \
+                  FlowChart::LOOP_NO )
+#define ENDCL    (FlowChart::END_CASE     | FlowChart::END_LOOP)
+#define EEND     (FlowChart::ENDIF_NO     | FlowChart::ELSE_NO )
+#define IFF      (FlowChart::ELSIF_NO     | FlowChart::IF_NO)
+#define EXITNEXT (FlowChart::EXIT_NO      | FlowChart::NEXT_NO )
+#define EMPTY    (EEND                    | FlowChart::ELSIF_NO)
+#define EE       (FlowChart::ELSE_NO      | FlowChart::ELSIF_NO)
+#define EMPTNODE (ENDCL | EEND            | FlowChart::ELSIF_NO)
+#define FLOWLEN (flowList.count()-1)
+
+static int ifcounter=0;
+static int nodeCounter=0;
+
+static struct
+{
+   // link colors
+   const char *textNodeLink;
+   const char *yesNodeLink;
+   const char *noNodeLink;
+
+   // node colors
+   const char* comment;
+   const char* decisionNode;
+   const char* varNode;
+   const char *startEndNode;
+   const char* textNode;
+} flowCol =
+{ "green",       // textNodeLink
+  "red",         // yesNodeLink
+  "black",       // noNodeLink
+  "khaki",       // comment
+  "0.7 0.3 1.0", // decisionNode
+  "lightyellow", // varNode
+  "white",       // startEndNode
+  "lightcyan"    // textNode
+};
+
+QList<FlowChart>  FlowChart::flowList;
+
+#ifdef DEBUGFLOW
+static QMap<QCString,int> keyMap;
+#endif
+
+void alignText(QCString & q)
+{
+  if (q.length()<=80) return;
+
+  if (q.length()>200)
+  {
+    q.resize(200);
+  }
+
+  q.append(" ...");
+
+  QRegExp reg("[\\s|]");
+  QCString str(q.data());
+  QCString temp;
+
+  while (str.length()>80)
+  {
+    int j=str.findRev(reg,80);
+    if (j<=0)
+    {
+      temp+=str;
+      q=temp;
+      return;
+    }
+    else
+    {
+      QCString qcs=str.left(j);
+      temp+=qcs+"\\";
+      temp+="n";
+      str.remove(0,j);
+    }
+  }//while
+
+ q=temp+str;
+// #endif
+}
+
+void FlowChart::printNode(const FlowChart* flo)
+{
+  if (flo==0) return;
+  QCString ui="-";
+  QCString q,t;
+  QRegExp ep("[\t\n\r]");
+
+  ui.fill('-',255);
+
+  if (flo->type & STARTL)
+  {
+    if (flo->stamp>0)
+    {
+      q=ui.left(2*flo->stamp);
+    }
+    else
+    {
+      q=" ";
+    }
+    QCString nn=flo->exp.stripWhiteSpace();
+    printf("\nYES: %s%s[%d,%d]",q.data(),nn.data(),flo->stamp,flo->id);
+  }
+  else
+  {
+    if (flo->type & COMMENT_NO)
+    {
+      t=flo->label;
+    }
+    else
+    {
+      t=flo->text;
+    }
+    t=t.replace(ep,"");
+    if (t.isEmpty())
+    {
+      t=" ";
+    }
+    if (flo->stamp>0)
+    {
+      q=ui.left(2*flo->stamp);
+    }
+    else
+    {
+      q=" ";
+    }
+    if (flo->type & EMPTNODE)
+    {
+      printf("\n NO: %s%s[%d,%d]",q.data(),FlowChart::getNodeType(flo->type),flo->stamp,flo->id);
+    }
+    else if (flo->type & COMMENT_NO)
+    {
+      printf("\n NO: %s%s[%d,%d]",t.data(),FlowChart::getNodeType(flo->type),flo->stamp,flo->id);
+    }
+    else
+    {
+      printf("\n NO: %s%s[%d,%d]",q.data(),t.data(),flo->stamp,flo->id);
+    }
+  }
+}
+
+void  FlowChart::printFlowTree()
+{
+  uint size=flowList.count();
+  for (uint j=0;j<size;j++)
+  {
+    printNode(flowList.at(j));
+  }
+}
+
+void  FlowChart::colTextNodes()
+{
+  QCString text;
+  FlowChart *flno;
+  bool found=FALSE;
+  for (uint j=0;j<flowList.count();j++)
+  {
+    FlowChart *flo=flowList.at(j);
+    if (flo->type&TEXT_NO)
+    {
+      text+=flo->text+'\n';
+      if (!found)
+      {
+        flno=flo;
+      }
+      if (found)
+      {
+        flno->text+=flo->text;
+        flowList.remove(flo);
+        if (j>0) j=j-1;
+      }
+      found=TRUE;
+    }
+    else
+      found=FALSE;
+  }
+
+  // find if..endif without text
+  //       if..elseif without text
+  for (uint j=0;j<flowList.count()-1;j++)
+  {
+    FlowChart *flo=flowList.at(j);
+    int kind=flo->type;
+    if ( (kind & IFF) || (flo->type & ELSE_NO))
+    {
+      FlowChart *ftemp=flowList.at(j+1);
+      if (ftemp->type & EMPTY)
+      {
+        FlowChart *fNew = new FlowChart(TEXT_NO,"empty ",0);
+        fNew->stamp=flo->stamp;
+        flowList.insert(j+1,fNew);
+      }
+    }
+  }
+
+}// colTextNode
+
+QCString FlowChart::getNodeName(int n)
+{
+  QCString node;
+  node.setNum(n);
+  return node.prepend("node");
+}
+
+void FlowChart::delFlowList()
+{
+  ifcounter=0;
+  nodeCounter=0;
+  uint size=flowList.count();
+
+  for (uint j=0;j <size ;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+    delete fll;
+  }
+  flowList.clear();
+}
+
+void FlowChart::alignCommentNode(FTextStream &t,QCString com)
+{
+  uint max=0;
+  QCString s;
+  QStringList ql=QStringList::split("\n",com);
+  for (uint j=0;j<ql.count();j++)
+  {
+    s=(QCString)ql[j].utf8();
+    if (max<s.length()) max=s.length();
+  }
+
+  s=ql.last().utf8();
+  int diff=max-s.length();
+
+  QCString n(1);
+  if (diff>0)
+  {
+    n.fill(' ',2*diff);
+    n.append(".");
+    s+=n;
+    ql.remove(ql.last());
+    ql.append(s);
+  }
+
+  for (uint j=0;j<ql.count();j++)
+  {
+    s=(QCString)ql[j].utf8();
+    if (j<ql.count()-1)
+    {
+      s+="\n";
+    }
+    FlowChart::codify(t,s.data());
+  }
+}
+
+
+void FlowChart::buildCommentNodes(FTextStream & t)
+{
+  uint size=flowList.count();
+  bool begin=false;
+
+  for (uint j=0;j < size-1 ;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+    if (fll->type & COMMENT_NO)
+    {
+      FlowChart* to=flowList.at(j+1);
+      if (to->type & COMMENT_NO)
+      {
+        fll->label+="\n";
+        QCString temp=fll->label+to->label;
+        to->label=temp;
+        flowList.remove(j);
+        size--;
+        if (j>0) j--;
+      }
+    }
+  }// for
+
+  for (uint j=0;j <flowList.count() ;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+
+    if (fll->type & BEGIN_NO)
+    {
+      begin = true;
+      continue;
+    }
+
+    if (fll->type & COMMENT_NO)
+    {
+      FlowChart* to;
+      if (!begin)
+      {
+        //  comment between function/process .. begin is linked to start node
+        to=flowList.at(0);
+      }
+      else
+      {
+        if (j>0 && flowList.at(j-1)->line==fll->line)
+          to=flowList.at(j-1);
+        else
+          to=flowList.at(j+1);
+       }
+      t << getNodeName(fll->id);
+      t << "[shape=none, label=<\n";
+      t << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"2\" >\n ";
+      t << "<TR><TD BGCOLOR=\"";
+      t << flowCol.comment;
+      t << "\" > ";
+
+      FlowChart::alignCommentNode(t,fll->label);
+      t << " </TD></TR></TABLE>>];";
+      writeEdge(t,fll->id,to->id,2);
+    }
+  }// for
+
+  // delete comment nodes;
+  size=flowList.count();
+  for (uint j=0;j < size;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+    if (fll->type & (COMMENT_NO | BEGIN_NO))
+    {
+      flowList.remove(j);
+      delete fll;
+      fll=0;
+      size--;
+      if (j>0) j--;
+    }
+  }// for;
+}
+
+void FlowChart::codify(FTextStream &t,const char *str)
+{
+  if (str)
+  {
+    const char *p=str;
+    char c;
+    while (*p)
+    {
+      c=*p++;
+      switch(c)
+      {
+        case '<':  t << "&lt;"; break;
+        case '>':  t << "&gt;"; break;
+        case '&':  t << "&amp;"; break;
+        case '\'': t << "&#39;"; break;
+        case '"':  t << "&quot;"; break;
+        case '\n': t <<"<BR ALIGN=\"LEFT\"/>"; break;
+        default:   t << c; break;
+      }
+    }
+  }
+}//codify
+
+FlowChart::~FlowChart()
+{
+}
+
+FlowChart::FlowChart(int typ,const char * t,const char* ex,const char* lab)
+{
+  stamp=ifcounter;
+
+  if (typ & STARTL)
+  {
+    ifcounter++;
+  }
+
+  text=t;
+  exp=ex;
+  type=typ;
+  label=lab;
+
+  if (typ & (ELSE_NO | ELSIF_NO))
+  {
+    stamp--;
+  }
+
+  if (typ & (START_NO | END_NO | VARIABLE_NO))
+  {
+    stamp=0;
+  }
+
+  id=nodeCounter++;
+}
+
+void FlowChart::addFlowChart(int type,const char* text,const char* exp, const char *label)
+{
+  static QRegExp reg("[;]");
+  static QRegExp reg1("[\"]");
+
+  if (!VhdlDocGen::getFlowMember()) return;
+
+  QCString typeString(text);
+  QCString expression(exp);
+
+
+  if (text)
+  {
+    typeString=typeString.replace(reg,"\n");
+  }
+
+  if (exp)
+  {
+    expression=expression.replace(reg1,"\\\"");
+  }
+
+  FlowChart *fl=new FlowChart(type,typeString.data(),expression.data(),label);
+
+  fl->line=vhdl::parser::VhdlParser::getLine();
+
+  if (type & (START_NO | VARIABLE_NO))
+  {
+    flowList.prepend(fl);
+  }
+  else
+  {
+    flowList.append(fl);
+  }
+
+}
+
+void FlowChart::moveToPrevLevel()
+{
+  if (!VhdlDocGen::getFlowMember()) return;
+  ifcounter--;
+}
+
+
+QCString FlowChart::convertNameToFileName()
+{
+  static QRegExp exp ("[^][a-z_A-Z0-9]");
+  QCString temp,qcs;
+  const  MemberDef* md=VhdlDocGen::getFlowMember();
+
+  temp.sprintf("%p",md);
+  qcs=md->name();
+
+  if (qcs.find(exp,0)>=0)
+  {
+    qcs.prepend("Z");
+    qcs=qcs.replace(exp,"_");
+  }
+
+  return qcs+temp;
+}
+
+const char* FlowChart::getNodeType(int c)
+{
+  switch(c)
+  {
+    case IF_NO:        return "if ";
+    case ELSIF_NO:     return "elsif ";
+    case ELSE_NO:      return "else ";
+    case CASE_NO:      return "case ";
+    case WHEN_NO:      return "when ";
+    case EXIT_NO:      return "exit ";
+    case END_NO:       return "end ";
+    case TEXT_NO:      return "text ";
+    case START_NO:     return "start  ";
+    case ENDIF_NO:     return "endif  ";
+    case FOR_NO:       return "for ";
+    case WHILE_NO:     return "while  ";
+    case END_LOOP:     return "end_loop  ";
+    case END_CASE:     return "end_case  ";
+    case VARIABLE_NO:  return "variable_decl  ";
+    case RETURN_NO:    return "return  ";
+    case LOOP_NO:      return "infinte loop  ";
+    case NEXT_NO:      return "next  ";
+    case COMMENT_NO:   return "comment  ";
+    case EMPTY_NO:     return "empty  ";
+    case BEGIN_NO:     return "<begin>  ";
+    default: return "--failure--";
+  }
+}
+
+void FlowChart::createSVG()
+{
+  QCString qcs("/");
+  QCString ov = Config_getString("HTML_OUTPUT");
+
+  qcs+=FlowChart::convertNameToFileName()+".svg";
+
+  //const  MemberDef *m=VhdlDocGen::getFlowMember();
+  //if (m)
+  //  fprintf(stderr,"\n creating  flowchart  : %s  %s in file %s \n",VhdlDocGen::trTypeString(m->getMemberSpecifiers()),m->name().data(),m->getFileDef()->name().data());
+
+  QCString dir=" -o "+ov+qcs;
+  ov+="/flow_design.dot";
+
+  QCString vlargs="-Tsvg "+ov+dir ;
+
+  if (portable_system("dot",vlargs)!=0)
+  {
+    err("could not create dot file");
+  }
+}
+
+void FlowChart::startDot(FTextStream &t)
+{
+  t << " digraph G { \n";
+  t << "rankdir=TB \n";
+  t << "concentrate=true\n";
+  t << "stylesheet=\"doxygen.css\"\n";
+}
+
+void FlowChart::endDot(FTextStream &t)
+{
+  t << " } \n";
+}
+
+void FlowChart::writeFlowChart()
+{
+  //  assert(VhdlDocGen::flowMember);
+
+  QCString ov = Config_getString("HTML_OUTPUT");
+  QCString fileName = ov+"/flow_design.dot";
+  QFile f(fileName);
+  FTextStream t(&f);
+
+  if (!f.open(IO_WriteOnly))
+  {
+    err("Cannot open file %s for writing\n",fileName.data());
+    return;
+  }
+
+  colTextNodes();
+
+#ifdef DEBUGFLOW
+  printFlowTree();
+#endif
+
+  startDot(t);
+  buildCommentNodes(t);
+
+  uint size=flowList.count();
+
+  for (uint j=0;j <size ;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+    writeShape(t,fll);
+  }
+  writeFlowLinks(t);
+
+  FlowChart::endDot(t);
+  delFlowList();
+  f.close();
+  FlowChart::createSVG();
+}// writeFlowChart
+
+void FlowChart::writeShape(FTextStream &t,const FlowChart* fl)
+{
+  if (fl->type & EEND) return;
+  QCString var;
+  if (fl->type & LOOP)
+  {
+    var=" loop";
+  }
+  else if (fl->type & IFF)
+  {
+    var=" then";
+  }
+  else
+  {
+    var="";
+  }
+
+  t<<getNodeName(fl->id).data();
+  QCString q=getNodeType(fl->type);
+
+#ifdef DEBUGFLOW
+  QCString qq(getNodeName(fl->id).data());
+  keyMap.insert(qq,fl->id);
+#endif
+
+  bool dec=(fl->type & DECLN);
+  bool exit=(fl->type & EXITNEXT);
+  if (exit && !fl->exp.isEmpty())
+  {
+    dec=TRUE;
+  }
+  if (dec)
+  {
+    QCString exp=fl->exp;
+    alignText(exp);
+
+    t << " [shape=diamond,style=filled,color=\"";
+    t << flowCol.decisionNode;
+    t << "\",label=\" ";
+    QCString kl;
+    if (exit) kl=fl->text+"  ";
+
+    if (fl->label)
+    {
+      kl+=fl->label+":"+exp+var;
+    }
+    else
+    {
+      kl+=exp+var;
+    }
+
+    FlowChart::alignCommentNode(t,kl);
+    t << "\"]\n";
+  }
+  else if (fl->type & ENDCL)
+  {
+    QCString val=fl->text;
+    t << " [shape=ellipse ,label=\""+val+"\"]\n";
+  }
+  else if (fl->type & STARTFIN)
+  {
+    QCString val=fl->text;
+    t << "[shape=box , style=rounded label=<\n";
+    t << "<TABLE BORDER=\"0\" CELLBORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\" >\n ";
+    t << "<TR><TD BGCOLOR=\"";
+    t<< flowCol.startEndNode;
+    t<< "\"> ";
+    FlowChart::alignCommentNode(t,val);
+    t << " </TD></TR></TABLE>>];";
+  }
+  else
+  {
+    if (fl->text.isEmpty()) return;
+    bool var=(fl->type & FlowChart::VARIABLE_NO);
+    QCString repl("<BR ALIGN=\"LEFT\"/>");
+    QCString q=fl->text;
+
+    if (exit)
+    {
+      q+=" "+fl->label;
+    }
+
+    int z=q.findRev("\n");
+
+    if (z==(int)q.length()-1)
+    {
+      q=q.remove(z,2);
+    }
+    t << "[shape=none margin=0.1, label=<\n";
+    t << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"2\" >\n ";
+    if (var)
+    {
+      t << "<TR><TD BGCOLOR=\"" << flowCol.varNode << "\" > ";
+    }
+    else
+    {
+      t << "<TR><TD BGCOLOR=\"" << flowCol.textNode << "\" > ";
+    }
+    FlowChart::alignCommentNode(t,q);
+    t << " </TD></TR></TABLE>>];";
+  }
+}
+
+
+void FlowChart::writeEdge(FTextStream &t,const FlowChart* fl_from,const FlowChart* fl_to,int i)
+{
+  bool b=fl_from->type & STARTL;
+  bool c=fl_to->type & STARTL;
+
+#ifdef DEBUGFLOW
+  QCString s1(getNodeName(fl_from->id).data());
+  QCString s2(getNodeName(fl_to->id).data());
+  QMap<QCString, int>::Iterator it = keyMap.find(s1);
+  QMap<QCString, int>::Iterator it1 = keyMap.find(s2);
+  // checks if the link is connected to a valid node
+  assert(it.key());
+  assert(it1.key());
+#endif
+
+  writeEdge(t,fl_from->id,fl_to->id,i,b,c);
+}
+
+void FlowChart::writeEdge(FTextStream &t,int fl_from,int fl_to,int i,bool bFrom,bool bTo)
+{
+  QCString label,col;
+
+  if (i==0)
+  {
+    col=flowCol.yesNodeLink;
+    label="yes";
+  }
+  else if (i==1)
+  {
+    col=flowCol.noNodeLink;
+    label="no";
+  }
+  else
+  {
+    col=flowCol.textNodeLink;
+    label="";
+  }
+
+  t << "edge [color=\""+col+"\",label=\""+label+"\"]\n";
+  t << getNodeName(fl_from).data();
+  if (bFrom) t << ":s";
+  t << "->";
+  t << getNodeName(fl_to).data();
+  if (bTo) t << ":n";
+  t << "\n";
+}
+
+void FlowChart::alignFuncProc( QCString & q,const ArgumentList* al,bool isFunc)
+{
+  if (al==0) return;
+
+  ArgumentListIterator ali(*al);
+  int index=ali.count();
+  if (index==0) return;
+
+  int len=q.length()+VhdlDocGen::getFlowMember()->name().length();
+  QCString prev,temp;
+  prev.fill(' ',len+1);
+
+  Argument *arg;
+  q+="\n";
+  for (;(arg=ali.current());++ali)
+  {
+    QCString attl=arg->defval+" ";
+    attl+=arg->name+" ";
+
+    if (!isFunc)
+    {
+      attl+=arg->attrib+" ";
+    }
+    else
+    {
+      attl+=" in ";
+    }
+    attl+=arg->type;
+    if (--index) attl+=",\n"; else attl+="\n";
+
+    attl.prepend(prev.data());
+    temp+=attl;
+  }
+
+  q+=temp;
+}
+
+int FlowChart::findNextLoop(int index,int stamp)
+{
+  for (uint j=index+1;j<flowList.count();j++)
+  {
+    FlowChart *flo=flowList.at(j);
+    if (flo->stamp==stamp)
+    {
+      continue;
+    }
+    if (flo->type&END_LOOP)
+    {
+      return j;
+    }
+  }
+  return flowList.count()-1;
+}
+
+int FlowChart::findPrevLoop(int index,int stamp,bool endif)
+{
+  for (uint j=index;j>0;j--)
+  {
+    FlowChart *flo=flowList.at(j);
+    if (flo->type & LOOP)
+    {
+      if (flo->stamp==stamp && endif)
+      {
+        return j;
+      }
+      else
+      {
+        if (flo->stamp<stamp)
+        {
+          return j;
+        }
+      }
+    }
+  }
+  return flowList.count()-1;
+}
+
+int FlowChart::findLabel(int index,QCString &label)
+{
+  for (uint j=index;j>0;j--)
+  {
+    FlowChart *flo=flowList.at(j);
+    if ((flo->type & LOOP) && !flo->label.isEmpty() && qstricmp(flo->label,label)==0)
+    {
+      return j;
+    }
+  }
+  err("could not find label: ",label.data());
+  return 0;
+}
+
+int FlowChart::findNode(int index,int stamp,int type)
+{
+  for (uint j=index+1;j<flowList.count();j++)
+  {
+    FlowChart *flo=flowList.at(j);
+    if (flo->type==type && flo->stamp==stamp)
+    {
+      return j;
+    }
+  }
+  return 0;
+}// findNode
+
+int FlowChart::getNextNode(int index,int stamp)
+{
+  for (uint j=index+1;j<flowList.count();j++)
+  {
+    FlowChart *flo=flowList.at(j);
+    int kind=flo->type;
+    int s=flo->stamp;
+    if (s>stamp)
+    {
+      continue;
+    }
+    if (kind & ENDIF_NO)
+    {
+      if (s<stamp && stamp>0)
+      {
+        stamp--;
+        continue;
+      }
+    }
+    if (kind & (ELSE_NO | ELSIF_NO))
+    {
+      if (s<stamp && stamp>0)
+      {
+        stamp--;
+      }
+      j=findNode(j,stamp,ENDIF_NO);
+      continue;
+    }
+    if (kind & WHEN_NO)
+    {
+      if (s<stamp && stamp>0)
+      {
+        stamp--;
+      }
+      return findNode(j,stamp-1,END_CASE);
+    }
+    return j;
+  }
+  return FLOWLEN;
+}
+
+int FlowChart::getNextIfLink(const FlowChart* fl,uint index)
+{
+  int stamp=fl->stamp;
+  uint start = index+1;
+  int endifNode  = findNode(start,stamp,ENDIF_NO);
+  int elseifNode = findNode(start,stamp,ELSIF_NO);
+  int elseNode   = findNode(start,stamp,ELSE_NO);
+
+  assert(endifNode>-1);
+
+  if (elseifNode>0 && elseifNode<endifNode)
+  {
+    return elseifNode;
+  }
+
+  if (elseNode>0 && elseNode<endifNode)
+  {
+    return elseNode+1;
+  }
+
+  stamp=flowList.at(endifNode)->stamp;
+  return getNextNode(endifNode,stamp);
+}
+
+void FlowChart::writeFlowLinks(FTextStream &t)
+{
+  uint size=flowList.count();
+  if (size<2) return;
+
+  // write start link
+  writeEdge(t,flowList.at(0),flowList.at(1),2);
+
+  for (uint j=0;j<size;j++)
+  {
+    FlowChart *fll=flowList.at(j);
+    int kind=fll->type;
+    int stamp=fll->stamp;
+    if (kind & EEND)
+    {
+      continue;
+    }
+
+    if (kind & IFF)
+    {
+      writeEdge(t,fll,flowList.at(j+1),0);
+      int z=getNextIfLink(fll,j);
+      // assert(z>-1);
+      writeEdge(t,fll,flowList.at(z),1);
+    }
+    else if (kind & LOOP_NO)
+    {
+      writeEdge(t,fll,flowList.at(j+1),2);
+      continue;
+    }
+    else if (kind & (CASE_NO | FOR_NO | WHILE_NO))
+    {
+      if (kind & CASE_NO)
+      {
+        writeEdge(t,fll,flowList.at(j+1),2);
+        continue;
+      }
+      else
+      {
+        writeEdge(t,fll,flowList.at(j+1),0);
+      }
+
+      kind=END_LOOP;
+      int z=findNode(j+1,fll->stamp,kind);
+      z=getNextNode(z,flowList.at(z)->stamp);
+
+      // assert(z>-1);
+      writeEdge(t,fll,flowList.at(z),1);
+      continue;
+    }
+    else if (kind & (TEXT_NO | VARIABLE_NO))
+    {
+      int z=getNextNode(j,stamp);
+      writeEdge(t,fll,flowList.at(z),2);
+    }
+    else if (kind & WHEN_NO)
+    {
+      // default value
+      if (qstricmp(fll->text.simplifyWhiteSpace().data(),"others")==0)
+      {
+        writeEdge(t,fll,flowList.at(j+1),2);
+        continue;
+      }
+
+
+      writeEdge(t,fll,flowList.at(j+1),0);
+      int u=findNode(j,stamp,WHEN_NO);
+      int v=findNode(j,stamp-1,END_CASE);
+
+      if (u>0 && u<v)
+      {
+        writeEdge(t,fll,flowList.at(u),1);
+      }
+      else
+      {
+        writeEdge(t,fll,flowList.at(v),1);
+      }
+    }
+    else if (kind & END_CASE)
+    {
+      int z=FlowChart::getNextNode(j,fll->stamp);
+      writeEdge(t,fll,flowList.at(z),2);
+    }
+    else if (kind & END_LOOP)
+    {
+      int z=findPrevLoop(j,fll->stamp,true);
+      writeEdge(t,fll,flowList.at(z),2);
+    }
+    else if (kind & RETURN_NO)
+    {
+      writeEdge(t,fll,FlowChart::flowList.at(size-1),2);
+    }
+    else if (kind & (EXIT_NO | NEXT_NO))
+    {
+      int z;
+      bool b = kind==NEXT_NO;
+      if (fll->exp)
+      {
+        writeEdge(t,fll,flowList.at(j+1),1);
+      }
+      if (!fll->label.isEmpty())
+      {
+        z=findLabel(j,fll->label);
+        if (b)
+        {
+          writeEdge(t,fll,flowList.at(z),0);
+        }
+        else
+        {
+          z=findNode(z,flowList.at(z)->stamp,END_LOOP);
+          z=getNextNode(z,flowList.at(z)->stamp);
+          writeEdge(t,fll,flowList.at(z),0);
+        }
+        continue;
+      }
+      else
+      {
+        if (b)
+        {
+          z=findPrevLoop(j,fll->stamp);
+          writeEdge(t,fll,flowList.at(z),0);
+          continue;
+        }
+        else
+        {
+          z =findNextLoop(j,fll->stamp-1);
+        }
+        z=getNextNode(z,flowList.at(z)->stamp);
+      }
+      writeEdge(t,fll,flowList.at(z),0);
+    }
+  } //for
+} //writeFlowLinks
+
+
+void VHDLLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
+    const char *scopeName,
+    const QCString &input,
+    SrcLangExt, // lang
+    bool isExampleBlock,
+    const char *exampleName,
+    FileDef *fileDef,
+    int startLine,
+    int endLine,
+    bool inlineFragment,
+    MemberDef *memberDef,
+    bool showLineNumbers,
+    Definition *searchCtx,
+    bool collectXRefs
+    )
+{
+
+parseVhdlCode(codeOutIntf,
+                 scopeName,
+                  input,
+                  isExampleBlock,
+                  exampleName,
+                  fileDef,
+                  startLine,
+                  endLine,
+                  inlineFragment,
+                  memberDef,
+                  showLineNumbers,
+                  searchCtx,
+                  collectXRefs
+
+);
+
+}

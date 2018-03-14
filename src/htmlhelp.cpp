@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -22,15 +22,20 @@
 #include <qlist.h>
 #include <qdict.h>
 #include <qregexp.h>
+#include <qfile.h>
+
 #include "qtextcodec.h"
 #include "sortdict.h"
-
 #include "htmlhelp.h"
 #include "config.h"
 #include "message.h"
 #include "doxygen.h"
 #include "language.h"
 #include "portable.h"
+#include "groupdef.h"
+#include "memberdef.h"
+#include "filedef.h"
+#include "util.h"
 
 //----------------------------------------------------------------------------
 
@@ -50,9 +55,10 @@ class IndexFieldSDict : public SDict<IndexField>
   public:
     IndexFieldSDict() : SDict<IndexField>(17) {}
    ~IndexFieldSDict() {}
-    int compareItems(GCI item1, GCI item2)
+ private:
+    int compareValues(const IndexField *item1, const IndexField *item2) const
     {
-      return stricmp(((IndexField *)item1)->name,((IndexField *)item2)->name);
+      return qstricmp(item1->name,item2->name);
     }
 };
 
@@ -121,6 +127,16 @@ void HtmlHelpIndex::addItem(const char *level1,const char *level2,
     f->reversed = reversed;
     dict->append(key,f);
   }
+}
+
+static QCString field2URL(const IndexField *f,bool checkReversed)
+{
+  QCString result = f->url + Doxygen::htmlFileExtension;
+  if (!f->anchor.isEmpty() && (!checkReversed || f->reversed)) 
+  {
+    result+="#"+f->anchor;  
+  }
+  return result;
 }
 
 /*! Writes the sorted list of index items into a html like list.
@@ -198,8 +214,7 @@ void HtmlHelpIndex::writeFields(FTextStream &t)
       if (level2.isEmpty())
       {
         t << "  <LI><OBJECT type=\"text/sitemap\">";
-        t << "<param name=\"Local\" value=\"" << f->url << Doxygen::htmlFileExtension;
-        if (!f->anchor.isEmpty() && f->reversed) t << "#" << f->anchor;  
+        t << "<param name=\"Local\" value=\"" << field2URL(f,TRUE);
         t << "\">";
         t << "<param name=\"Name\" value=\"" << m_help->recode(level1) << "\">"
            "</OBJECT>\n";
@@ -209,8 +224,7 @@ void HtmlHelpIndex::writeFields(FTextStream &t)
         if (f->link)
         {
           t << "  <LI><OBJECT type=\"text/sitemap\">";
-          t << "<param name=\"Local\" value=\"" << f->url << Doxygen::htmlFileExtension;
-          if (!f->anchor.isEmpty() && f->reversed) t << "#" << f->anchor;  
+          t << "<param name=\"Local\" value=\"" << field2URL(f,TRUE);
           t << "\">";
           t << "<param name=\"Name\" value=\"" << m_help->recode(level1) << "\">"
                "</OBJECT>\n";
@@ -237,8 +251,7 @@ void HtmlHelpIndex::writeFields(FTextStream &t)
     if (level2Started)
     {
       t << "    <LI><OBJECT type=\"text/sitemap\">";
-      t << "<param name=\"Local\" value=\"" << f->url << Doxygen::htmlFileExtension;
-      if (!f->anchor.isEmpty()) t << "#" << f->anchor;  
+      t << "<param name=\"Local\" value=\"" << field2URL(f,FALSE);
       t << "\">";
       t << "<param name=\"Name\" value=\"" << m_help->recode(level2) << "\">"
          "</OBJECT>\n";
@@ -293,7 +306,7 @@ void HtmlHelp::initialize()
   m_fromUtf8 = portable_iconv_open(str,"UTF-8"); 
   if (m_fromUtf8==(void *)(-1))
   {
-    err("Error: unsupported character conversion for CHM_INDEX_ENCODING: '%s'->'UTF-8'\n", str);
+    err("unsupported character conversion for CHM_INDEX_ENCODING: '%s'->'UTF-8'\n", str);
     exit(1);
   }
 
@@ -372,6 +385,7 @@ void HtmlHelp::initialize()
 	 0x422 Ukrainian
 	 0x81A Serbian (Serbia, Latin)
 	 0x403 Catalan
+	 0x426 Latvian
 	 0x427 Lithuanian
 	 0x436 Afrikaans
 	 0x42A Vietnamese
@@ -394,7 +408,7 @@ void HtmlHelp::initialize()
   s_languageDict.insert("norwegian",   new QCString("0x814 Norwegian"));
   s_languageDict.insert("polish",      new QCString("0x415 Polish"));
   s_languageDict.insert("portuguese",  new QCString("0x816 Portuguese(Portugal)"));
-  s_languageDict.insert("brazil",      new QCString("0x416 Portuguese(Brazil)"));
+  s_languageDict.insert("brazilian",   new QCString("0x416 Portuguese(Brazil)"));
   s_languageDict.insert("russian",     new QCString("0x419 Russian"));
   s_languageDict.insert("spanish",     new QCString("0x40A Spanish(Traditional Sort)"));
   s_languageDict.insert("swedish",     new QCString("0x41D Swedish"));
@@ -420,6 +434,14 @@ void HtmlHelp::initialize()
   s_languageDict.insert("vietnamese",  new QCString("0x42A Vietnamese"));
   s_languageDict.insert("persian",     new QCString("0x429 Persian (Iran)"));
   s_languageDict.insert("arabic",      new QCString("0xC01 Arabic (Egypt)"));
+  s_languageDict.insert("latvian",     new QCString("0x426 Latvian"));
+  s_languageDict.insert("macedonian",  new QCString("0x042f Macedonian (Former Yugoslav Republic of Macedonia)"));
+  s_languageDict.insert("armenian",    new QCString("0x42b Armenian"));
+  //Code for Esperanto should be as shown below but the htmlhelp compiler 1.3 does not support this
+  // (and no newer version is available).
+  //So do a fallback to the default language (see getLanguageString())
+  //s_languageDict.insert("esperanto",   new QCString("0x48f Esperanto"));
+  s_languageDict.insert("serbian-cyrillic", new QCString("0xC1A Serbian (Serbia, Cyrillic)"));
 }
 
 
@@ -449,7 +471,6 @@ void HtmlHelp::createProjectFile()
     FTextStream t(&f);
     
     QCString indexName="index"+Doxygen::htmlFileExtension;
-    //if (Config_getBool("GENERATE_TREEVIEW")) indexName="main"+Doxygen::htmlFileExtension;
     t << "[OPTIONS]\n";
     if (!Config_getString("CHM_FILE").isEmpty())
     {
@@ -474,9 +495,22 @@ void HtmlHelp::createProjectFile()
     //       the font-size one is not normally settable by the HTML Help Workshop
     //       utility but the way to set it is described here:
     //          http://support.microsoft.com/?scid=kb%3Ben-us%3B240062&x=17&y=18
-    t << "main=\"" << recode(Config_getString("PROJECT_NAME")) << "\",\"index.hhc\","
+    // NOTE: the 0x70387e number in addition to the above the Next and Prev button
+    //       are shown. They can only be shown in case of a binary toc.
+    //          dee http://www.mif2go.com/xhtml/htmlhelp_0016_943addingtabsandtoolbarbuttonstohtmlhelp.htm#Rz108x95873
+    //       Value has been taken from htmlhelp.h file of the HTML Help Workshop
+    if (Config_getBool("BINARY_TOC"))
+    {
+      t << "main=\"" << recode(Config_getString("PROJECT_NAME")) << "\",\"index.hhc\","
+         "\"index.hhk\",\"" << indexName << "\",\"" << 
+         indexName << "\",,,,,0x23520,,0x70387e,,,,,,,,0" << endl << endl;
+    }
+    else
+    {
+      t << "main=\"" << recode(Config_getString("PROJECT_NAME")) << "\",\"index.hhc\","
          "\"index.hhk\",\"" << indexName << "\",\"" << 
          indexName << "\",,,,,0x23520,,0x10387e,,,,,,,,0" << endl << endl;
+    }
     
     t << "[FILES]" << endl;
     char *s = indexFiles.first();
@@ -485,52 +519,6 @@ void HtmlHelp::createProjectFile()
       t << s << endl;
       s = indexFiles.next();
     }
-#if 0
-    // items not found by the html help compiler scan.
-    t << "tabs.css" << endl;
-    t << "tab_a.png" << endl;
-    t << "tab_b.png" << endl;
-    t << "tab_h.png" << endl;
-    t << "tab_s.png" << endl;
-    t << "nav_h.png" << endl;
-    t << "nav_f.png" << endl;
-    t << "bc_s.png" << endl;
-    if (Config_getBool("HTML_DYNAMIC_SECTIONS"))
-    {
-      t << "open.png" << endl;
-      t << "closed.png" << endl;
-    }
-    if (Config_getBool("GENERATE_HTMLHELP"))
-    {
-      t << "ftv2blank.png" << endl;
-      t << "ftv2doc.png" << endl;
-      t << "ftv2folderclosed.png" << endl;
-      t << "ftv2folderopen.png" << endl;
-      t << "ftv2lastnode.png" << endl;
-      t << "ftv2link.png" << endl;
-      t << "ftv2mlastnode.png" << endl;
-      t << "ftv2mnode.png" << endl;
-      t << "ftv2node.png" << endl;
-      t << "ftv2plastnode.png" << endl;
-      t << "ftv2pnode.png" << endl;
-      t << "ftv2vertline.png" << endl;
-    }
-    if (Config_getBool("SEARCHENGINE"))
-    {
-      t << "search_l.png" << endl;
-      t << "search_m.png" << endl;
-      t << "search_r.png" << endl;
-      if (Config_getBool("SERVER_BASED_SEARCH"))
-      {
-        t << "mag.png" << endl;
-      }
-      else
-      {
-        t << "mag_sel.png" << endl;
-        t << "close.png" << endl;
-      }
-    }
-#endif
     uint i;
     for (i=0;i<imageFiles.count();i++)
     {
@@ -610,11 +598,11 @@ QCString HtmlHelp::recode(const QCString &s)
   QCString output(oSize);
   size_t iLeft     = iSize;
   size_t oLeft     = oSize;
-  const char *iPtr = s.data();
+  char *iPtr       = s.data();
   char *oPtr       = output.data();
   if (!portable_iconv(m_fromUtf8,&iPtr,&iLeft,&oPtr,&oLeft))
   {
-    oSize -= oLeft;
+    oSize -= (int)oLeft;
     output.resize(oSize+1);
     output.at(oSize)='\0';
     return output;
@@ -645,18 +633,32 @@ void HtmlHelp::addContentsItem(bool isDir,
                                Definition * /* def */)
 {
   // If we're using a binary toc then folders cannot have links. 
-  if(Config_getBool("BINARY_TOC") && isDir) 
-  {
-    file = 0;
-    anchor = 0;
-  }
+  // Tried this and I didn't see any problems, when not using
+  // the resetting of file and anchor the TOC works better
+  // (prev / next button)
+  //if(Config_getBool("BINARY_TOC") && isDir) 
+  //{
+    //file = 0;
+    //anchor = 0;
+  //}
   int i; for (i=0;i<dc;i++) cts << "  ";
   cts << "<LI><OBJECT type=\"text/sitemap\">";
-  cts << "<param name=\"Name\" value=\"" << recode(name) << "\">";
+  cts << "<param name=\"Name\" value=\"" << convertToHtml(recode(name),TRUE) << "\">";
   if (file)      // made file optional param - KPW
   {
-    cts << "<param name=\"Local\" value=\"" << file << Doxygen::htmlFileExtension;
-    if (anchor) cts << "#" << anchor;  
+    if (file && (file[0]=='!' || file[0]=='^')) // special markers for user defined URLs
+    {
+      cts << "<param name=\"";
+      if (file[0]=='^') cts << "URL"; else cts << "Local";
+      cts << "\" value=\"";
+      cts << &file[1];
+    }
+    else
+    {
+      cts << "<param name=\"Local\" value=\"";
+      cts << file << Doxygen::htmlFileExtension;
+      if (anchor) cts << "#" << anchor;  
+    }
     cts << "\">";
   }
   cts << "<param name=\"ImageNumber\" value=\"";
@@ -674,7 +676,7 @@ void HtmlHelp::addContentsItem(bool isDir,
 
 
 void HtmlHelp::addIndexItem(Definition *context,MemberDef *md,
-                            const char *word)
+                            const char *sectionAnchor,const char *word)
 {
   if (md)
   {
@@ -694,19 +696,19 @@ void HtmlHelp::addIndexItem(Definition *context,MemberDef *md,
     QCString level2  = md->name();
     QCString contRef = separateMemberPages ? cfname : cfiname;
     QCString memRef  = cfname;
-    QCString anchor  = md->anchor();
+    QCString anchor  = sectionAnchor ? QCString(sectionAnchor) : md->anchor();
     index->addItem(level1,level2,contRef,anchor,TRUE,FALSE);
     index->addItem(level2,level1,memRef,anchor,TRUE,TRUE);
   }
   else if (context)
   {
     QCString level1  = word ? QCString(word) : context->name();
-    index->addItem(level1,0,context->getOutputFileBase(),0,TRUE,FALSE);
+    index->addItem(level1,0,context->getOutputFileBase(),sectionAnchor,TRUE,FALSE);
   }
 }
 
 void HtmlHelp::addImageFile(const char *fileName)
 {
-  imageFiles.append(fileName);
+  if (!imageFiles.contains(fileName)) imageFiles.append(fileName);
 }
 

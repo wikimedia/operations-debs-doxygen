@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -30,6 +30,13 @@
 #include "doxygen.h"
 #include "outputgen.h"
 #include "parserintf.h"
+#include "classdef.h"
+#include "namespacedef.h"
+#include "filedef.h"
+#include "util.h"
+#include "classlist.h"
+#include "config.h"
+#include "filename.h"
 
 class XRefDummyCodeGenerator : public CodeOutputInterface
 {
@@ -41,14 +48,19 @@ class XRefDummyCodeGenerator : public CodeOutputInterface
     // and cross-linked version of the source code, but who needs that anyway ;-)
     void codify(const char *) {}
     void writeCodeLink(const char *,const char *,const char *,const char *,const char *)  {}
-    void startCodeLine() {}
+    void writeLineNumber(const char *,const char *,const char *,int) {}
+    virtual void writeTooltip(const char *,const DocLinkInfo &,
+                              const char *,const char *,const SourceLinkInfo &, 
+                              const SourceLinkInfo &) {}
+    void startCodeLine(bool) {}
     void endCodeLine() {}
     void startCodeAnchor(const char *) {}
     void endCodeAnchor() {}
     void startFontClass(const char *) {}
     void endFontClass() {}
     void writeCodeAnchor(const char *) {}
-    void writeLineNumber(const char *,const char *,const char *,int) {}
+    void setCurrentDoc(Definition *,const char *,bool) {}
+    void addWord(const char *,bool) {}
 
     // here we are presented with the symbols found by the code parser
     void linkableSymbol(int l, const char *sym,Definition *symDef,Definition *context) 
@@ -98,6 +110,9 @@ static void findXRefSymbols(FileDef *fd)
   // get the interface to a parser that matches the file extension
   ParserInterface *pIntf=Doxygen::parserManager->getParser(fd->getDefFileExtension());
 
+  // get the programming language from the file name
+  SrcLangExt lang = getLanguageFromFileName(fd->name());
+
   // reset the parsers state
   pIntf->resetCodeParserState();
 
@@ -108,6 +123,7 @@ static void findXRefSymbols(FileDef *fd)
   pIntf->parseCode(*xrefGen,
                 0,
                 fileToString(fd->absFilePath()),
+                lang,
                 FALSE,
                 0,
                 fd);

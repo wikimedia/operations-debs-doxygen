@@ -12,7 +12,7 @@
 # Documents produced by Doxygen are derivative works derived from the
 # input used in their production; they are not affected by this license.
 
-PROJECT_NAME      = 
+PROJECT_NAME      = "Doxygen"
 OUTPUT_DIRECTORY  = ..
 HTML_HEADER       = 
 HTML_FOOTER       = 
@@ -35,11 +35,11 @@ CASE_SENSE_NAMES  = NO
 IMAGE_PATH        = .
 INPUT             = index.doc install.doc starting.doc docblocks.doc markdown.doc \
                     lists.doc grouping.doc formulas.doc diagrams.doc preprocessing.doc \
-                    autolink.doc output.doc searching.doc customize.doc custcmd.doc \
+                    autolink.doc output.doc searching.doc extsearch.doc customize.doc custcmd.doc \
                     external.doc faq.doc trouble.doc features.doc \
 		    doxygen_usage.doc doxywizard_usage.doc \
 		    config.doc commands.doc htmlcmds.doc xmlcmds.doc language.doc \
-                    perlmod.doc perlmod_tree.doc arch.doc 
+                    perlmod.doc perlmod_tree.doc arch.doc changelog.doc
 FILE_PATTERNS     = *.cpp *.h *.doc
 EXAMPLE_PATH      = ../examples
 RECURSIVE         = NO
@@ -51,3 +51,5 @@ PDF_HYPERLINKS    = YES
 USE_PDFLATEX      = YES
 STRIP_CODE_COMMENTS = NO
 HTML_STYLESHEET   = doxygen_manual.css
+ALIASES           = LaTeX="\f$\mbox{\LaTeX}\f$"
+ALIASES          += TeX="\f$\mbox{\TeX}\f$"

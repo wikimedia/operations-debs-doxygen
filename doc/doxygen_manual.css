@@ -871,7 +871,7 @@ div.header
 
 div.headertitle
 {
-	padding: 5px 5px 5px 7px;
+	padding: 5px 5px 5px 0px;
 }
 
 dl
@@ -983,6 +983,8 @@ dl.section dd {
 	margin: 0px;
 	width: 100%;
 	border-bottom: 1px solid #848484;
+        visibility: hidden;
+	height: 0px;
 }
 
 .image

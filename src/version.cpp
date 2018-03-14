@@ -1,1 +1,1 @@
-char versionString[]="1.8.1.2";
+char versionString[]="1.8.8";

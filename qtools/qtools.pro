@@ -1,5 +1,5 @@
 #
-# This file was generated from qtools.pro.in on Thu Jul 12 20:08:34 CEST 2012
+# This file was generated from qtools.pro.in on Thu Aug 21 10:48:35 CEST 2014
 #
 
 TEMPLATE	= lib
@@ -30,7 +30,7 @@ HEADERS		= qarray.h \
 		  qgvector.h \
 		  qintdict.h \
 		  qiodevice.h \
-		  qlist.h \
+		  qinternallist.h \
 		  qptrdict.h \
 		  qqueue.h \
 		  qregexp.h \
@@ -102,6 +102,8 @@ INCLUDEPATH = .
 TMAKE_CXXFLAGS += -DQT_LITE_UNICODE
 win32:TMAKE_CXXFLAGS += -DQT_NODLL
 win32-g++:TMAKE_CXXFLAGS += -D__CYGWIN__ -DALL_STATIC
-OBJECTS_DIR = ../objects
+OBJECTS_DIR = ../objects/qtools
 DESTDIR = ../lib
 TMAKE_MOC = /usr/bin/moc
+LIBS += -L/opt/local/lib
+INCLUDEPATH += /opt/local/include

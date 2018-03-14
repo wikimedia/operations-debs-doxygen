@@ -30,7 +30,7 @@ extern char **environ;
 static double  g_sysElapsedTime;
 static QTime   g_time;
 
-int  portable_system(const char *command,const char *args,bool commandHasConsole)
+int portable_system(const char *command,const char *args,bool commandHasConsole)
 {
 
   if (command==0) return 1;
@@ -49,7 +49,7 @@ int  portable_system(const char *command,const char *args,bool commandHasConsole
 #endif
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
-  commandHasConsole=commandHasConsole;
+  (void)commandHasConsole;
   /*! taken from the system() manpage on my Linux box */
   int pid,status=0;
 
@@ -84,7 +84,11 @@ int  portable_system(const char *command,const char *args,bool commandHasConsole
 #else  // Other Unices just use fork
 
   pid = fork();
-  if (pid==-1) return -1;
+  if (pid==-1)
+  {
+    perror("fork error");
+	  return -1;
+  }
   if (pid==0)
   {
     const char * argv[4];
@@ -130,20 +134,23 @@ int  portable_system(const char *command,const char *args,bool commandHasConsole
     // For that case COM is initialized as follows
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
+    QString commandw = QString::fromUtf8( command );
+    QString argsw = QString::fromUtf8( args );
+
     // gswin32 is a GUI api which will pop up a window and run
     // asynchronously. To prevent both, we use ShellExecuteEx and
     // WaitForSingleObject (thanks to Robert Golias for the code)
 
-    SHELLEXECUTEINFO sInfo = {
-      sizeof(SHELLEXECUTEINFO),   /* structure size */
+    SHELLEXECUTEINFOW sInfo = {
+      sizeof(SHELLEXECUTEINFOW),   /* structure size */
       SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI,  /* tell us the process
                                                        *  handle so we can wait till it's done | 
                                                        *  do not display msg box if error 
                                                        */
       NULL,                       /* window handle */
       NULL,                       /* action to perform: open */
-      command,                    /* file to execute */
-      args,                       /* argument list */ 
+      (LPCWSTR)commandw.ucs2(),   /* file to execute */
+      (LPCWSTR)argsw.ucs2(),      /* argument list */ 
       NULL,                       /* use current working dir */
       SW_HIDE,                    /* minimize on start-up */
       0,                          /* application instance handle */
@@ -154,7 +161,8 @@ int  portable_system(const char *command,const char *args,bool commandHasConsole
       NULL,                       /* ignored: icon */
       NULL                        /* resulting application handle */
     };
-    if (!ShellExecuteEx(&sInfo))
+
+    if (!ShellExecuteExW(&sInfo))
     {
       return -1;
     }
@@ -190,15 +198,16 @@ void portable_setenv(const char *name,const char *value)
 #else
     register char **ep = 0;
     register size_t size;
-    const size_t namelen=strlen(name);
-    const size_t vallen=strlen(value) + 1;
+    const size_t namelen=qstrlen(name);
+    const size_t vallen=qstrlen(value) + 1;
 
     size = 0;
     if (environ!=0)
     {
       for (ep = environ; *ep; ++ep)
       {
-        if (!strncmp (*ep, name, namelen) && (*ep)[namelen] == '=')
+        if (!qstrncmp (*ep, name, (uint)namelen) &&
+            (*ep)[namelen] == '=')
           break;
         else
           ++size;
@@ -243,7 +252,7 @@ void portable_setenv(const char *name,const char *value)
     }
     else /* replace existing string */
     {
-      size_t len = strlen (*ep);
+      size_t len = qstrlen (*ep);
       if (len + 1 < namelen + 1 + vallen)
       {
         /* The existing string is too short; malloc a new one.  */
@@ -276,12 +285,12 @@ void portable_unsetenv(const char *variable)
       return; // not properly formatted
     }
 
-    len = strlen(variable);
+    len = qstrlen(variable);
 
     ep = environ;
     while (*ep != NULL)
     {
-      if (!strncmp(*ep, variable, len) && (*ep)[len]=='=')
+      if (!qstrncmp(*ep, variable, (uint)len) && (*ep)[len]=='=')
       {
         /* Found it.  Remove this pointer by moving later ones back.  */
         char **dp = ep;
@@ -303,7 +312,9 @@ const char *portable_getenv(const char *variable)
 
 portable_off_t portable_fseek(FILE *f,portable_off_t offset, int whence)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(__MINGW32__)
+  return fseeko64(f,offset,whence);
+#elif defined(_WIN32) && !defined(__CYGWIN__)
   return _fseeki64(f,offset,whence);
 #else
   return fseeko(f,offset,whence);
@@ -312,7 +323,9 @@ portable_off_t portable_fseek(FILE *f,portable_off_t offset, int whence)
 
 portable_off_t portable_ftell(FILE *f)
 {
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(__MINGW32__)
+  return ftello64(f);  
+#elif defined(_WIN32) && !defined(__CYGWIN__)
   return _ftelli64(f);
 #else
   return ftello(f);
@@ -408,3 +421,22 @@ void portable_sleep(int ms)
   usleep(1000*ms);
 #endif
 }
+
+bool portable_isAbsolutePath(const char *fileName)
+{
+# ifdef _WIN32
+  if (isalpha (fileName [0]) && fileName[1] == ':')
+    fileName += 2;
+# endif
+  char const fst = fileName [0];
+  if (fst == '/')  {
+    return true;
+  }
+# ifdef _WIN32
+  if (fst == '\\')
+    return true;
+# endif
+  return false;
+}
+
+

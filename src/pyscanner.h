@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: pyscanner.h,v 1.9 2001/03/19 19:27:39 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -35,13 +35,18 @@ class PythonLanguageScanner : public ParserInterface
 {
   public:
     virtual ~PythonLanguageScanner() {}
+    void startTranslationUnit(const char *) {}
+    void finishTranslationUnit() {}
     void parseInput(const char * fileName, 
                     const char *fileBuf, 
-                    Entry *root);
+                    Entry *root,
+                    bool sameTranslationUnit,
+                    QStrList &filesInSameTranslationUnit);
     bool needsPreprocessing(const QCString &extension);
     void parseCode(CodeOutputInterface &codeOutIntf,
                    const char *scopeName,
                    const QCString &input,
+                   SrcLangExt lang,
                    bool isExampleBlock,
                    const char *exampleName=0,
                    FileDef *fileDef=0,
@@ -49,7 +54,9 @@ class PythonLanguageScanner : public ParserInterface
                    int endLine=-1,
                    bool inlineFragment=FALSE,
                    MemberDef *memberDef=0,
-                   bool showLineNumbers=TRUE
+                   bool showLineNumbers=TRUE,
+                   Definition *searchCtx=0,
+                   bool collectXrefs=TRUE
                   );
     void resetCodeParserState();
     void parsePrototype(const char *text);

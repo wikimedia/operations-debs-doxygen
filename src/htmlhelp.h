@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: htmlhelp.h,v 1.7 2001/03/19 19:27:40 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,8 +21,8 @@
 #ifndef HTMLHELP_H
 #define HTMLHELP_H
 
-#include "qtbc.h"
 #include <qstrlist.h>
+#include <qdict.h>
 #include "index.h"
 #include "ftextstream.h"
 
@@ -79,7 +79,8 @@ class HtmlHelp  : public IndexIntf
                          bool separateIndex,
                          bool addToNavIndex,
                          Definition *def);
-    void addIndexItem(Definition *context,MemberDef *md,const char *title);
+    void addIndexItem(Definition *context,MemberDef *md,
+                      const char *sectionAnchor, const char *title);
     void addIndexFile(const char *name);
     void addImageFile(const char *);
     void addStyleSheetFile(const char *) {}

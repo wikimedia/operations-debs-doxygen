@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -20,6 +20,8 @@
 
 // Updates:
 // --------
+// 2013/04/11 - Updates for "new since 1.8.4".
+// 2012/07/31 - Updates for "new since 1.8.2".
 // 2012/04/10 - Updates for "new since 1.8.0".
 // 2011/07/28 - Updates for "new since 1.7.5".
 // 2010/06/01 - typo
@@ -95,12 +97,6 @@ class TranslatorCzech : public Translator
     {
       return "\\usepackage[T2A]{fontenc}\n"
              "\\usepackage[czech]{babel}\n";
-    }
-
-    /*! return the language charset. This will be used for the HTML output */
-    virtual QCString idLanguageCharset()
-    {
-        return "utf-8";
     }
 
     // --- Language translation methods -------------------
@@ -458,12 +454,6 @@ class TranslatorCzech : public Translator
     { return "Definice maker"; }
 
     /*! This is used in the documentation of a file as a header before the
-     *  list of function prototypes
-     */
-    virtual QCString trFuncProtos()
-    { return "Prototypy"; }
-
-    /*! This is used in the documentation of a file as a header before the
      *  list of typedefs
      */
     virtual QCString trTypedefs()
@@ -498,12 +488,6 @@ class TranslatorCzech : public Translator
      */
     virtual QCString trDefineDocumentation()
     { return "Dokumentace k definicím maker"; }
-
-    /*! This is used in the documentation of a file/namespace before the list
-     *  of documentation blocks for function prototypes
-     */
-    virtual QCString trFunctionPrototypeDocumentation()
-    { return "Dokumentace prototypů"; }
 
     /*! This is used in the documentation of a file/namespace before the list
      *  of documentation blocks for typedefs
@@ -555,12 +539,6 @@ class TranslatorCzech : public Translator
           result += QCString(" pro projekt ") + projName;
       result += " programem";
       return result;
-    }
-    /*! This is part of the sentence used in the standard footer of each page.
-     */
-    virtual QCString trWrittenBy()
-    {
-      return " -- autor ";
     }
 
     /*! this text is put before a class diagram */
@@ -656,6 +634,7 @@ class TranslatorCzech : public Translator
         case ClassDef::Protocol:   result += "protokolu "; break;
         case ClassDef::Category:   result += "kategorie "; break;
         case ClassDef::Exception:  result += "výjimky "; break;
+        default: break;
       }
       result += clName;
       return result;
@@ -828,18 +807,13 @@ class TranslatorCzech : public Translator
         case ClassDef::Protocol:   result+="tento protokol "; break;
         case ClassDef::Category:   result+="tuto kategorii "; break;
         case ClassDef::Exception:  result+="tuto výjimku"; break;
+        default: break;
       }
       result+=" byla generována z ";
       if (single) result+="následujícího souboru:";
       else        result+="následujících souborů:";
       return result;
     }
-
-    /*! This is in the (quick) index as a link to the alphabetical compound
-     * list.
-     */
-    virtual QCString trAlphabeticalList()
-    { return "Rejstřík tříd"; }
 
 //////////////////////////////////////////////////////////////////////////
 // new since 0.49-990901
@@ -1154,16 +1128,6 @@ class TranslatorCzech : public Translator
     }
 
 //////////////////////////////////////////////////////////////////////////
-// new since 1.2.1
-//////////////////////////////////////////////////////////////////////////
-
-    /*! Used as a section header for KDE-2 IDL methods */
-    virtual QCString trDCOPMethods()
-    {
-      return "Metody DCOP";
-    }
-
-//////////////////////////////////////////////////////////////////////////
 // new since 1.2.2
 //////////////////////////////////////////////////////////////////////////
 
@@ -1473,13 +1437,6 @@ class TranslatorCzech : public Translator
 // new since 1.3.3
 //////////////////////////////////////////////////////////////////////////
 
-    /*! When the search engine is enabled this text is put in the index
-     *  of each page before the search field.
-     */
-    virtual QCString trSearchForIndex()
-    {
-      return "Vyhledat";
-    }
     /*! This string is used as the title for the page listing the search
      *  results.
      */
@@ -1718,6 +1675,7 @@ class TranslatorCzech : public Translator
         case ClassDef::Protocol:   result += "protokolu "; break;
         case ClassDef::Category:   result += "kategorie "; break;
         case ClassDef::Exception:  result += "výjimky "; break;
+        default: break;
       }
       result += clName;
       return result;
@@ -1785,6 +1743,7 @@ class TranslatorCzech : public Translator
         case ClassDef::Protocol:   result+="k tomuto protokolu"; break;
         case ClassDef::Category:   result+="k této kategorii"; break;
         case ClassDef::Exception:  result+="k této výjimce"; break;
+        default: break;
       }
       result+=" byla vygenerována z ";
       if (single) result+="následujícího souboru:";
@@ -1855,12 +1814,6 @@ class TranslatorCzech : public Translator
 //////////////////////////////////////////////////////////////////////////
 // new since 1.6.3 (missing items for the directory pages)
 //////////////////////////////////////////////////////////////////////////
-
-    /*! introduction text for the directory dependency graph */
-    virtual QCString trDirDependency(const char *name)
-    {
-      return (QCString)"Graf závislosti adresářů pro "+name;
-    }
 
     /*! when clicking a directory dependency label, a page with a
      *  table is shown. The heading for the first column mentions the
@@ -1964,6 +1917,126 @@ class TranslatorCzech : public Translator
     { return "Další zděděné členy"; }
 
 //////////////////////////////////////////////////////////////////////////
+// new since 1.8.2
+//////////////////////////////////////////////////////////////////////////
+
+    /*! Used as a tooltip for the toggle button that appears in the
+     *  navigation tree in the HTML output when GENERATE_TREEVIEW is
+     *  enabled. This tooltip explains the meaning of the button.
+     */
+    virtual QCString trPanelSynchronisationTooltip(bool enable)
+    {
+      QCString opt = enable ? "povolit" : "zakázat";
+      return opt + " synchronizaci panelů";
+    }
+
+    /*! Used in a method of an Objective-C class that is declared in a
+     *  a category. Note that the @1 marker is required and is replaced
+     *  by a link.
+     */
+    virtual QCString trProvidedByCategory()
+    {
+      return "Deklarováno v kategorii @1.";
+    }
+
+    /*! Used in a method of an Objective-C category that extends a class.
+     *  Note that the @1 marker is required and is replaced by a link to
+     *  the class method.
+     */
+    virtual QCString trExtendsClass()
+    {
+      return "Rozšiřuje třídu @1.";
+    }
+
+    /*! Used as the header of a list of class methods in Objective-C.
+     *  These are similar to static public member functions in C++.
+     */
+    virtual QCString trClassMethods()
+    {
+      return "Metody třídy";
+    }
+
+    /*! Used as the header of a list of instance methods in Objective-C.
+     *  These are similar to public member functions in C++.
+     */
+    virtual QCString trInstanceMethods()
+    {
+      return "Metody instance";
+    }
+
+    /*! Used as the header of the member functions of an Objective-C class.
+     */
+    virtual QCString trMethodDocumentation()
+    {
+      return "Dokumentace metody";
+    }
+
+    /*! Used as the title of the design overview picture created for the
+     *  VHDL output.
+     */
+    virtual QCString trDesignOverview()
+    {
+      return "Návrhové schéma";
+    }
+
+//////////////////////////////////////////////////////////////////////////
+// new since 1.8.4
+//////////////////////////////////////////////////////////////////////////
+
+    /** old style UNO IDL services: implemented interfaces */
+    virtual QCString trInterfaces()
+    { return "Exportovaná rozhraní"; }
+
+    /** old style UNO IDL services: inherited services */
+    virtual QCString trServices()
+    { return "Začleněné služby"; }
+
+    /** UNO IDL constant groups */
+    virtual QCString trConstantGroups()
+    { return "Konstantní skupiny"; }
+
+    /** UNO IDL constant groups */
+    virtual QCString trConstantGroupReference(const char *namespaceName)
+    {
+      QCString result="Konstantní skupiny z ";
+      result += namespaceName;
+      return result;
+    }
+    /** UNO IDL service page title */
+    virtual QCString trServiceReference(const char *sName)
+    {
+      QCString result="Popis služby ";
+      result += sName;
+      return result;
+    }
+    /** UNO IDL singleton page title */
+    virtual QCString trSingletonReference(const char *sName)
+    {
+      QCString result="Popis singletonu ";
+      result += sName;
+      return result;
+    }
+    /** UNO IDL service page */
+    virtual QCString trServiceGeneratedFromFiles(bool single)
+    {
+      // single is true implies a single file
+      QCString result="Dokumentace k této službě byla generována ";
+      if (single) result+="z následujícího souboru:";
+      else        result+="z následujících souborů:";
+      return result;
+    }
+    /** UNO IDL singleton page */
+    virtual QCString trSingletonGeneratedFromFiles(bool single)
+    {
+      // single is true implies a single file
+      QCString result="Dokumentace k tomuto singletonu byla generována ";
+      if (single) result+="z následujícího souboru:";
+      else        result+="z následujících souborů:";
+      return result;
+    }
+
+//////////////////////////////////////////////////////////////////////////
+
 };
 
 #endif // TRANSLATOR_CZ_H

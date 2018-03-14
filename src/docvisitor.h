@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: $
+ * 
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -27,6 +27,7 @@ const int DocVisitor_RTF   = 3;
 const int DocVisitor_Man   = 4;
 const int DocVisitor_Text  = 5;
 const int DocVisitor_Other = 6;
+const int DocVisitor_Docbook = 7;
 
 // forward declarations
 class DocWord;
@@ -66,6 +67,7 @@ class DocHtmlHeader;
 class DocImage;
 class DocDotFile;
 class DocMscFile;
+class DocDiaFile;
 class DocLink;
 class DocCite;
 class DocRef;
@@ -80,6 +82,8 @@ class DocCopy; // TODO: no longer generated => remove
 class DocText;
 class DocSimpleSectSep;
 class DocHtmlBlockQuote;
+class DocVhdlFlow;
+class DocParBlock;
 
 /*! @brief Abstract visitor that participates in the visitor pattern.
  */
@@ -163,6 +167,8 @@ class DocVisitor
     virtual void visitPost(DocDotFile *) = 0;
     virtual void visitPre(DocMscFile *) = 0;
     virtual void visitPost(DocMscFile *) = 0;   
+    virtual void visitPre(DocDiaFile *) = 0;
+    virtual void visitPost(DocDiaFile *) = 0;
     virtual void visitPre(DocLink *) = 0;
     virtual void visitPost(DocLink *) = 0;
     virtual void visitPre(DocRef *) = 0;
@@ -185,6 +191,10 @@ class DocVisitor
     virtual void visitPost(DocText *) = 0;
     virtual void visitPre(DocHtmlBlockQuote *) = 0;
     virtual void visitPost(DocHtmlBlockQuote *) = 0;
+    virtual void visitPre(DocVhdlFlow *) = 0;
+    virtual void visitPost(DocVhdlFlow *) = 0;
+    virtual void visitPre(DocParBlock *) = 0;
+    virtual void visitPost(DocParBlock *) = 0;
     /*! @} */
 };
 

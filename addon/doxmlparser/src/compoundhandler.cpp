@@ -1,9 +1,9 @@
 /******************************************************************************
  *
- * $Id: compoundhandler.cpp,v 1.33 2002/10/13 21:01:58 dimitri Exp $
+ * $Id$
  *
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -507,15 +507,19 @@ ICompound *CompoundHandler::toICompound() const
 {
   switch (m_kind)
   {
-    case IClass::Class:         return (IClass *)this;
-    case IStruct::Struct:       return (IStruct *)this;
-    case IUnion::Union:         return (IUnion *)this;
-    case IException::Exception: return (IException *)this;
-    case IInterface::Interface: return (IInterface *)this;
-    case INamespace::Namespace: return (INamespace *)this;
-    case IFile::File:           return (IFile *)this;
-    case IGroup::Group:         return (IGroup *)this;
-    case IPage::Page:           return (IPage *)this;
+    case ICompound::Class:     return (IClass *)this;
+    case ICompound::Struct:    return (IStruct *)this;
+    case ICompound::Union:     return (IUnion *)this;
+    case ICompound::Interface: return (IInterface *)this;
+    case ICompound::Protocol:  return (IClass *)this;
+    case ICompound::Category:  return (IClass *)this;
+    case ICompound::Exception: return (IException *)this;
+    case ICompound::File:      return (IFile *)this;
+    case ICompound::Namespace: return (INamespace *)this;
+    case ICompound::Group:     return (IGroup *)this;
+    case ICompound::Page:      return (IPage *)this;
+    case ICompound::Example:   return (IPage *)this;
+    case ICompound::Dir:       return (IDir *)this;
     default:   return 0;
   }
   return 0;

@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * $Id: htmlgen.cpp,v 1.17 1998/11/28 11:33:19 root Exp $
+ * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -20,7 +20,6 @@
 
 #include <stdlib.h>
 
-#include "qtbc.h"
 #include <qdir.h>
 #include "message.h"
 #include "mangen.h"
@@ -34,24 +33,52 @@
 
 static QCString getExtension()
 {
+  /*
+   * [.][nuber][rest]
+   * in case of . missing, just ignore it
+   * in case number missing, just place a 3 in front of it
+   */
   QCString ext = Config_getString("MAN_EXTENSION");
-  if( ext.length() >= 2 &&
-      ext.data()[0] == '.')
+  if (ext.isEmpty())
   {
-    ext = ext.mid(1, ext.length()-1);
+    ext = "3"; 
   }
   else
   {
-    ext = "3"; 
+    if (ext.at(0)=='.')
+    {
+      if (ext.length()==1)
+      {
+        ext = "3"; 
+      }
+      else // strip .
+      {
+        ext = ext.mid(1);
+      }
+    }
+    if (ext.at(0)<'0' || ext.at(0)>'9')
+    {
+      ext.prepend("3");
+    }
   }
   return ext;
 }
 
+static QCString getSubdir()
+{
+  QCString dir = Config_getString("MAN_SUBDIR");
+  if (dir.isEmpty())
+  {
+    dir = "man" + getExtension();
+  }
+  return dir;
+}
+
 ManGenerator::ManGenerator() : OutputGenerator()
 {
-  dir=Config_getString("MAN_OUTPUT")+"/man" + getExtension();
+  dir=Config_getString("MAN_OUTPUT") + "/" + getSubdir();
   firstCol=TRUE;
-  paragraph=FALSE;
+  paragraph=TRUE;
   col=0;
   upperCase=FALSE;
   insideTabbing=FALSE;
@@ -89,10 +116,10 @@ void ManGenerator::init()
     err("Could not create output directory %s\n",manOutput.data());
     exit(1);
   }
-  d.setPath(manOutput+"/man"+ext);
-  if (!d.exists() && !d.mkdir(manOutput+"/man"+ext))
+  d.setPath(manOutput + "/" + getSubdir());
+  if (!d.exists() && !d.mkdir(manOutput + "/" + getSubdir()))
   {
-    err("Could not create output directory %s/man%s\n",manOutput.data(),ext.data());
+    err("Could not create output directory %s/%s\n",manOutput.data(), getSubdir().data());
     exit(1);
   }
   createSubDirs(d);
@@ -130,8 +157,8 @@ static QCString buildFileName(const char *name)
     }
   }
 
-  QCString &manExtension = Config_getString("MAN_EXTENSION");
-  if (convertToQCString(fileName.right(2))!=manExtension) 
+  QCString manExtension = "." + getExtension();
+  if (fileName.right(manExtension.length())!=manExtension) 
   {
     fileName+=manExtension;
   }
@@ -314,7 +341,7 @@ void ManGenerator::codify(const char *str)
         case '\n':  t << "\n"; firstCol=TRUE; col=0; break;
         case '\\':  t << "\\"; col++; break;
         case '\"':  c = '\''; // no break!
-        default:    t << c; firstCol=FALSE; col++; break;
+        default:    p=writeUtf8Char(t,p-1); firstCol=FALSE; col++; break;
       }
     }
     //printf("%s",str);fflush(stdout);
@@ -428,7 +455,7 @@ void ManGenerator::startDoxyAnchor(const char *,const char *manName,
 	      FTextStream linkstream;
 	      linkstream.setDevice(&linkfile);
 	      //linkstream.setEncoding(QTextStream::UnicodeUTF8);
-	      linkstream << ".so man" << getExtension() << "/" << buildFileName( manName ) << endl;
+	      linkstream << ".so " << getSubdir() << "/" << buildFileName( manName ) << endl;
 	}
     }
     linkfile.close();
@@ -659,9 +686,9 @@ void ManGenerator::endParamList()
 {
 }
 
-void ManGenerator::printDoc(DocNode *n,const char *langExt)
+void ManGenerator::writeDoc(DocNode *n,Definition *ctx,MemberDef *)
 {
-  ManDocVisitor *visitor = new ManDocVisitor(t,*this,langExt);
+  ManDocVisitor *visitor = new ManDocVisitor(t,*this,ctx?ctx->getDefFileExtension():QCString(""));
   n->accept(visitor);
   delete visitor; 
   firstCol=FALSE;
@@ -797,6 +824,14 @@ void ManGenerator::writeLabel(const char *l,bool isLast)
 
 void ManGenerator::endLabels()
 {
+}
+
+void ManGenerator::endHeaderSection()
+{
+  if (!firstCol) 
+  { 
+    t<< endl; firstCol=TRUE; 
+  }
 }
 
 

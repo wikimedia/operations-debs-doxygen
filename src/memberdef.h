@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2012 by Dimitri van Heesch.
+ * Copyright (C) 1997-2014 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -18,14 +18,11 @@
 #ifndef MEMBERDEF_H
 #define MEMBERDEF_H
 
-#include "qtbc.h"
 #include <qlist.h>
-#include <qdict.h>
-#include <qstack.h>
+#include <sys/types.h>
 
 #include "types.h"
 #include "definition.h"
-#include "sortdict.h"
 
 class ClassDef;
 class NamespaceDef;
@@ -39,28 +36,15 @@ class GroupDef;
 class QTextStream;
 class ArgumentList;
 class MemberDefImpl;
+class QStrList;
+struct TagInfo;
 
 /** A model of a class/file/namespace member symbol. */
 class MemberDef : public Definition
 {
   public:
     
-    enum MemberType { 
-      Define,
-      Function, 
-      Variable, 
-      Typedef, 
-      Enumeration, 
-      EnumValue,
-      Signal,
-      Slot,
-      Friend,
-      DCOP,
-      Property,
-      Event
-    };
-
-    MemberDef(const char *defFileName,int defLine,
+    MemberDef(const char *defFileName,int defLine,int defColumn,
               const char *type,const char *name,const char *args,
               const char *excp,Protection prot,Specifier virt,bool stat,
               Relationship related,MemberType t,const ArgumentList *tal,
@@ -68,6 +52,7 @@ class MemberDef : public Definition
    ~MemberDef(); 
     DefType definitionType() const        { return TypeMember; }
     // move this member into a different scope
+    MemberDef *deepCopy() const;
     void moveTo(Definition *);
     
     //-----------------------------------------------------------------------------------
@@ -88,13 +73,15 @@ class MemberDef : public Definition
     const char *extraTypeChars() const;
     const QCString &initializer() const;
     int initializerLines() const;
-    int  getMemberSpecifiers() const;
+    uint64 getMemberSpecifiers() const;
     MemberList *getSectionList(Definition *d) const;
+    QCString    displayDefinition() const;
 
     // scope query members
     ClassDef *getClassDef() const;
     FileDef  *getFileDef() const;
     NamespaceDef* getNamespaceDef() const;
+    ClassDef *accessorClass() const;
 
     // grabbing the property read/write accessor names
     const char *getReadAccessor() const;
@@ -136,7 +123,11 @@ class MemberDef : public Definition
     bool isExplicit() const;
     bool isMutable() const;
     bool isGettable() const;
+    bool isPrivateGettable() const;
+    bool isProtectedGettable() const;
     bool isSettable() const;
+    bool isPrivateSettable() const;
+    bool isProtectedSettable() const;
     bool isReadable() const;
     bool isWritable() const;
     bool isAddable() const;
@@ -159,6 +150,20 @@ class MemberDef : public Definition
     bool isSealed() const;
     bool isImplementation() const;
     bool isExternal() const;
+    bool isAlias() const;
+    bool isDefault() const;
+    bool isDelete() const;
+    bool isNoExcept() const;
+    bool isAttribute() const; // UNO IDL attribute
+    bool isUNOProperty() const; // UNO IDL property
+    bool isReadonly() const;
+    bool isBound() const;
+    bool isConstrained() const;
+    bool isTransient() const;
+    bool isMaybeVoid() const;
+    bool isMaybeDefault() const;
+    bool isMaybeAmbiguous() const;
+    bool isPublished() const; // UNO IDL published
     bool isTemplateSpecialization() const;
     bool hasDocumentedParams() const;
     bool hasDocumentedReturnType() const;
@@ -169,6 +174,14 @@ class MemberDef : public Definition
     bool hasOneLineInitializer() const;
     bool hasMultiLineInitializer() const;
     bool protectionVisible() const;
+    bool showInCallGraph() const;
+    bool isStrongEnumValue() const;
+
+    // derived getters
+    bool isFriendToHide() const;
+    bool isNotFriend() const;
+    bool isFunctionOrSignalSlot() const;
+    bool isRelatedOrFriend() const;
 
     // output info
     bool isLinkableInProject() const;
@@ -182,7 +195,7 @@ class MemberDef : public Definition
     bool isDocumentedFriendClass() const;
 
     MemberDef *reimplements() const;
-    LockingPtr< MemberList > reimplementedBy() const;
+    MemberList *reimplementedBy() const;
     bool isReimplementedBy(ClassDef *cd) const;
 
     //int inbodyLine() const;
@@ -195,17 +208,19 @@ class MemberDef : public Definition
     MemberDef *getAnonymousEnumType() const;
     bool isDocsForDefinition() const;
     MemberDef *getEnumScope() const;
-    LockingPtr< MemberList > enumFieldList() const;
+    MemberList *enumFieldList() const;
+    void setEnumBaseType(const QCString &type);
+    QCString enumBaseType() const;
 
     bool hasExamples();
-    LockingPtr<ExampleSDict> getExamples() const;
+    ExampleSDict *getExamples() const;
     bool isPrototype() const;
 
     // argument related members
-    LockingPtr<ArgumentList> argumentList() const;
-    LockingPtr<ArgumentList> declArgumentList() const;
-    LockingPtr<ArgumentList> templateArguments() const;
-    LockingPtr< QList<ArgumentList> > definitionTemplateParameterLists() const;
+    ArgumentList *argumentList() const;
+    ArgumentList *declArgumentList() const;
+    ArgumentList *templateArguments() const;
+    QList<ArgumentList> *definitionTemplateParameterLists() const;
 
     // member group related members
     int getMemberGroupId() const;
@@ -213,6 +228,7 @@ class MemberDef : public Definition
 
     bool fromAnonymousScope() const;
     bool anonymousDeclShown() const;
+    MemberDef *fromAnonymousMember() const;
 
     // callgraph related members
     bool hasCallGraph() const;
@@ -235,8 +251,19 @@ class MemberDef : public Definition
     MemberDef *getGroupAlias() const;
 
     ClassDef *category() const;
+    MemberDef *categoryRelation() const;
 
     QCString displayName(bool=TRUE) const;
+    QCString getDeclType() const;
+    void getLabels(QStrList &sl,Definition *container) const;
+
+    const ArgumentList *typeConstraints() const;
+
+    // overrules
+    QCString documentation() const;
+    QCString briefDescription(bool abbr=FALSE) const;
+    QCString fieldType() const;
+
 
     //-----------------------------------------------------------------------------------
     // ----  setters -----
@@ -246,10 +273,10 @@ class MemberDef : public Definition
     void setMemberType(MemberType t);
     void setDefinition(const char *d);
     void setFileDef(FileDef *fd);
-    void setAnchor(const char *a);
+    void setAnchor();
     void setProtection(Protection p);
-    void setMemberSpecifiers(int s);
-    void mergeMemberSpecifiers(int s);
+    void setMemberSpecifiers(uint64 s);
+    void mergeMemberSpecifiers(uint64 s);
     void setInitializer(const char *i);
     void setBitfields(const char *s);
     void setMaxInitLines(int lines);
@@ -282,7 +309,7 @@ class MemberDef : public Definition
 
     // enumeration specific members
     void insertEnumField(MemberDef *md);
-    void setEnumScope(MemberDef *md);
+    void setEnumScope(MemberDef *md,bool livesInsideEnum=FALSE);
     void setEnumClassScope(ClassDef *cd);
     void setDocumentedEnumValues(bool value);
     void setAnonymousEnumType(MemberDef *md);
@@ -334,6 +361,7 @@ class MemberDef : public Definition
     void copyArgumentNames(MemberDef *bmd);
 
     void setCategory(ClassDef *);
+    void setCategoryRelation(MemberDef *);
 
     void setDocumentation(const char *d,const char *docFile,int docLine,bool stripWhiteSpace=TRUE);
     void setBriefDescription(const char *b,const char *briefFile,int briefLine);
@@ -348,19 +376,20 @@ class MemberDef : public Definition
     // output generation
     void writeDeclaration(OutputList &ol,
                    ClassDef *cd,NamespaceDef *nd,FileDef *fd,GroupDef *gd,
-                   bool inGroup,ClassDef *inheritFrom=0,const char *inheritId=0); 
+                   bool inGroup, const DefType compoundType,
+                   ClassDef *inheritFrom=0,const char *inheritId=0); 
     void writeDocumentation(MemberList *ml,OutputList &ol,
                             const char *scopeName,Definition *container,
                             bool inGroup,bool showEnumValues=FALSE,bool
                             showInline=FALSE);
     void writeMemberDocSimple(OutputList &ol,Definition *container);
+    void writeEnumDeclaration(OutputList &typeDecl,
+            ClassDef *cd,NamespaceDef *nd,FileDef *fd,GroupDef *gd, 
+            const DefType compoundType);
     void warnIfUndocumented();
     
     MemberDef *createTemplateInstanceMember(ArgumentList *formalArgs,
                ArgumentList *actualArgs);
-
-    void writeEnumDeclaration(OutputList &typeDecl,
-            ClassDef *cd,NamespaceDef *nd,FileDef *fd,GroupDef *gd);
 
     void findSectionsInDocumentation();
     
@@ -377,7 +406,7 @@ class MemberDef : public Definition
     void _computeLinkableInProject();
     void _computeIsConstructor();
     void _computeIsDestructor();
-    void _getLabels(QStrList &sl,Definition *container) const;
+    void _writeGroupInclude(OutputList &ol,bool inGroup);
     void _writeCallGraph(OutputList &ol);
     void _writeCallerGraph(OutputList &ol);
     void _writeReimplements(OutputList &ol);
@@ -387,6 +416,9 @@ class MemberDef : public Definition
     void _writeEnumValues(OutputList &ol,Definition *container,
                           const QCString &cfname,const QCString &ciname,
                           const QCString &cname);
+    void _writeCategoryRelation(OutputList &ol);
+    void _writeTagData(const DefType);
+    void _addToSearchIndex();
 
     static int s_indentLevel;
     // disable copying of member defs
@@ -398,12 +430,11 @@ class MemberDef : public Definition
                    bool onlyText=FALSE);
 
     MemberDefImpl *m_impl;
-    int m_cacheHandle;
-    off_t m_storagePos;     // location where the item is stored in file (if impl==0)
-    bool m_flushPending;
     uchar m_isLinkableCached;    // 0 = not cached, 1=FALSE, 2=TRUE
     uchar m_isConstructorCached; // 0 = not cached, 1=FALSE, 2=TRUE
     uchar m_isDestructorCached;  // 0 = not cached, 1=FALSE, 2=TRUE
 };
+
+void combineDeclarationAndDefinition(MemberDef *mdec,MemberDef *mdef);
 
 #endif
