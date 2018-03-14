@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -58,10 +58,10 @@ class DefinitionImpl
 
     SectionDict *sectionDict;  // dictionary of all sections, not accessible
 
-    MemberSDict *sourceRefByDict;       
-    MemberSDict *sourceRefsDict;        
-    QList<ListItemInfo> *xrefListItems; 
-    GroupList *partOfGroups;            
+    MemberSDict *sourceRefByDict;
+    MemberSDict *sourceRefsDict;
+    QList<ListItemInfo> *xrefListItems;
+    GroupList *partOfGroups;
 
     DocInfo   *details;    // not exported
     DocInfo   *inbodyDocs; // not exported
@@ -89,11 +89,11 @@ class DefinitionImpl
     QCString id; // clang unique id
 };
 
-DefinitionImpl::DefinitionImpl() 
-  : sectionDict(0), sourceRefByDict(0), sourceRefsDict(0), 
+DefinitionImpl::DefinitionImpl()
+  : sectionDict(0), sourceRefByDict(0), sourceRefsDict(0),
     xrefListItems(0), partOfGroups(0),
-    details(0), inbodyDocs(0), brief(0), body(0), 
-    outerScope(0)
+    details(0), inbodyDocs(0), brief(0), body(0), hidden(FALSE), isArtificial(FALSE),
+    outerScope(0), lang(SrcLangExt_Unknown)
 {
 }
 
@@ -149,7 +149,7 @@ void DefinitionImpl::init(const char *df, const char *n)
 
 static bool matchExcludedSymbols(const char *name)
 {
-  static QStrList &exclSyms = Config_getList("EXCLUDE_SYMBOLS");
+  static QStrList &exclSyms = Config_getList(EXCLUDE_SYMBOLS);
   if (exclSyms.count()==0) return FALSE; // nothing specified
   const char *pat = exclSyms.first();
   QCString symName = name;
@@ -206,7 +206,7 @@ static bool matchExcludedSymbols(const char *name)
 
 void Definition::addToMap(const char *name,Definition *d)
 {
-  bool vhdlOpt = Config_getBool("OPTIMIZE_OUTPUT_VHDL");
+  bool vhdlOpt = Config_getBool(OPTIMIZE_OUTPUT_VHDL);
   QCString symbolName = name;
   int index=computeQualifiedIndex(symbolName);
   if (!vhdlOpt && index!=-1) symbolName=symbolName.mid(index+2);
@@ -282,7 +282,7 @@ void Definition::removeFromMap(Definition *d)
 
 Definition::Definition(const char *df,int dl,int dc,
                        const char *name,const char *b,
-                       const char *d,bool isSymbol)
+                       const char *d,bool isSymbol) : m_cookie(0)
 {
   m_name = name;
   m_defLine = dl;
@@ -299,7 +299,7 @@ Definition::Definition(const char *df,int dl,int dc,
   }
 }
 
-Definition::Definition(const Definition &d) : DefinitionIntf()
+Definition::Definition(const Definition &d) : DefinitionIntf(), m_cookie(0)
 {
   m_name = d.m_name;
   m_defLine = d.m_defLine;
@@ -371,7 +371,7 @@ Definition::Definition(const Definition &d) : DefinitionIntf()
   }
   if (d.m_impl->inbodyDocs)
   {
-    m_impl->details = new DocInfo(*d.m_impl->inbodyDocs);
+    m_impl->inbodyDocs = new DocInfo(*d.m_impl->inbodyDocs);
   }
 
   m_isSymbol = d.m_isSymbol;
@@ -380,7 +380,7 @@ Definition::Definition(const Definition &d) : DefinitionIntf()
 
 Definition::~Definition()
 {
-  if (m_isSymbol) 
+  if (m_isSymbol)
   {
     removeFromMap(this);
   }
@@ -389,6 +389,8 @@ Definition::~Definition()
     delete m_impl;
     m_impl=0;
   }
+  delete m_cookie;
+  m_cookie=0;
 }
 
 void Definition::setName(const char *name)
@@ -495,7 +497,11 @@ void Definition::addSectionsToIndex()
       }
       QCString title = si->title;
       if (title.isEmpty()) title = si->label;
-      Doxygen::indexList->addContentsItem(TRUE,title,
+      // determine if there is a next level inside this item
+      ++li;
+      bool isDir = ((li.current()) ? (int)(li.current()->type > nextLevel):FALSE);
+      --li;
+      Doxygen::indexList->addContentsItem(isDir,title,
                                          getReference(),
                                          getOutputFileBase(),
                                          si->label,
@@ -511,27 +517,25 @@ void Definition::addSectionsToIndex()
   }
 }
 
-void Definition::writeDocAnchorsToTagFile()
+void Definition::writeDocAnchorsToTagFile(FTextStream &tagFile)
 {
-  if (!Config_getString("GENERATE_TAGFILE").isEmpty() && m_impl->sectionDict)
+  if (m_impl->sectionDict)
   {
     //printf("%s: writeDocAnchorsToTagFile(%d)\n",name().data(),m_impl->sectionDict->count());
     SDict<SectionInfo>::Iterator sdi(*m_impl->sectionDict);
     SectionInfo *si;
     for (;(si=sdi.current());++sdi)
     {
-      if (!si->generated)
+      if (!si->generated && si->ref.isEmpty())
       {
         //printf("write an entry!\n");
-        if (definitionType()==TypeMember) Doxygen::tagFile << "  ";
-        Doxygen::tagFile << "    <docanchor file=\"" 
-                         << si->fileName << "\"";
+        if (definitionType()==TypeMember) tagFile << "  ";
+        tagFile << "    <docanchor file=\"" << si->fileName << "\"";
         if (!si->title.isEmpty())
         {
-          Doxygen::tagFile << " title=\"" << convertToXML(si->title) << "\"";
+          tagFile << " title=\"" << convertToXML(si->title) << "\"";
         }
-        Doxygen::tagFile << ">" << si->label 
-                         << "</docanchor>" << endl;
+        tagFile << ">" << si->label << "</docanchor>" << endl;
       }
     }
   }
@@ -545,7 +549,7 @@ bool Definition::_docsAlreadyAdded(const QCString &doc,QCString &sigList)
   // double whitespaces...
   QCString docStr = doc.simplifyWhiteSpace();
   MD5Buffer((const unsigned char *)docStr.data(),docStr.length(),md5_sig);
-  MD5SigToString(md5_sig,sigStr.data(),33);
+  MD5SigToString(md5_sig,sigStr.rawData(),33);
   //printf("%s:_docsAlreadyAdded doc='%s' sig='%s' docSigs='%s'\n",
   //    name().data(),doc.data(),sigStr.data(),sigList.data());
   if (sigList.find(sigStr)==-1) // new docs, add signature to prevent re-adding it
@@ -627,7 +631,7 @@ static bool lastCharIsMultibyte(const QCString &s)
 
 void Definition::_setBriefDescription(const char *b,const char *briefFile,int briefLine)
 {
-  static QCString outputLanguage = Config_getEnum("OUTPUT_LANGUAGE");
+  static QCString outputLanguage = Config_getEnum(OUTPUT_LANGUAGE);
   static bool needsDot = outputLanguage!="Japanese" && 
                          outputLanguage!="Chinese" &&
                          outputLanguage!="Korean";
@@ -724,8 +728,8 @@ void Definition::setInbodyDocumentation(const char *d,const char *inbodyFile,int
 bool readCodeFragment(const char *fileName,
                       int &startLine,int &endLine,QCString &result)
 {
-  static bool filterSourceFiles = Config_getBool("FILTER_SOURCE_FILES");
-  static int tabSize = Config_getInt("TAB_SIZE");
+  static bool filterSourceFiles = Config_getBool(FILTER_SOURCE_FILES);
+  static int tabSize = Config_getInt(TAB_SIZE);
   //printf("readCodeFragment(%s,%d,%d)\n",fileName,startLine,endLine);
   if (fileName==0 || fileName[0]==0) return FALSE; // not a valid file name
   QCString filter = getFileFilter(fileName,TRUE);
@@ -739,7 +743,7 @@ bool readCodeFragment(const char *fileName,
   else // use filter
   {
     QCString cmd=filter+" \""+fileName+"\"";
-    Debug::print(Debug::ExtCmd,0,"Executing popen(`%s`)\n",cmd.data());
+    Debug::print(Debug::ExtCmd,0,"Executing popen(`%s`)\n",qPrint(cmd));
     f = portable_popen(cmd,"r");
   }
   bool found = lang==SrcLangExt_VHDL   || 
@@ -757,6 +761,7 @@ bool readCodeFragment(const char *fileName,
     {
       while ((c=fgetc(f))!='\n' && c!=EOF) /* skip */;
       lineNr++; 
+      if (found && c == '\n') c = '\0';
     }
     if (!feof(f))
     {
@@ -765,7 +770,7 @@ bool readCodeFragment(const char *fileName,
       while (lineNr<=endLine && !feof(f) && !found)
       {
         int pc=0;
-        while ((c=fgetc(f))!='{' && c!=':' && c!=EOF) 
+        while ((c=fgetc(f))!='{' && c!=':' && c!=EOF)  // } so vi matching brackets has no problem
         {
           //printf("parsing char `%c'\n",c);
           if (c=='\n') 
@@ -818,7 +823,7 @@ bool readCodeFragment(const char *fileName,
           result+=spaces;
         }
         // copy until end of line
-        result+=c;
+        if (c) result+=c;
         startLine=lineNr;
         if (c==':') 
         {
@@ -865,7 +870,7 @@ bool readCodeFragment(const char *fileName,
     {
       portable_pclose(f); 
       Debug::print(Debug::FilterOutput, 0, "Filter output\n");
-      Debug::print(Debug::FilterOutput,0,"-------------\n%s\n-------------\n",result.data());
+      Debug::print(Debug::FilterOutput,0,"-------------\n%s\n-------------\n",qPrint(result));
     }
     else 
     {
@@ -873,6 +878,7 @@ bool readCodeFragment(const char *fileName,
     }
   }
   result = transcodeCharacterStringToUTF8(result);
+  if (!result.isEmpty() && result.at(result.length()-1)!='\n') result += "\n";
   //fprintf(stderr,"readCodeFragement(%d-%d)=%s\n",startLine,endLine,result.data());
   return found;
 }
@@ -881,7 +887,7 @@ QCString Definition::getSourceFileBase() const
 { 
   ASSERT(definitionType()!=Definition::TypeFile); // file overloads this method
   QCString fn;
-  static bool sourceBrowser = Config_getBool("SOURCE_BROWSER");
+  static bool sourceBrowser = Config_getBool(SOURCE_BROWSER);
   if (sourceBrowser && 
       m_impl->body && m_impl->body->startLine!=-1 && m_impl->body->fileDef)
   {
@@ -892,16 +898,18 @@ QCString Definition::getSourceFileBase() const
 
 QCString Definition::getSourceAnchor() const
 {
-  QCString anchorStr;
+  const int maxAnchorStrLen = 20;
+  char anchorStr[maxAnchorStrLen];
+  anchorStr[0]='\0';
   if (m_impl->body && m_impl->body->startLine!=-1)
   {
     if (Htags::useHtags)
     {
-      anchorStr.sprintf("L%d",m_impl->body->startLine);
+      qsnprintf(anchorStr,maxAnchorStrLen,"L%d",m_impl->body->startLine);
     }
     else
     {
-      anchorStr.sprintf("l%05d",m_impl->body->startLine);
+      qsnprintf(anchorStr,maxAnchorStrLen,"l%05d",m_impl->body->startLine);
     }
   }
   return anchorStr;
@@ -910,7 +918,8 @@ QCString Definition::getSourceAnchor() const
 /*! Write a reference to the source code defining this definition */
 void Definition::writeSourceDef(OutputList &ol,const char *)
 {
-  static bool latexSourceCode = Config_getBool("LATEX_SOURCE_CODE");
+  static bool latexSourceCode = Config_getBool(LATEX_SOURCE_CODE);
+  static bool rtfSourceCode = Config_getBool(RTF_SOURCE_CODE);
   ol.pushGeneratorState();
   //printf("Definition::writeSourceRef %d %p\n",bodyLine,bodyDef);
   QCString fn = getSourceFileBase();
@@ -924,19 +933,22 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
       QCString lineStr;
       lineStr.sprintf("%d",m_impl->body->startLine);
       QCString anchorStr = getSourceAnchor();
-      ol.startParagraph();
+      ol.startParagraph("definition");
       if (lineMarkerPos<fileMarkerPos) // line marker before file marker
       {
         // write text left from linePos marker
         ol.parseText(refText.left(lineMarkerPos)); 
         ol.pushGeneratorState();
-        ol.disable(OutputGenerator::RTF); 
         ol.disable(OutputGenerator::Man); 
         if (!latexSourceCode)
         {
           ol.disable(OutputGenerator::Latex);
         }
-        // write line link (HTML, LaTeX optionally)
+        if (!rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
+        }
+        // write line link (HTML, LaTeX optionally, RTF optionally)
         ol.writeObjectLink(0,fn,anchorStr,lineStr);
         ol.enableAll();
         ol.disable(OutputGenerator::Html);
@@ -944,7 +956,11 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
         {
           ol.disable(OutputGenerator::Latex);
         }
-        // write normal text (Man/RTF, Latex optionally)
+        if (rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
+        }
+        // write normal text (Man, Latex optionally, RTF optionally)
         ol.docify(lineStr);
         ol.popGeneratorState();
         
@@ -953,13 +969,16 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
               fileMarkerPos-lineMarkerPos-2));
 
         ol.pushGeneratorState();
-        ol.disable(OutputGenerator::RTF); 
         ol.disable(OutputGenerator::Man); 
         if (!latexSourceCode)
         {
           ol.disable(OutputGenerator::Latex);
         }
-        // write file link (HTML, LaTeX optionally)
+        if (!rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
+        }
+        // write file link (HTML, LaTeX optionally, RTF optionally)
         ol.writeObjectLink(0,fn,0,m_impl->body->fileDef->name());
         ol.enableAll();
         ol.disable(OutputGenerator::Html);
@@ -967,7 +986,11 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
         {
           ol.disable(OutputGenerator::Latex);
         }
-        // write normal text (Man/RTF, Latex optionally)
+        if (rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
+        }
+        // write normal text (Man, Latex optionally, RTF optionally)
         ol.docify(m_impl->body->fileDef->name());
         ol.popGeneratorState();
         
@@ -980,11 +1003,14 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
         // write text left from file marker
         ol.parseText(refText.left(fileMarkerPos)); 
         ol.pushGeneratorState();
-        ol.disable(OutputGenerator::RTF); 
         ol.disable(OutputGenerator::Man); 
         if (!latexSourceCode)
         {
           ol.disable(OutputGenerator::Latex);
+        }
+        if (!rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
         }
         // write file link (HTML only)
         ol.writeObjectLink(0,fn,0,m_impl->body->fileDef->name());
@@ -994,7 +1020,11 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
         {
           ol.disable(OutputGenerator::Latex);
         }
-        // write normal text (Latex/Man only)
+        if (rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
+        }
+        // write normal text (RTF/Latex/Man only)
         ol.docify(m_impl->body->fileDef->name());
         ol.popGeneratorState();
         
@@ -1003,11 +1033,14 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
               lineMarkerPos-fileMarkerPos-2)); 
 
         ol.pushGeneratorState();
-        ol.disable(OutputGenerator::RTF); 
         ol.disable(OutputGenerator::Man); 
         if (!latexSourceCode)
         {
           ol.disable(OutputGenerator::Latex);
+        }
+        if (!rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
         }
         ol.disableAllBut(OutputGenerator::Html); 
         // write line link (HTML only)
@@ -1017,6 +1050,10 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
         if (latexSourceCode) 
         {
           ol.disable(OutputGenerator::Latex);
+        }
+        if (rtfSourceCode)
+        {
+          ol.disable(OutputGenerator::RTF);
         }
         // write normal text (Latex/Man only)
         ol.docify(lineStr);
@@ -1030,7 +1067,7 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
     }
     else
     {
-      err("translation error: invalid markers in trDefinedInSourceFile()\n");
+      err("translation error: invalid markers in trDefinedAtLineInSourceFile()\n");
     }
   }
   ol.popGeneratorState();
@@ -1060,7 +1097,7 @@ bool Definition::hasSources() const
 /*! Write code of this definition into the documentation */
 void Definition::writeInlineCode(OutputList &ol,const char *scopeName)
 {
-  static bool inlineSources = Config_getBool("INLINE_SOURCES");
+  static bool inlineSources = Config_getBool(INLINE_SOURCES);
   ol.pushGeneratorState();
   //printf("Source Fragment %s: %d-%d bodyDef=%p\n",name().data(),
   //        m_startBodyLine,m_endBodyLine,m_bodyDef);
@@ -1106,15 +1143,16 @@ void Definition::writeInlineCode(OutputList &ol,const char *scopeName)
 void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
     const QCString &text,MemberSDict *members,bool /*funcOnly*/)
 {
-  static bool latexSourceCode = Config_getBool("LATEX_SOURCE_CODE"); 
-  static bool sourceBrowser   = Config_getBool("SOURCE_BROWSER");
-  static bool refLinkSource   = Config_getBool("REFERENCES_LINK_SOURCE");
+  static bool latexSourceCode = Config_getBool(LATEX_SOURCE_CODE); 
+  static bool rtfSourceCode   = Config_getBool(RTF_SOURCE_CODE);
+  static bool sourceBrowser   = Config_getBool(SOURCE_BROWSER);
+  static bool refLinkSource   = Config_getBool(REFERENCES_LINK_SOURCE);
   ol.pushGeneratorState();
   if (members)
   {
     members->sort();
 
-    ol.startParagraph();
+    ol.startParagraph("reference");
     ol.parseText(text);
     ol.docify(" ");
 
@@ -1159,14 +1197,18 @@ void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
           ol.pushGeneratorState();
           //ol.disableAllBut(OutputGenerator::Html);
 
-          ol.disable(OutputGenerator::RTF); 
           ol.disable(OutputGenerator::Man); 
           if (!latexSourceCode)
           {
             ol.disable(OutputGenerator::Latex);
           }
-          QCString lineStr,anchorStr;
-          anchorStr.sprintf("l%05d",md->getStartBodyLine());
+          if (!rtfSourceCode)
+          {
+            ol.disable(OutputGenerator::RTF);
+          }
+          const int maxLineNrStr = 10;
+          char anchorStr[maxLineNrStr];
+          qsnprintf(anchorStr,maxLineNrStr,"l%05d",md->getStartBodyLine());
           //printf("Write object link to %s\n",md->getBodyDef()->getSourceFileBase().data());
           ol.writeObjectLink(0,md->getBodyDef()->getSourceFileBase(),anchorStr,name);
           ol.popGeneratorState();
@@ -1178,6 +1220,10 @@ void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
           {
             ol.disable(OutputGenerator::Latex);
           }
+          if (rtfSourceCode)
+          {
+            ol.disable(OutputGenerator::RTF);
+          }
           ol.docify(name);
           ol.popGeneratorState();
         }
@@ -1186,11 +1232,14 @@ void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
           // for HTML write a real link
           ol.pushGeneratorState();
           //ol.disableAllBut(OutputGenerator::Html); 
-          ol.disable(OutputGenerator::RTF); 
           ol.disable(OutputGenerator::Man); 
           if (!latexSourceCode)
           {
             ol.disable(OutputGenerator::Latex);
+          }
+          if (!rtfSourceCode)
+          {
+            ol.disable(OutputGenerator::RTF);
           }
 
           ol.writeObjectLink(md->getReference(),
@@ -1204,6 +1253,10 @@ void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
           if (latexSourceCode)
           {
             ol.disable(OutputGenerator::Latex);
+          }
+          if (rtfSourceCode)
+          {
+            ol.disable(OutputGenerator::RTF);
           }
           ol.docify(name);
           ol.popGeneratorState();
@@ -1224,7 +1277,7 @@ void Definition::_writeSourceRefList(OutputList &ol,const char *scopeName,
 
 void Definition::writeSourceReffedBy(OutputList &ol,const char *scopeName)
 {
-  if (Config_getBool("REFERENCED_BY_RELATION"))
+  if (Config_getBool(REFERENCED_BY_RELATION))
   {
     _writeSourceRefList(ol,scopeName,theTranslator->trReferencedBy(),m_impl->sourceRefByDict,FALSE);
   }
@@ -1232,7 +1285,7 @@ void Definition::writeSourceReffedBy(OutputList &ol,const char *scopeName)
 
 void Definition::writeSourceRefs(OutputList &ol,const char *scopeName)
 {
-  if (Config_getBool("REFERENCES_RELATION"))
+  if (Config_getBool(REFERENCES_RELATION))
   {
     _writeSourceRefList(ol,scopeName,theTranslator->trReferences(),m_impl->sourceRefsDict,TRUE);
   }
@@ -1240,8 +1293,8 @@ void Definition::writeSourceRefs(OutputList &ol,const char *scopeName)
 
 bool Definition::hasDocumentation() const
 { 
-  static bool extractAll    = Config_getBool("EXTRACT_ALL"); 
-  //static bool sourceBrowser = Config_getBool("SOURCE_BROWSER");
+  static bool extractAll    = Config_getBool(EXTRACT_ALL); 
+  //static bool sourceBrowser = Config_getBool(SOURCE_BROWSER);
   bool hasDocs = 
          (m_impl->details    && !m_impl->details->doc.isEmpty())    || // has detailed docs
          (m_impl->brief      && !m_impl->brief->doc.isEmpty())      || // has brief description
@@ -1288,9 +1341,6 @@ void Definition::addSourceReferencedBy(MemberDef *md)
 
 void Definition::addSourceReferences(MemberDef *md)
 {
-  QCString name  = md->name();
-  QCString scope = md->getScopeString();
-
   if (md)
   {
     QCString name  = md->name();
@@ -1458,19 +1508,6 @@ QList<ListItemInfo> *Definition::xrefListItems() const
   return m_impl->xrefListItems;
 }
 
-
-QCString Definition::convertNameToFile(const char *name,bool allowDots) const
-{
-  if (!m_impl->ref.isEmpty())
-  {
-    return name;
-  }
-  else
-  {
-    return ::convertNameToFile(name,allowDots);
-  }
-}
-
 QCString Definition::pathFragment() const
 {
   QCString result;
@@ -1526,12 +1563,12 @@ QCString Definition::navigationPathAsString() const
     if (definitionType()==Definition::TypeGroup && ((const GroupDef*)this)->groupTitle())
     {
       result+="<a class=\"el\" href=\"$relpath^"+getOutputFileBase()+Doxygen::htmlFileExtension+"\">"+
-              ((const GroupDef*)this)->groupTitle()+"</a>";
+              convertToHtml(((const GroupDef*)this)->groupTitle())+"</a>";
     }
     else if (definitionType()==Definition::TypePage && !((const PageDef*)this)->title().isEmpty())
     {
       result+="<a class=\"el\" href=\"$relpath^"+getOutputFileBase()+Doxygen::htmlFileExtension+"\">"+
-              ((const PageDef*)this)->title()+"</a>";
+              convertToHtml(((const PageDef*)this)->title())+"</a>";
     }
     else if (definitionType()==Definition::TypeClass)
     {
@@ -1542,17 +1579,17 @@ QCString Definition::navigationPathAsString() const
       }
       result+="<a class=\"el\" href=\"$relpath^"+getOutputFileBase()+Doxygen::htmlFileExtension;
       if (!anchor().isEmpty()) result+="#"+anchor();
-      result+="\">"+name+"</a>";
+      result+="\">"+convertToHtml(name)+"</a>";
     }
     else
     {
       result+="<a class=\"el\" href=\"$relpath^"+getOutputFileBase()+Doxygen::htmlFileExtension+"\">"+
-              locName+"</a>";
+              convertToHtml(locName)+"</a>";
     }
   }
   else
   {
-    result+="<b>"+locName+"</b>";
+    result+="<b>"+convertToHtml(locName)+"</b>";
   }
   result+="</li>";
   return result;
@@ -1620,7 +1657,8 @@ void Definition::writeToc(OutputList &ol)
       }
       cs[0]='0'+nextLevel;
       if (inLi[nextLevel]) ol.writeString("</li>\n");
-      ol.writeString("<li class=\"level"+QCString(cs)+"\"><a href=\"#"+si->label+"\">"+si->title+"</a>");
+      QCString titleDoc = convertToHtml(si->title);
+      ol.writeString("<li class=\"level"+QCString(cs)+"\"><a href=\"#"+si->label+"\">"+(si->title.isEmpty()?si->label:titleDoc)+"</a>");
       inLi[nextLevel]=TRUE;
       level = nextLevel;
     }
@@ -1691,7 +1729,7 @@ QCString abbreviate(const char *s,const char *name)
     result=result.left(result.length()-1);
 
   // strip any predefined prefix
-  QStrList &briefDescAbbrev = Config_getList("ABBREVIATE_BRIEF");
+  QStrList &briefDescAbbrev = Config_getList(ABBREVIATE_BRIEF);
   const char *p = briefDescAbbrev.first();
   while (p)
   {
@@ -1838,6 +1876,21 @@ GroupList *Definition::partOfGroups() const
   return m_impl->partOfGroups; 
 }
 
+bool Definition::isLinkableViaGroup() const
+{
+  GroupList *gl = partOfGroups();
+  if (gl)
+  {
+    GroupListIterator gli(*gl);
+    GroupDef *gd;
+    for (gli.toFirst();(gd=gli.current());++gli)
+    {
+      if (gd->isLinkable()) return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 Definition *Definition::getOuterScope() const 
 { 
   return m_impl->outerScope; 
@@ -1891,8 +1944,31 @@ void Definition::_setSymbolName(const QCString &name)
 
 bool Definition::hasBriefDescription() const
 {
-  static bool briefMemberDesc = Config_getBool("BRIEF_MEMBER_DESC");
+  static bool briefMemberDesc = Config_getBool(BRIEF_MEMBER_DESC);
   return !briefDescription().isEmpty() && briefMemberDesc;
 }
+
+QCString Definition::externalReference(const QCString &relPath) const
+{
+  QCString ref = getReference();
+  if (!ref.isEmpty())
+  {
+    QCString *dest = Doxygen::tagDestinationDict[ref];
+    if (dest)
+    {
+      QCString result = *dest;
+      int l = result.length();
+      if (!relPath.isEmpty() && l>0 && result.at(0)=='.')
+      { // relative path -> prepend relPath.
+        result.prepend(relPath);
+        l+=relPath.length();
+      }
+      if (l>0 && result.at(l-1)!='/') result+='/';
+      return result;
+    }
+  }
+  return relPath;
+}
+
 
 

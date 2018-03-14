@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -110,7 +110,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Thông tin về trường";
       }
@@ -177,7 +177,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Cấu trúc cơ sở dữ liệu (Data Structures)";
       }
@@ -194,7 +194,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Các trường dữ liệu";
       }
@@ -207,7 +207,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Toàn cục";
       }
@@ -248,7 +248,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Đây là cấu trúc cơ sở dữ liệu với mô tả tóm tắt:";
       }
@@ -267,7 +267,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
       {
         result+="(đã được mô tả) ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="struct và union fields";
       }
@@ -278,7 +278,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
       result+=" cùng với các các liên kết đến ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="Thông tin về struct/union cho từng trường:";
         }
@@ -289,7 +289,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="các structures/unions thuộc:";
         }
@@ -307,7 +307,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
       QCString result="Danh sách tất cả các ";
       if (!extractAll) result+="(đã được mô tat) ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="functions, variables, defines, enums, và typedefs";
       }
@@ -358,7 +358,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Index cấu trúc cơ sở dữ liệu";
       }
@@ -385,7 +385,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Thông tin về cấu trúc cơ sở dữ liệu";
       }
@@ -488,7 +488,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Cấu trúc cơ sở dữ liệu";
       }
@@ -749,8 +749,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! This is put at the bottom of a class documentation page and is
      *  followed by a list of files that were used to generate the page.
      */
-    virtual QCString trGeneratedFromFiles(ClassDef::CompoundType compType,
-        bool single)
+    virtual QCString trGeneratedFromFiles(ClassDef::CompoundType compType,bool)
     { // here s is one of " Class", " Struct" or " Union"
       // single is true implies a single file
       QCString result=(QCString)"Thông tin cho ";
@@ -766,7 +765,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
         default: break;
       }
       result+=" được biên soạn từ các file sau đây";
-      if (single) result+=":"; else result+=":";
+      result+=":";
       return result;
     }
 
@@ -896,7 +895,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "các trường đữ liệu";
       }
@@ -1022,7 +1021,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
         "};\n"
         "\\endcode\n"
         "Kết quả trong biểu đồ sau đây:"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "Các hộp trong biểu đồ trên có ý nghĩa như sau:\n"
         "<ul>\n"
@@ -1091,7 +1090,7 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Cấu trúc dữ liệu";
       }
@@ -1501,10 +1500,9 @@ class TranslatorVietnamese : public TranslatorAdapter_1_6_0
     /*! This returns the word directory with or without starting capital
      *  (\a first_capital) and in sigular or plural form (\a singular).
      */
-    virtual QCString trDir(bool first_capital, bool singular)
+    virtual QCString trDir(bool first_capital, bool)
     {
       QCString result((first_capital ? "Thư mục" : "thư mục"));
-      if (singular) result+=""; else result+="";
       return result;
     }
 

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -36,6 +36,8 @@
 #include <qregexp.h>
 #include <qfileinfo.h>
 #include <qdict.h>
+#include <qvector.h>
+#define USE_ORIGINAL_TABLES
 
 #include "markdown.h"
 #include "growbuf.h"
@@ -56,7 +58,13 @@
 #define isIdChar(i) \
   ((data[i]>='a' && data[i]<='z') || \
    (data[i]>='A' && data[i]<='Z') || \
-   (data[i]>='0' && data[i]<='9'))   \
+   (data[i]>='0' && data[i]<='9') || \
+   (((unsigned char)data[i])>=0x80)) // unicode characters
+
+#define extraChar(i) \
+  (data[i]=='-' || data[i]=='+' || data[i]=='!' || \
+   data[i]=='?' || data[i]=='$' || data[i]=='@' || \
+   data[i]=='&' || data[i]=='*' || data[i]=='%')
 
 // is character at position i in data allowed before an emphasis section
 #define isOpenEmphChar(i) \
@@ -78,6 +86,13 @@ struct LinkRef
   LinkRef(const QCString &l,const QCString &t) : link(l), title(t) {}
   QCString link;
   QCString title;
+};
+
+struct TableCell
+{
+  TableCell() : colSpan(false) {}
+  QCString cellText;
+  bool colSpan;
 };
 
 typedef int (*action_t)(GrowBuf &out,const char *data,int offset,int size);
@@ -110,19 +125,22 @@ static void processInline(GrowBuf &out,const char *data,int size);
 static QCString escapeSpecialChars(const QCString &s)
 {
   if (s.isEmpty()) return "";
+  bool insideQuote=FALSE;
   GrowBuf growBuf;
   const char *p=s;
-  char c;
+  char c,pc='\0';
   while ((c=*p++))
   {
     switch (c)
     {
-      case '<':  growBuf.addStr("\\<");   break;
-      case '>':  growBuf.addStr("\\>");   break;
-      case '\\': growBuf.addStr("\\\\");  break;
-      case '@':  growBuf.addStr("\\@");   break;
-      default:   growBuf.addChar(c);      break;
+      case '"':  if (pc!='\\')  { insideQuote=!insideQuote; } growBuf.addChar(c);   break;
+      case '<':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('<'); break;
+      case '>':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('>'); break;
+      case '\\': if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('\\'); break;
+      case '@':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('@'); break;
+      default:   growBuf.addChar(c); break;
     }
+    pc=c;
   }
   growBuf.addChar(0);
   return growBuf.get();
@@ -132,7 +150,7 @@ static void convertStringFragment(QCString &result,const char *data,int size)
 {
   if (size<0) size=0;
   result.resize(size+1);
-  memcpy(result.data(),data,size);
+  memcpy(result.rawData(),data,size);
   result.at(size)='\0';
 }
 
@@ -588,8 +606,8 @@ static int processHtmlTag(GrowBuf &out,const char *data,int offset,int size)
 static int processEmphasis(GrowBuf &out,const char *data,int offset,int size)
 {
   if ((offset>0 && !isOpenEmphChar(-1)) || // invalid char before * or _
-      (size>1 && data[0]!=data[1] && !isIdChar(1)) || // invalid char after * or _
-      (size>2 && data[0]==data[1] && !isIdChar(2)))   // invalid char after ** or __
+      (size>1 && data[0]!=data[1] && !(isIdChar(1) || extraChar(1) || data[1]=='[')) || // invalid char after * or _
+      (size>2 && data[0]==data[1] && !(isIdChar(2) || extraChar(2) || data[2]=='[')))   // invalid char after ** or __
   {
     return 0;
   }
@@ -694,14 +712,26 @@ static int processLink(GrowBuf &out,const char *data,int,int size)
     if (i<size && data[i]=='<') i++;
     linkStart=i;
     nl=0;
-    while (i<size && data[i]!='\'' && data[i]!='"' && data[i]!=')') 
+    int braceCount=1;
+    while (i<size && data[i]!='\'' && data[i]!='"' && braceCount>0)
     {
-      if (data[i]=='\n')
+      if (data[i]=='\n') // unexpected EOL
       {
         nl++;
         if (nl>1) return 0;
       }
-      i++;
+      else if (data[i]=='(')
+      {
+        braceCount++;
+      }
+      else if (data[i]==')')
+      {
+        braceCount--;
+      }
+      if (braceCount>0)
+      {
+        i++;
+      }
     }
     if (i>=size || data[i]=='\n') return 0;
     convertStringFragment(link,data+linkStart,i-linkStart);
@@ -719,7 +749,7 @@ static int processLink(GrowBuf &out,const char *data,int,int size)
       nl=0;
       while (i<size && data[i]!=')')
       {
-        if (data[i]=='\n') 
+        if (data[i]=='\n')
         {
           if (nl>1) return 0;
           nl++;
@@ -810,7 +840,6 @@ static int processLink(GrowBuf &out,const char *data,int,int size)
   {
     return 0;
   }
-  static QRegExp re("^[@\\]ref ");
   if (isToc) // special case for [TOC]
   {
     if (g_current) g_current->stat=TRUE;
@@ -826,7 +855,7 @@ static int processLink(GrowBuf &out,const char *data,int,int size)
       out.addStr("@image html ");
       out.addStr(link.mid(fd ? 0 : 5));
       if (!explicitTitle && !content.isEmpty())
-      { 
+      {
         out.addStr(" \"");
         out.addStr(content);
         out.addStr("\"");
@@ -889,7 +918,8 @@ static int processLink(GrowBuf &out,const char *data,int,int size)
         out.addStr("\"");
       }
       out.addStr(">");
-      out.addStr(content.simplifyWhiteSpace());
+      content = content.simplifyWhiteSpace();
+      processInline(out,content,content.length());
       out.addStr("</a>");
     }
     else // avoid link to e.g. F[x](y)
@@ -1005,21 +1035,20 @@ static int processSpecialCommand(GrowBuf &out, const char *data, int offset, int
   if (size>1 && data[0]=='\\')
   {
     char c=data[1];
-    if (c=='[' || c==']' || c=='*' || c=='+' || c=='-' ||
-        c=='!' || c=='(' || c==')' || c=='.' || c=='`' || c=='_') 
+    if (c=='[' || c==']' || c=='*' || c=='!' || c=='(' || c==')' || c=='`' || c=='_')
     {
-      if (c=='-' && size>3 && data[2]=='-' && data[3]=='-') // \---
-      {
-        out.addStr(&data[1],3);
-        return 4;
-      }
-      else if (c=='-' && size>2 && data[2]=='-') // \--
-      {
-        out.addStr(&data[1],2);
-        return 3;
-      }
-      out.addStr(&data[1],1);
+      out.addChar(data[1]);
       return 2;
+    }
+    else if (c=='-' && size>3 && data[2]=='-' && data[3]=='-') // \---
+    {
+      out.addStr(&data[1],3);
+      return 4;
+    }
+    else if (c=='-' && size>2 && data[2]=='-') // \--
+    {
+      out.addStr(&data[1],2);
+      return 3;
     }
   }
   return 0;
@@ -1214,7 +1243,7 @@ static int isHRuler(const char *data,int size)
   return n>=3; // at least 3 characters needed for a hruler
 }
 
-static QCString extractTitleId(QCString &title)
+static QCString extractTitleId(QCString &title, int level)
 {
   //static QRegExp r1("^[a-z_A-Z][a-z_A-Z0-9\\-]*:");
   static QRegExp r2("\\{#[a-z_A-Z][a-z_A-Z0-9\\-]*\\}");
@@ -1225,6 +1254,14 @@ static QCString extractTitleId(QCString &title)
     QCString id = title.mid(i+2,l-3);
     title = title.left(i);
     //printf("found id='%s' title='%s'\n",id.data(),title.data());
+    return id;
+  }
+  if ((level > 0) && (level <= Config_getInt(TOC_INCLUDE_HEADINGS)))
+  {
+    static int autoId = 0;
+    QCString id;
+    id.sprintf("autotoc_md%d",autoId++);
+    //printf("auto-generated id='%s' title='%s'\n",id.data(),title.data());
     return id;
   }
   //printf("no id found in title '%s'\n",title.data());
@@ -1258,7 +1295,7 @@ static int isAtxHeader(const char *data,int size,
 
   // store result
   convertStringFragment(header,data+i,end-i);
-  id = extractTitleId(header);
+  id = extractTitleId(header, level);
   if (!id.isEmpty()) // strip #'s between title and id
   {
     i=header.length()-1;
@@ -1366,7 +1403,9 @@ static bool isFencedCodeBlock(const char *data,int size,int refIndent,
   int startTildes=0;
   while (i<size && data[i]==' ') indent++,i++;
   if (indent>=refIndent+4) return FALSE; // part of code block
-  while (i<size && data[i]=='~') startTildes++,i++;
+  char tildaChar='~';
+  if (i<size && data[i]=='`') tildaChar='`';
+  while (i<size && data[i]==tildaChar) startTildes++,i++;
   if (startTildes<3) return FALSE; // not enough tildes
   if (i<size && data[i]=='{') i++; // skip over optional {
   int startLang=i;
@@ -1376,11 +1415,11 @@ static bool isFencedCodeBlock(const char *data,int size,int refIndent,
   start=i;
   while (i<size)
   {
-    if (data[i]=='~')
+    if (data[i]==tildaChar)
     {
       end=i-1;
       int endTildes=0;
-      while (i<size && data[i]=='~') endTildes++,i++; 
+      while (i<size && data[i]==tildaChar) endTildes++,i++;
       while (i<size && data[i]==' ') i++;
       if (i==size || data[i]=='\n') 
       {
@@ -1540,7 +1579,7 @@ static bool isTableBlock(const char *data,int size)
 
   i+=ret; // goto next line
   int cc2;
-  ret = findTableColumns(data+i,size-i,start,end,cc2);
+  findTableColumns(data+i,size-i,start,end,cc2);
 
   //printf("isTableBlock: %d\n",cc1==cc2);
   return cc1==cc2;
@@ -1553,6 +1592,7 @@ static int writeTableBlock(GrowBuf &out,const char *data,int size)
 
   i = findTableColumns(data,size,start,end,columns);
   
+#ifdef USE_ORIGINAL_TABLES
   out.addStr("<table>");
 
   // write table header, in range [start..end]
@@ -1560,7 +1600,8 @@ static int writeTableBlock(GrowBuf &out,const char *data,int size)
 
   int headerStart = start;
   int headerEnd = end;
-
+#endif
+    
   // read cell alignments
   int ret = findTableColumns(data+i,size-i,start,end,cc);
   k=0;
@@ -1600,6 +1641,8 @@ static int writeTableBlock(GrowBuf &out,const char *data,int size)
   }
   // proceed to next line
   i+=ret;
+
+#ifdef USE_ORIGINAL_TABLES
 
   int m=headerStart;
   for (k=0;k<columns;k++)
@@ -1664,6 +1707,161 @@ static int writeTableBlock(GrowBuf &out,const char *data,int size)
   }
 
   out.addStr("</table> ");
+#else
+  // Store the table cell information by row then column.  This
+  // allows us to handle row spanning.
+  QVector<QVector<TableCell> > tableContents;
+  tableContents.setAutoDelete(TRUE);
+
+  int headerStart = start;
+  int headerEnd = end;
+
+  int m=headerStart;
+  QVector<TableCell> *headerContents = new QVector<TableCell>(columns);
+  headerContents->setAutoDelete(TRUE);
+  for (k=0;k<columns;k++)
+  {
+    headerContents->insert(k, new TableCell);
+    while (m<=headerEnd && (data[m]!='|' || (m>0 && data[m-1]=='\\')))
+    {
+      headerContents->at(k)->cellText += data[m++];
+    }
+    m++;
+    // do the column span test before stripping white space
+    // || is spanning columns, | | is not
+    headerContents->at(k)->colSpan = headerContents->at(k)->cellText.isEmpty();
+    headerContents->at(k)->cellText = headerContents->at(k)->cellText.stripWhiteSpace();
+  }
+  // qvector doesn't have an append like std::vector, so we gotta do
+  // extra work
+  tableContents.resize(1);
+  tableContents.insert(0, headerContents);
+
+  // write table cells
+  int rowNum = 1;
+  while (i<size)
+  {
+    int ret = findTableColumns(data+i,size-i,start,end,cc);
+    if (cc!=columns) break; // end of table
+
+    j=start+i;
+    k=0;
+    QVector<TableCell> *rowContents = new QVector<TableCell>(columns);
+    rowContents->setAutoDelete(TRUE);
+    rowContents->insert(k, new TableCell);
+    while (j<=end+i)
+    {
+      if (j<=end+i && (data[j]=='|' && (j==0 || data[j-1]!='\\'))) 
+      {
+        // do the column span test before stripping white space
+        // || is spanning columns, | | is not
+        rowContents->at(k)->colSpan = rowContents->at(k)->cellText.isEmpty();
+        rowContents->at(k)->cellText = rowContents->at(k)->cellText.stripWhiteSpace();
+        k++;
+        rowContents->insert(k, new TableCell);
+      } // if (j<=end+i && (data[j]=='|' && (j==0 || data[j-1]!='\\'))) 
+      else
+      {
+        rowContents->at(k)->cellText += data[j];
+      } // else { if (j<=end+i && (data[j]=='|' && (j==0 || data[j-1]!='\\'))) }
+      j++;
+    } // while (j<=end+i)
+    // do the column span test before stripping white space
+    // || is spanning columns, | | is not
+    rowContents->at(k)->colSpan = rowContents->at(k)->cellText.isEmpty();
+    rowContents->at(k)->cellText = rowContents->at(k)->cellText.stripWhiteSpace();
+    // qvector doesn't have an append like std::vector, so we gotta do
+    // extra work
+    tableContents.resize(tableContents.size()+1);
+    tableContents.insert(rowNum++, rowContents);
+
+    // proceed to next line
+    i+=ret;
+  }
+
+
+  out.addStr("<table class=\"markdownTable\">\n");
+  QCString cellTag("th"), cellClass("class=\"markdownTableHead");
+  for (unsigned row = 0; row < tableContents.size(); row++)
+  {
+    out.addStr("  <tr class=\"markdownTable");
+    if (row)
+    {
+      out.addStr("Body\"");
+      if (row % 2)
+      {
+        out.addStr(" class=\"markdownTableRowOdd\">\n");
+      }
+      else
+      {
+        out.addStr(" class=\"markdownTableRowEven\">\n");
+      }
+    }
+    else
+    {
+      out.addStr("Head\">\n");
+    }
+    for (int c = 0; c < columns; c++)
+    {
+      // save the cell text for use after column span computation
+      QCString cellText(tableContents[row]->at(c)->cellText);
+
+      // Row span handling.  Spanning rows will contain a caret ('^').
+      // If the current cell contains just a caret, this is part of an
+      // earlier row's span and the cell should not be added to the
+      // output.
+      if (tableContents[row]->at(c)->cellText == "^")
+        continue;
+      unsigned rowSpan = 1, spanRow = row+1;
+      while ((spanRow < tableContents.size()) &&
+             (tableContents[spanRow]->at(c)->cellText == "^"))
+      {
+        spanRow++;
+        rowSpan++;
+      }
+
+      out.addStr("    <" + cellTag + " " + cellClass);
+      // use appropriate alignment style
+      switch (columnAlignment[c])
+      {
+        case AlignLeft:   out.addStr("Left\""); break;
+        case AlignRight:  out.addStr("Right\""); break;
+        case AlignCenter: out.addStr("Center\""); break;
+        case AlignNone:   out.addStr("None\""); break;
+      }
+
+      if (rowSpan > 1)
+      {
+        QCString spanStr;
+        spanStr.setNum(rowSpan);
+        out.addStr(" rowspan=\"" + spanStr + "\"");
+      }
+      // Column span handling, assumes that column spans will have
+      // empty strings, which would indicate the sequence "||", used
+      // to signify spanning columns.
+      unsigned colSpan = 1;
+      while ((c < columns-1) &&
+             tableContents[row]->at(c+1)->colSpan)
+      {
+        c++;
+        colSpan++;
+      }
+      if (colSpan > 1)
+      {
+        QCString spanStr;
+        spanStr.setNum(colSpan);
+        out.addStr(" colspan=\"" + spanStr + "\"");
+      }
+      // need at least one space on either side of the cell text in
+      // order for doxygen to do other formatting
+      out.addStr("> " + cellText + " </" + cellTag + ">\n");
+    }
+    cellTag = "td";
+    cellClass = "class=\"markdownTableBody";
+    out.addStr("  </tr>\n");
+  }
+  out.addStr("</table>\n");
+#endif
 
   delete[] columnAlignment;
   return i;
@@ -1817,7 +2015,7 @@ static int writeCodeBlock(GrowBuf &out,const char *data,int size,int refIndent)
     int indent=0;
     while (j<end && data[j]==' ') j++,indent++;
     //printf("j=%d end=%d indent=%d refIndent=%d tabSize=%d data={%s}\n",
-    //    j,end,indent,refIndent,Config_getInt("TAB_SIZE"),QCString(data+i).left(end-i-1).data());
+    //    j,end,indent,refIndent,Config_getInt(TAB_SIZE),QCString(data+i).left(end-i-1).data());
     if (j==end-1) // empty line 
     {
       emptyLines++;
@@ -2065,7 +2263,7 @@ static QCString processBlocks(const QCString &s,int indent)
         while (pi<size && data[pi]==' ') pi++;
         QCString header,id;
         convertStringFragment(header,data+pi,i-pi-1);
-        id = extractTitleId(header);
+        id = extractTitleId(header, level);
         //printf("header='%s' is='%s'\n",header.data(),id.data());
         if (!header.isEmpty())
         {
@@ -2176,6 +2374,29 @@ static QCString processBlocks(const QCString &s,int indent)
   return out.get();
 }
 
+/** returns TRUE if input string docs starts with \@page or \@mainpage command */
+static bool isExplicitPage(const QCString &docs)
+{
+  int i=0;
+  const char *data = docs.data();
+  if (data)
+  {
+    int size=docs.size();
+    while (i<size && (data[i]==' ' || data[i]=='\n'))
+    {
+      i++;
+    }
+    if (i<size+1 &&
+        (data[i]=='\\' || data[i]=='@') &&
+        (qstrncmp(&data[i+1],"page ",5)==0 || qstrncmp(&data[i+1],"mainpage",8)==0)
+       )
+    {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 static QCString extractPageTitle(QCString &docs,QCString &id)
 {
   int ln=0;
@@ -2206,7 +2427,7 @@ static QCString extractPageTitle(QCString &docs,QCString &id)
       QCString lns;
       lns.fill('\n',ln);
       docs=lns+docs.mid(end2);
-      id = extractTitleId(title);
+      id = extractTitleId(title, 0);
       //printf("extractPageTitle(title='%s' docs='%s' id='%s')\n",title.data(),docs.data(),id.data());
       return title;
     }
@@ -2221,7 +2442,7 @@ static QCString extractPageTitle(QCString &docs,QCString &id)
 
 static QCString detab(const QCString &s,int &refIndent)
 {
-  static int tabSize = Config_getInt("TAB_SIZE");
+  static int tabSize = Config_getInt(TAB_SIZE);
   GrowBuf out;
   int size = s.length();
   const char *data = s.data();
@@ -2316,7 +2537,7 @@ QCString processMarkdown(const QCString &fileName,const int lineNr,Entry *e,cons
   // finally process the inline markup (links, emphasis and code spans)
   processInline(out,s,s.length());
   out.addChar(0);
-  Debug::print(Debug::Markdown,0,"======== Markdown =========\n---- input ------- \n%s\n---- output -----\n%s\n---------\n",input.data(),out.get());
+  Debug::print(Debug::Markdown,0,"======== Markdown =========\n---- input ------- \n%s\n---- output -----\n%s\n---------\n",qPrint(input),qPrint(out.get()));
   return out.get();
 }
 
@@ -2347,24 +2568,28 @@ void MarkdownFileParser::parseInput(const char *fileName,
   QCString title=extractPageTitle(docs,id).stripWhiteSpace();
   QCString titleFn = QFileInfo(fileName).baseName().utf8();
   QCString fn      = QFileInfo(fileName).fileName().utf8();
-  static QCString mdfileAsMainPage = Config_getString("USE_MDFILE_AS_MAINPAGE");
+  static QCString mdfileAsMainPage = Config_getString(USE_MDFILE_AS_MAINPAGE);
   if (id.isEmpty()) id = markdownFileNameToId(fileName);
-  if (title.isEmpty()) title = titleFn;
-  if (!mdfileAsMainPage.isEmpty() &&
-      (fn==mdfileAsMainPage || // name reference
-       QFileInfo(fileName).absFilePath()==
-       QFileInfo(mdfileAsMainPage).absFilePath()) // file reference with path
-     )
+  if (!isExplicitPage(docs))
   {
-    docs.prepend("@mainpage\n");
-  }
-  else if (id=="mainpage" || id=="index")
-  {
-    docs.prepend("@mainpage "+title+"\n");
-  }
-  else
-  {
-    docs.prepend("@page "+id+" "+title+"\n");
+    if (!mdfileAsMainPage.isEmpty() &&
+        (fn==mdfileAsMainPage || // name reference
+         QFileInfo(fileName).absFilePath()==
+         QFileInfo(mdfileAsMainPage).absFilePath()) // file reference with path
+       )
+    {
+      docs.prepend("@mainpage "+title+"\n");
+    }
+    else if (id=="mainpage" || id=="index")
+    {
+      if (title.isEmpty()) title = titleFn;
+      docs.prepend("@mainpage "+title+"\n");
+    }
+    else
+    {
+      if (title.isEmpty()) title = titleFn;
+      docs.prepend("@page "+id+" "+title+"\n");
+    }
   }
   int lineNr=1;
   int position=0;
@@ -2374,8 +2599,8 @@ void MarkdownFileParser::parseInput(const char *fileName,
   bool markdownEnabled = Doxygen::markdownSupport;
   Doxygen::markdownSupport = TRUE;
 
-  bool needsEntry;
-  Protection prot;
+  bool needsEntry = FALSE;
+  Protection prot=Public;
   while (parseCommentBlock(
         this,
         current,

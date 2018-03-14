@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -37,9 +37,9 @@ static FILE *warnFile = stderr;
 
 void initWarningFormat()
 {
-//  int filePos = Config_getString("WARN_FORMAT").find("$file");
-//  int linePos = Config_getString("WARN_FORMAT").find("$line");
-//  int textPos = Config_getString("WARN_FORMAT").find("$text");
+//  int filePos = Config_getString(WARN_FORMAT).find("$file");
+//  int linePos = Config_getString(WARN_FORMAT).find("$line");
+//  int textPos = Config_getString(WARN_FORMAT).find("$text");
 //
 //  // sort items on position (there are 6 cases)
 //  warnFormatOrder = 1;
@@ -69,11 +69,11 @@ void initWarningFormat()
 //  {
 //    warnFormatOrder = 6;
 //  }
-//  outputFormat = 
+//  outputFormat =
 //      substitute(
 //        substitute(
-//          substitute( 
-//            Config_getString("WARN_FORMAT"),
+//          substitute(
+//            Config_getString(WARN_FORMAT),
 //           "$file","%s"
 //          ),
 //          "$text","%s"
@@ -86,22 +86,27 @@ void initWarningFormat()
   //    replace(QRegExp("\\$line"),"%d")+
   //    '\n';
 
-  outputFormat = Config_getString("WARN_FORMAT");
+  outputFormat = Config_getString(WARN_FORMAT);
 
-  if (!Config_getString("WARN_LOGFILE").isEmpty())
+  if (!Config_getString(WARN_LOGFILE).isEmpty())
   {
-    warnFile = portable_fopen(Config_getString("WARN_LOGFILE"),"w");
+    warnFile = portable_fopen(Config_getString(WARN_LOGFILE),"w");
   }
   if (!warnFile) // point it to something valid, because warn() relies on it
   {
     warnFile = stderr;
+  }
+
+  if (Config_getBool(WARN_AS_ERROR))
+  {
+    warning_str = error_str;
   }
 }
 
 
 void msg(const char *fmt, ...)
 {
-  if (!Config_getBool("QUIET"))
+  if (!Config_getBool(QUIET))
   {
     if (Debug::isFlagSet(Debug::Time))
     {
@@ -130,37 +135,48 @@ static void format_warn(const char *file,int line,const char *text)
     }
   }
   // substitute markers by actual values
-  QCString msgText = 
+  bool warnAsError = Config_getBool(WARN_AS_ERROR);
+  QCString msgText =
       substitute(
         substitute(
           substitute(
-            substitute( 
+            substitute(
               outputFormat,
               "$file",fileSubst
             ),
-            "$text",textSubst
+            "$line",lineSubst
           ),
-          "$line",lineSubst
+          "$version",versionSubst
         ),
-        "$version",versionSubst
-      )+'\n';
+        "$text",textSubst
+      );
+  if (warnAsError)
+  {
+    msgText += " (warning treated as error, aborting now)";
+  }
+  msgText += '\n';
 
   // print resulting message
   fwrite(msgText.data(),1,msgText.length(),warnFile);
+  if (warnAsError)
+  {
+    exit(1);
+  }
 }
 
-static void do_warn(const char *tag, const char *file, int line, const char *prefix, const char *fmt, va_list args)
+static void do_warn(bool enabled, const char *file, int line, const char *prefix, const char *fmt, va_list args)
 {
-  if (!Config_getBool(tag)) return; // warning type disabled
-  char text[40960];
+  if (!enabled) return; // warning type disabled
+  const int bufSize = 40960;
+  char text[bufSize];
   int l=0;
   if (prefix)
   {
-    strcpy(text,prefix);
+    qstrncpy(text,prefix,bufSize);
     l=strlen(prefix);
   }
-  vsnprintf(text+l, 40960-l, fmt, args);
-  text[40960-1]='\0';
+  vsnprintf(text+l, bufSize-l, fmt, args);
+  text[bufSize-1]='\0';
   format_warn(file,line,text);
 }
 
@@ -168,18 +184,18 @@ void warn(const char *file,int line,const char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  do_warn("WARNINGS", file, line, warning_str, fmt, args);
-  va_end(args); 
+  do_warn(Config_getBool(WARNINGS), file, line, warning_str, fmt, args);
+  va_end(args);
 }
 
 void va_warn(const char *file,int line,const char *fmt,va_list args)
 {
-  do_warn("WARNINGS", file, line, warning_str, fmt, args);
+  do_warn(Config_getBool(WARNINGS), file, line, warning_str, fmt, args);
 }
 
 void warn_simple(const char *file,int line,const char *text)
 {
-  if (!Config_getBool("WARNINGS")) return; // warning type disabled
+  if (!Config_getBool(WARNINGS)) return; // warning type disabled
   format_warn(file,line,QCString(warning_str) + text);
 }
 
@@ -187,15 +203,15 @@ void warn_undoc(const char *file,int line,const char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  do_warn("WARN_IF_UNDOCUMENTED", file, line, warning_str, fmt, args);
+  do_warn(Config_getBool(WARN_IF_UNDOCUMENTED), file, line, warning_str, fmt, args);
   va_end(args);
 }
-  
+
 void warn_doc_error(const char *file,int line,const char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  do_warn("WARN_IF_DOC_ERROR", file, line, warning_str, fmt, args);
+  do_warn(Config_getBool(WARN_IF_DOC_ERROR), file, line, warning_str, fmt, args);
   va_end(args);
 }
 
@@ -204,7 +220,7 @@ void warn_uncond(const char *fmt, ...)
   va_list args;
   va_start(args, fmt);
   vfprintf(warnFile, (QCString(warning_str) + fmt).data(), args);
-  va_end(args); 
+  va_end(args);
 }
 
 void err(const char *fmt, ...)
@@ -212,7 +228,15 @@ void err(const char *fmt, ...)
   va_list args;
   va_start(args, fmt);
   vfprintf(warnFile, (QCString(error_str) + fmt).data(), args);
-  va_end(args); 
+  va_end(args);
+}
+
+extern void err_full(const char *file,int line,const char *fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  do_warn(TRUE, file, line, error_str, fmt, args);
+  va_end(args);
 }
 
 void printlex(int dbg, bool enter, const char *lexName, const char *fileName)
@@ -229,15 +253,15 @@ void printlex(int dbg, bool enter, const char *lexName, const char *fileName)
   if (dbg)
   {
     if (fileName)
-      fprintf(stderr,"--%s lexical analyzer: %s (for: %s)\n",enter_txt, lexName, fileName);
+      fprintf(stderr,"--%s lexical analyzer: %s (for: %s)\n",enter_txt, qPrint(lexName), qPrint(fileName));
     else
-      fprintf(stderr,"--%s lexical analyzer: %s\n",enter_txt, lexName);
+      fprintf(stderr,"--%s lexical analyzer: %s\n",enter_txt, qPrint(lexName));
   }
   else
   {
     if (fileName)
-      Debug::print(Debug::Lex,0,"%s lexical analyzer: %s (for: %s)\n",enter_txt_uc, lexName, fileName);
+      Debug::print(Debug::Lex,0,"%s lexical analyzer: %s (for: %s)\n",enter_txt_uc, qPrint(lexName), qPrint(fileName));
     else
-      Debug::print(Debug::Lex,0,"%s lexical analyzer: %s\n",enter_txt_uc, lexName);
+      Debug::print(Debug::Lex,0,"%s lexical analyzer: %s\n",enter_txt_uc, qPrint(lexName));
   }
 }

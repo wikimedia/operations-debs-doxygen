@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -20,6 +20,7 @@
 #include "reflist.h"
 #include "util.h"
 #include "ftextstream.h"
+#include "definition.h"
 
 /*! Create a list of items that are cross referenced with documentation blocks
  *  @param listName String representing the name of the list.
@@ -36,6 +37,7 @@ RefList::RefList(const char *listName,
   m_dictIterator = 0;
   m_id = 0;
   m_listName = listName;
+  m_fileName = convertNameToFile(listName,FALSE,TRUE);
   m_pageTitle = pageTitle;
   m_secTitle = secTitle;
 }
@@ -98,6 +100,11 @@ QCString RefList::listName() const
   return m_listName;
 }
 
+QCString RefList::fileName() const
+{
+  return m_fileName;
+}
+
 QCString RefList::pageTitle() const
 {
   return m_pageTitle;
@@ -144,6 +151,15 @@ void RefList::generatePage()
     doc +=  "\\anchor ";
     doc += item->listAnchor;
     doc += "\n";
+    if (item->scope)
+    {
+      if (item->scope->name() != "<globalScope>")
+      {
+        doc += "\\_setscope ";
+        doc += item->scope->name();
+        doc += " ";
+      }
+    }
     doc += item->prefix;
     doc += " \\_internalref ";
     doc += item->name;
@@ -166,6 +182,7 @@ void RefList::generatePage()
     doc += "</dd>";
   }
   doc += "</dl>\n";
-  addRelatedPage(m_listName,m_pageTitle,doc,0,m_listName,1,0,0,0);
+  //printf("generatePage('%s')\n",doc.data());
+  addRelatedPage(m_listName,m_pageTitle,doc,0,m_fileName,1,0,0,0);
 }
 

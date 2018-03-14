@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -39,11 +39,12 @@ class NamespaceSDict;
 class MemberGroupSDict;
 class PackageDef;
 class DirDef;
+class FTextStream;
 
 /** Class representing the data associated with a \#include statement. */
 struct IncludeInfo
 {
-  IncludeInfo() { fileDef=0; local=FALSE; indirect=FALSE; }
+  IncludeInfo() : fileDef(0), local(FALSE), imported(FALSE), indirect(FALSE) {}
   ~IncludeInfo() {}
   FileDef *fileDef;
   QCString includeName;
@@ -62,8 +63,6 @@ struct IncludeInfo
  */
 class FileDef : public Definition
 {
-  friend class FileName;
-
   public:
     //enum FileType { Source, Header, Unknown };
 
@@ -79,23 +78,24 @@ class FileDef : public Definition
     QCString displayName(bool=TRUE) const { return name(); }
     QCString fileName() const { return m_fileName; }
     
-    QCString getOutputFileBase() const 
-    { return convertNameToFile(m_diskName); }
+    QCString getOutputFileBase() const;
 
     QCString anchor() const { return QCString(); }
-
-    QCString getFileBase() const { return m_diskName; }
 
     QCString getSourceFileBase() const;
     
     /*! Returns the name of the verbatim copy of this file (if any). */
     QCString includeName() const;
+
+    QCString includeDependencyGraphFileName() const;
+
+    QCString includedByDependencyGraphFileName() const;
     
     /*! Returns the absolute path including the file name. */
     QCString absFilePath() const { return m_filePath; }
     
     /*! Returns the name as it is used in the documentation */
-    QCString docName() const { return m_docname; }
+    const QCString &docName() const { return m_docname; }
 
     /*! Returns TRUE if this file is a source file. */
     bool isSource() const { return m_isSource; }
@@ -146,13 +146,14 @@ class FileDef : public Definition
     void writeMemberPages(OutputList &ol);
     void writeQuickMemberLinks(OutputList &ol,MemberDef *currentMd) const;
     void writeSummaryLinks(OutputList &ol);
+    void writeTagFile(FTextStream &t);
 
     void startParsing();
     void writeSource(OutputList &ol,bool sameTu,QStrList &filesInSameTu);
     void parseSource(bool sameTu,QStrList &filesInSameTu);
     void finishParsing();
+    void setDiskName(const QCString &name);
 
-    friend void generatedFileNames();
     void insertMember(MemberDef *md);
     void insertClass(ClassDef *cd);
     void insertNamespace(NamespaceDef *nd);
@@ -217,7 +218,9 @@ class FileDef : public Definition
     SDict<Definition>    *m_usingDeclList;
     QCString              m_path;
     QCString              m_filePath;
-    QCString              m_diskName;
+    QCString              m_inclDepFileName;
+    QCString              m_inclByDepFileName;
+    QCString              m_outputDiskName;
     QCString              m_fileName;
     QCString              m_docname;
     QIntDict<Definition> *m_srcDefDict;

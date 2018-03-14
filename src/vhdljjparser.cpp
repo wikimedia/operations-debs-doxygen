@@ -40,28 +40,8 @@ static int              yyLineNr      = 1;
 static int*             lineParse;
 static int              iDocLine      = -1;
 static QCString         inputString;
-static Entry            gBlock;
+static Entry*           gBlock        = 0;
 static Entry*           previous      = 0;
-#if 0
-int iLine;
-QStringList      qrl;
-ParserInterface *g_thisParser;
-int              inputPosition;
-int              inputLen;
-int              startComment  = 0;
-QFile            inputFile;
-QCString         inbuf;
-
-QCString         yyFileName;
-bool             g_lexInit     = FALSE;
-int              yyLineNr      = 1;
-int              g_lastCommentContext = 0;
-bool             docBlockAutoBrief;
-char             docBlockTerm;
-int              iDocLine      = -1;
-int              num_chars;
-int*             lineParse;
-#endif
 //-------------------------------------------------------
 
 static Entry* oldEntry;
@@ -92,7 +72,7 @@ int VhdlParser::levelCounter;
 
 static QList<VhdlConfNode> configL;
 
-struct
+static struct
 {
   QCString doc;
   bool brief;
@@ -122,41 +102,40 @@ Entry* getVhdlCompound()
 void startCodeBlock(int index)
 {
   int ll=strComment.length();
+  if (!gBlock) gBlock = new Entry;
   iCodeLen=inputString.findRev(strComment.data())+ll;
   // fprintf(stderr,"\n startin code..%d %d %d\n",iCodeLen,num_chars,ll);
-  //assert(false);
-  gBlock.reset();
+  gBlock->reset();
   int len=strComment.length();
   QCString name=strComment.right(len-index);//
   name=VhdlDocGen::getIndexWord(name.data(),1);
   if (!name)
-    gBlock.name="misc"+ VhdlDocGen::getRecordNumber();
+    gBlock->name="misc"+ VhdlDocGen::getRecordNumber();
   else
-    gBlock.name=name;
+    gBlock->name=name;
 
-  //int li=strComment.contains('\n');
-
-  gBlock.startLine=yyLineNr;
-  gBlock.bodyLine=yyLineNr;
+  gBlock->startLine=yyLineNr;
+  gBlock->bodyLine=yyLineNr;
 
   strComment=strComment.left(index);
   VhdlDocGen::prepareComment(strComment);
-  gBlock.brief+=strComment;
+  gBlock->brief+=strComment;
 }
 
 void makeInlineDoc(int endCode)
 {
   int len=endCode-iCodeLen;
+  if (!gBlock) gBlock = new Entry;
   QCString par=inputString.mid(iCodeLen,len);
   //fprintf(stderr,"\n inline code: \n<%s>",par.data());
-  gBlock.doc=par;
-  gBlock.inbodyDocs=par;
-  gBlock.section=Entry::VARIABLE_SEC;
-  gBlock.spec=VhdlDocGen::MISCELLANEOUS;
-  gBlock.fileName = yyFileName;
-  gBlock.endBodyLine=yyLineNr-1;
-  gBlock.lang=SrcLangExt_VHDL;
-  Entry *temp=new Entry(gBlock);
+  gBlock->doc=par;
+  gBlock->inbodyDocs=par;
+  gBlock->section=Entry::VARIABLE_SEC;
+  gBlock->spec=VhdlDocGen::MISCELLANEOUS;
+  gBlock->fileName = yyFileName;
+  gBlock->endBodyLine=yyLineNr-1;
+  gBlock->lang=SrcLangExt_VHDL;
+  Entry *temp=new Entry(*gBlock);
   Entry* compound=getVhdlCompound();
 
   if (compound)
@@ -169,7 +148,7 @@ void makeInlineDoc(int endCode)
     VhdlParser::current_root->addSubEntry(temp);
   }
   strComment.resize(0);
-  gBlock.reset();
+  gBlock->reset();
 }// makeInlineDoc
 
 
@@ -185,6 +164,9 @@ void VHDLLanguageScanner::parseInput(const char *fileName,const char *fileBuf,En
   g_thisParser=this;
   bool inLine=false;
   inputString=fileBuf;
+
+ // fprintf(stderr,"\n ============= %s\n ==========\n",fileBuf);
+
   if (strlen(fileName)==0)
   {
     inLine=true;
@@ -217,7 +199,7 @@ void VHDLLanguageScanner::parseInput(const char *fileName,const char *fileBuf,En
   VhdlParser::current=new Entry();
   VhdlParser::initEntry(VhdlParser::current);
   groupEnterFile(fileName,yyLineNr);
-  lineParse=new int[200];
+  lineParse=new int[200]; // Dimitri: dangerous constant: should be bigger than largest token id in VhdlParserConstants.h
   VhdlParserIF::parseVhdlfile(fileBuf,inLine);
 
   delete VhdlParser::current;
@@ -226,13 +208,16 @@ void VHDLLanguageScanner::parseInput(const char *fileName,const char *fileBuf,En
   if (!inLine)
   VhdlParser::mapLibPackage(root);
 
-  delete lineParse;
+  delete[] lineParse;
   yyFileName.resize(0);
   libUse.clear();
   VhdlDocGen::resetCodeVhdlParserState();
 }
 
-void VhdlParser::lineCount(){ yyLineNr++; }
+void VhdlParser::lineCount()
+{
+  yyLineNr++;
+}
 
 void VhdlParser::lineCount(const char* text)
 {
@@ -309,7 +294,8 @@ bool checkInlineCode(QCString & doc)
 
 void VhdlParser::handleFlowComment(const char* doc)
 {
-  lineCount(doc);
+	lineCount(doc);
+
   if (VhdlDocGen::getFlowMember())
   {
     QCString qcs(doc);
@@ -319,16 +305,19 @@ void VhdlParser::handleFlowComment(const char* doc)
   }
 }
 
+
 void VhdlParser::handleCommentBlock(const char* doc1,bool brief)
 {
   int position=0;
   static bool isIn;
-  QCString doc(doc1);
+  QCString doc;
+  doc.append(doc1);
+ // fprintf(stderr,"\n %s",doc.data());
   if (doc.isEmpty()) return;
 
   if (checkMultiComment(doc,yyLineNr))
   {
-    lineCount(doc1);
+    strComment.resize(0);
     return;
   }
 
@@ -345,7 +334,6 @@ void VhdlParser::handleCommentBlock(const char* doc1,bool brief)
   if (isIn)
   {
     isIn=false;
-    lineCount(doc1);
     return;
   }
 
@@ -353,7 +341,6 @@ void VhdlParser::handleCommentBlock(const char* doc1,bool brief)
 
   bool needsEntry=FALSE;
   Protection protection=Public;
-  int lineNr = iDocLine;
 
   if (oldEntry==current)
   {
@@ -375,13 +362,21 @@ void VhdlParser::handleCommentBlock(const char* doc1,bool brief)
   {
     current->docLine = yyLineNr;
   }
-  //  printf("parseCommentBlock file<%s>\n [%s]\n",yyFileName.data(),doc.data());
+  //  printf("parseCommentBlock file<%s>\n [%s]\n at line [%d] \n ",yyFileName.data(),doc.data(),iDocLine);
+
+  int j=doc.find("[plant]");
+  if (j>=0)
+  {
+    doc=doc.remove(j,7);
+    current->stat=true;
+  }
+
   while (parseCommentBlock(
         g_thisParser,
         current,
         doc,        // text
         yyFileName, // file
-        lineNr,     // line of block start
+        iDocLine,   // line of block start
         brief,
         0,
         FALSE,
@@ -405,7 +400,8 @@ void VhdlParser::handleCommentBlock(const char* doc1,bool brief)
     }
     newEntry();
   }
-  lineCount(doc1);
+  iDocLine=-1;
+  strComment.resize(0);
 }
 
 void VHDLLanguageScanner::parsePrototype(const char *text)
@@ -414,7 +410,7 @@ void VHDLLanguageScanner::parsePrototype(const char *text)
   varr=TRUE;
 }
 
-void VhdlParser::addCompInst(char *n, char* instName, char* comp,int iLine)
+void VhdlParser::addCompInst(const char *n, const char* instName, const char* comp,int iLine)
 {
   current->spec=VhdlDocGen::INSTANTIATION;
   current->section=Entry::VARIABLE_SEC;
@@ -423,7 +419,10 @@ void VhdlParser::addCompInst(char *n, char* instName, char* comp,int iLine)
   current->type=instName;                       // foo:instname e.g proto or work. proto(ttt)
   current->exception=genLabels.lower();         // |arch|label1:label2...
   current->name=n;                              // foo
-  current->args=lastCompound->name;             // architecture name
+  if (lastCompound)
+  {
+    current->args=lastCompound->name;             // architecture name
+  }
   current->includeName=comp;                    // component/enity/configuration
   int u=genLabels.find("|",1);
   if (u>0)
@@ -455,7 +454,6 @@ void VhdlParser::addCompInst(char *n, char* instName, char* comp,int iLine)
 void VhdlParser::addVhdlType(const char *n,int startLine,int section,
     uint64 spec,const char* args,const char* type,Protection prot)
 {
-  static QRegExp reg("[\\s]");
   QCString name(n);
   if (isFuncProcProced() || VhdlDocGen::getFlowMember())  return;
 
@@ -558,7 +556,6 @@ void VhdlParser::pushLabel( QCString &label,QCString & val)
 
  QCString  VhdlParser::popLabel(QCString & q)
 {
-  QCString u=q;
   int i=q.findRev("|");
   if (i<0) return "";
   q = q.left(i);
@@ -568,15 +565,12 @@ void VhdlParser::pushLabel( QCString &label,QCString & val)
 void VhdlParser::addConfigureNode(const char* a,const char*b, bool,bool isLeaf,bool inlineConf)
 {
   VhdlConfNode* co=0;
-  QCString ent,arch,lab;
-  QCString l=genLabels;
+  QCString ent;
   ent=a;
- // lab =  VhdlDocGen::parseForConfig(ent,arch);
 
   if (b)
   {
     ent=b;
-   // lab=VhdlDocGen::parseForBinding(ent,arch);
   }
   int level=0;
 
@@ -619,15 +613,13 @@ void VhdlParser::addConfigureNode(const char* a,const char*b, bool,bool isLeaf,b
   }
 
   configL.append(co);
-
-}// addConfigure
+}
 
 
 void VhdlParser::addProto(const char *s1,const char *s2,const char *s3,
     const char *s4,const char *s5,const char *s6)
 {
   (void)s5; // avoid unused warning
-  static QRegExp reg("[\\s]");
   QCString name=s2;
   QStringList ql=QStringList::split(",",name,FALSE);
 
@@ -710,7 +702,7 @@ void VhdlParser::mapLibPackage( Entry* root)
 
 bool VhdlParser::addLibUseClause(const QCString &type)
 {
-  static bool showIEEESTD=Config_getBool("FORCE_LOCAL_INCLUDES");
+  static bool showIEEESTD=Config_getBool(FORCE_LOCAL_INCLUDES);
 
   if (showIEEESTD) // all standard packages and libraries will not be shown
   {
@@ -788,23 +780,55 @@ void VhdlParser::createFlow()
   currP=0;
 }
 
+void VhdlParser::setMultCommentLine()
+{
+  iDocLine=yyLineNr;
+}
+
+void VhdlParser::oneLineComment(QCString qcs)
+{
+  bool isEndCode=qcs.contains("\\endcode");
+
+  int index = qcs.find("\\code");
+  if (isEndCode)
+  {
+    int end = inputString.find(qcs.data(),iCodeLen);
+    makeInlineDoc(end);
+  }
+  else if (index > 0)
+  {
+    // assert(false);
+    strComment=qcs;
+    startCodeBlock(index);
+    strComment.resize(0);
+  }
+
+  if (!isEndCode && index==-1)
+  {
+    int j=qcs.find("--!");
+    qcs=qcs.right(qcs.length()-3-j);
+    if (!checkMultiComment(qcs,iDocLine))
+    {
+      handleCommentBlock(qcs,TRUE);
+    }
+  }
+}
+
+
 bool  checkMultiComment(QCString& qcs,int line)
 {
   QList<Entry> *pTemp=getEntryAtLine(VhdlParser::current_root,line);
 
   if (pTemp->isEmpty()) return false;
 
-  //int ii=pTemp->count();
-  // qcs.stripPrefix("--!");
   VhdlDocGen::prepareComment(qcs);
   while (!pTemp->isEmpty())
   {
     Entry *e=(Entry*)pTemp->getFirst();
     e->briefLine=line;
     e->brief+=qcs;
-    iDocLine=-1;
+
     pTemp->removeFirst();
-    //ii=pTemp->count();
   }
   return true;
 }
@@ -819,7 +843,7 @@ QList<Entry>* getEntryAtLine(const Entry* ce,int line)
     if (rt->bodyLine==line)
     {
       lineEntry.insert(0,rt);
-    } // if
+    }
 
     getEntryAtLine(rt,line);
   }

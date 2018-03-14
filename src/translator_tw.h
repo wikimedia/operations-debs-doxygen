@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -104,7 +104,7 @@ class TranslatorChinesetraditional : public Translator
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "欄位說明文件";
       }
@@ -171,7 +171,7 @@ class TranslatorChinesetraditional : public Translator
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料結構";
       }
@@ -188,7 +188,7 @@ class TranslatorChinesetraditional : public Translator
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料欄位";
       }
@@ -201,7 +201,7 @@ class TranslatorChinesetraditional : public Translator
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "全域資料";
       }
@@ -241,7 +241,7 @@ class TranslatorChinesetraditional : public Translator
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "這是附帶簡略說明的資料結構:";
       }
@@ -260,7 +260,7 @@ class TranslatorChinesetraditional : public Translator
       {
         result+="文件化過";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="結構及聯合型態欄位";
       }
@@ -271,7 +271,7 @@ class TranslatorChinesetraditional : public Translator
       result+=", 並且帶有連結至";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="每個欄位的結構/聯合型態說明文件:";
         }
@@ -282,7 +282,7 @@ class TranslatorChinesetraditional : public Translator
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="這些結構/聯合型態所屬:";
         }
@@ -300,7 +300,7 @@ class TranslatorChinesetraditional : public Translator
       QCString result="這是全部";
       if (!extractAll) result+="文件化的";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="函式，變數，定義，列舉，及型態定義";
       }
@@ -352,7 +352,7 @@ class TranslatorChinesetraditional : public Translator
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料結構索引";
       }
@@ -379,7 +379,7 @@ class TranslatorChinesetraditional : public Translator
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料結構說明文件";
       }
@@ -488,7 +488,7 @@ class TranslatorChinesetraditional : public Translator
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料結構";
       }
@@ -749,8 +749,7 @@ class TranslatorChinesetraditional : public Translator
     /*! This is put at the bottom of a class documentation page and is
      *  followed by a list of files that were used to generate the page.
      */
-    virtual QCString trGeneratedFromFiles(ClassDef::CompoundType compType,
-        bool single)
+    virtual QCString trGeneratedFromFiles(ClassDef::CompoundType compType,bool)
     { // here s is one of " Class", " Struct" or " Union"
       // single is true implies a single file
       QCString result=(QCString)"此";
@@ -766,7 +765,7 @@ class TranslatorChinesetraditional : public Translator
         default: break;
       }
       result+=" 文件是由下列檔案中產生";
-      if (single) result+=":"; else result+=":";
+      result+=":";
       return result;
     }
 
@@ -896,7 +895,7 @@ class TranslatorChinesetraditional : public Translator
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料欄位";
       }
@@ -994,7 +993,7 @@ class TranslatorChinesetraditional : public Translator
         ".<p>\n"
         "請看下面範例:\n"
         "\\code\n"
-        "/*! 因為截斷的不可見類別 */\n"
+        "/*! 因為截斷而造成的不可見類別 */\n"
         "class Invisible { };\n\n"
         "/*! 截斷的類別, 繼承關係被隱藏 */\n"
         "class Truncated : public Invisible { };\n\n"
@@ -1021,32 +1020,32 @@ class TranslatorChinesetraditional : public Translator
         "    Used *m_usedClass;\n"
         "};\n"
         "\\endcode\n"
-        "若在組態檔中的 \\c MAX_DOT_GRAPH_HEIGHT tag "
-        "設為 240，將會產生下列的圖示:"
-        "<p><center><img src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "這個例子會產生下列的圖示:"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center></p>\n"
         "<p>\n"
         "上圖中的各區塊意義如下:\n"
+        "</p>\n"
         "<ul>\n"
         "<li>%A 填滿黑色的區塊代表產生這個圖示的類別或結構 "
         ".\n"
-        "<li>%A 黑邊的區塊代表文件化過的結構或類別.\n"
-        "<li>%A 灰邊的區塊代表未經文件化的結構或是類別.\n"
+        "<li>%A 黑邊的區塊代表文件化過的結構或類別.</li>\n"
+        "<li>%A 灰邊的區塊代表未經文件化的結構或是類別.</li>\n"
         "<li>%A 紅邊的區塊代表文件化的結構或是類別，"
         "這些結構或類別的繼承或包含關係不會全部顯示. %A 圖示 "
-        "若無法塞入指定的邊界中將會被截斷.\n"
+        "若無法塞入指定的邊界中將會被截斷.</li>\n"
         "</ul>\n"
+        "<p>\n"
         "箭頭具有下面的意義:\n"
+        "</p>\n"
         "<ul>\n"
         "<li>%A 深藍色箭頭用來代表兩個類別間的公開繼承 "
         "關係.\n"
-        "<li>%A 深綠色箭頭代表保護繼承.\n"
-        "<li>%A 深紅色箭頭代表私有繼承.\n"
+        "<li>%A 深綠色箭頭代表保護繼承。</li>\n"
+        "<li>%A 深紅色箭頭代表私有繼承。</li>\n"
         "<li>%A 紫色箭頭用來表示類別被另一個包含或是使用."
-        "箭頭上標示著可存取該類別或是結構的對應變數"
-        ".\n"
+        "箭頭上標示著可存取該類別或是結構的對應變數。</li>\n"
         "<li>%A 黃色箭頭代表樣版實體與樣版類別之間的關係。"
-        "箭頭上標記著樣版實體上的參數"
-        ".\n"
+        "箭頭上標記著樣版實體上的參數。</li>\n"
         "</ul>\n";
     }
     /*! text for the link to the legend page */
@@ -1092,7 +1091,7 @@ class TranslatorChinesetraditional : public Translator
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "資料結構";
       }
@@ -1867,7 +1866,7 @@ class TranslatorChinesetraditional : public Translator
      */
     virtual QCString trProvidedByCategory()
     {
-      return "由 @1 分類所提供.";
+      return "由 @0 分類所提供.";
     }
 
     /*! Used in a method of an Objective-C category that extends a class.
@@ -1876,7 +1875,7 @@ class TranslatorChinesetraditional : public Translator
      */
     virtual QCString trExtendsClass()
     {
-      return "延伸 @1 類別 .";
+      return "延伸 @0 類別 .";
     }
 
     /*! Used as the header of a list of class methods in Objective-C.
@@ -1948,21 +1947,21 @@ class TranslatorChinesetraditional : public Translator
       return result;
     }
     /** UNO IDL service page */
-    virtual QCString trServiceGeneratedFromFiles(bool single)
+    virtual QCString trServiceGeneratedFromFiles(bool)
     {
       // single is true implies a single file
       QCString result=(QCString)"本服務的文件由以下的檔案"
                                 "所產生";
-      if (single) result+=":"; else result+=":";
+      result+=":";
       return result;
     }
     /** UNO IDL singleton page */
-    virtual QCString trSingletonGeneratedFromFiles(bool single)
+    virtual QCString trSingletonGeneratedFromFiles(bool)
     {
       // single is true implies a single file
       QCString result=(QCString)"本singleton的文件由下面的檔案"
                                 "所產生";
-      if (single) result+=":"; else result+=":";
+      result+=":";
       return result;
     }
 

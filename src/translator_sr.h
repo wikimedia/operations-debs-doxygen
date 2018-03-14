@@ -2,7 +2,7 @@
  *
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -91,7 +91,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Dokumentacija polja";
       }
@@ -158,7 +158,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Spisak struktura";
       }
@@ -175,7 +175,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Sva polja struktura";
       }
@@ -188,14 +188,14 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
-      {
-       return "Članovi datoteke";
-      }
-      else
-      {
-       return "Članovi datoteke";
-      }
+      //if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
+      //{
+      // return "Članovi datoteke"; // TODO: translate me
+      //}
+      //else
+      //{
+      return "Članovi datoteke";
+      //}
     }
 
     /*! This is put above each page as a link to all related pages. */
@@ -227,7 +227,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Spisak struktura sa kratkim opisima:";
       }
@@ -245,7 +245,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
       {
         result+="dokumentovanih ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="članova struktura/unija";
       }
@@ -256,7 +256,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
       result+=" sa vezama ka ";
       if (extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="dokumentaciji svakog polja strukture/unije:";
         }
@@ -267,7 +267,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="strukturama/unijama kojima pripadaju:";
         }
@@ -285,7 +285,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
       QCString result="Spisak svih ";
       if (!extractAll) result+="dokumentovanih ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="funkcija, promenljivih, makro zamena, nabrajanja i definicija tipa";
       }
@@ -336,7 +336,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Spisak struktura/unija";
       }
@@ -363,7 +363,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Dokumentacija stuktura/unija";
       }
@@ -466,7 +466,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Strukture i unije";
       }
@@ -874,7 +874,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Polja";
       }
@@ -1001,7 +1001,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
         "\\endcode\n"
         "Ako je \\c MAX_DOT_GRAPH_HEIGHT tag u konfiguracionoj datoteci "
         "postavljen na \\c 200 graf izvođenja će izgledati ovako:"
-        "<p><center><img src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "Graf će biti odsečen ako ne stane unutar zadatih granica.\n"
         "<p>\n"
         "Pravougaonici imaju sledeća značenja:\n"
@@ -1069,7 +1069,7 @@ class TranslatorSerbian : public TranslatorAdapter_1_6_0
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Strukture i unije";
       }

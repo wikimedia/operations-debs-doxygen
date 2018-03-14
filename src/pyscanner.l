@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,6 +21,8 @@
  *  taught by Peter H. Froehlich <phf@acm.org>.
  */
 
+%option never-interactive
+%option prefix="pyscannerYY"
 
 %{
 
@@ -35,7 +37,6 @@
 #include <qarray.h>
 #include <qstack.h>
 #include <qregexp.h>
-#include <unistd.h>
 #include <qfile.h>
 #include <qfileinfo.h>
   
@@ -55,8 +56,8 @@
 //#define DBG_CTX(x) fprintf x
 #define DBG_CTX(x) do { } while(0)
 
-#define YY_NEVER_INTERACTIVE 1
 #define YY_NO_INPUT 1
+#define YY_NO_UNISTD_H 1
 
 /* -----------------------------------------------------------------
  *
@@ -83,7 +84,6 @@ static Specifier 	virt;
 
 static int              docBlockContext;
 static QCString         docBlock;
-static QCString         docBlockName;
 static bool             docBlockInBody;
 static bool             docBlockJavaStyle;
 static bool             docBrief;
@@ -97,7 +97,6 @@ static int              g_indent = 0;
 static int              g_curIndent = 0;
 
 static QDict<QCString>  g_packageNameCache(257);
-static QCString         g_packageScope;
 
 static char             g_atomStart;
 static char             g_atomEnd;
@@ -115,6 +114,9 @@ static int              g_braceCount;
 
 static bool             g_lexInit = FALSE;
 static bool             g_packageCommentAllowed;
+
+static bool             g_start_init = FALSE;
+static int              g_search_count = 0;
 
 //-----------------------------------------------------------------------------
 
@@ -181,7 +183,7 @@ static void newFunction()
 static inline int computeIndent(const char *s)
 {
   int col=0;
-  static int tabSize=Config_getInt("TAB_SIZE");
+  static int tabSize=Config_getInt(TAB_SIZE);
   const char *p=s;
   char c;
   while ((c=*p++))
@@ -368,7 +370,7 @@ static void initTriDoubleQuoteBlock()
   docBlockContext   = YY_START;
   docBlockInBody    = FALSE;
   docBlockJavaStyle = TRUE;
-  docBlockSpecial   = yytext[3]=='!';
+  docBlockSpecial   = yytext[strlen(yytext) - 1]=='!';
   docBlock.resize(0);
   g_doubleQuote = TRUE;
   startCommentBlock(FALSE);
@@ -379,7 +381,7 @@ static void initTriSingleQuoteBlock()
   docBlockContext   = YY_START;
   docBlockInBody    = FALSE;
   docBlockJavaStyle = TRUE;
-  docBlockSpecial   = yytext[3]=='!';
+  docBlockSpecial   = yytext[strlen(yytext) - 1]=='!';
   docBlock.resize(0);
   g_doubleQuote = FALSE;
   startCommentBlock(FALSE);
@@ -401,7 +403,6 @@ static void searchFoundDef()
   current->startLine = yyLineNr;
   current->bodyLine  = yyLineNr;
   current->section = Entry::FUNCTION_SEC;
-  current->protection = protection = Public;
   current->lang = SrcLangExt_Python;
   current->virt = Normal;
   current->stat = gstat;
@@ -461,6 +462,7 @@ OCTNUMBER         "0"[0-7]+[lL]?
 NUMBER            {DIGIT}+[lLjJ]?
 INTNUMBER         {HEXNUMBER}|{OCTNUMBER}|{NUMBER}
 FLOATNUMBER       {DIGIT}+"."{DIGIT}+([eE][+\-]?{DIGIT}+)?[jJ]?
+BOOL              ("True"|"False")
 LETTER            [A-Za-z\x80-\xFF]
 NONEMPTY          [A-Za-z0-9_\x80-\xFF]
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
@@ -470,8 +472,10 @@ IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
 SCOPE             {IDENTIFIER}("."{IDENTIFIER})*
 BORDER            ([^A-Za-z0-9])
 
-TRISINGLEQUOTE    "'''"(!)?
-TRIDOUBLEQUOTE    "\"\"\""(!)?
+TRISINGLEQUOTE    {STRINGPREFIX}?"'''"(!)?
+TRIDOUBLEQUOTE    {STRINGPREFIX}?"\"\"\""(!)?
+ENDTRISINGLEQUOTE "'''"
+ENDTRIDOUBLEQUOTE "\"\"\""
 LONGSTRINGCHAR    [^\\"']
 ESCAPESEQ         ("\\")(.)
 LONGSTRINGITEM    ({LONGSTRINGCHAR}|{ESCAPESEQ})
@@ -486,6 +490,7 @@ STRINGPREFIX      ("r"|"u"|"ur"|"R"|"U"|"UR"|"Ur"|"uR")
 KEYWORD           ("lambda"|"import"|"class"|"assert"|"as"|"from"|"global"|"def"|"True"|"False")
 FLOWKW            ("or"|"and"|"is"|"not"|"print"|"for"|"in"|"if"|"try"|"except"|"yield"|"raise"|"break"|"continue"|"pass"|"if"|"return"|"while"|"elif"|"else"|"finally")
 POUNDCOMMENT      "#"[^#\n][^\n]* 
+SCRIPTCOMMENT      "#!".* 
 
 STARTDOCSYMS      "##"
 
@@ -583,6 +588,7 @@ STARTDOCSYMS      "##"
 			BEGIN(VariableDec);
        	              }
      ^{B}{IDENTIFIER}/{B}"="[^=] { // variable
+                        if (g_search_count) REJECT;
       			g_indent=computeIndent(yytext);
       			current->section   = Entry::VARIABLE_SEC;
 			current->name      = QCString(yytext).stripWhiteSpace();
@@ -591,6 +597,20 @@ STARTDOCSYMS      "##"
 			current->bodyLine  = yyLineNr;
 			g_packageCommentAllowed = FALSE;
 			BEGIN(VariableDec);
+      		      }
+     {B}{IDENTIFIER}/({B},{B}{IDENTIFIER})*{B}")"*{B}"="[^=] { // list of variables, we cannot place the default value
+                                                               // so we will skip it later on in a general rule
+                                                               // Also note ")" this is to catch also (a,b). the "("
+                                                               // is caught in the rule: [(], the ")" will be handled in [)]
+                        if (g_search_count > 1) REJECT;
+      			g_indent=computeIndent(yytext);
+      			current->section   = Entry::VARIABLE_SEC;
+			current->name      = QCString(yytext).stripWhiteSpace();
+			current->fileName  = yyFileName;
+			current->startLine = yyLineNr;
+			current->bodyLine  = yyLineNr;
+			g_packageCommentAllowed = FALSE;
+			newVariable();
       		      }
      "'"	      { // start of a single quoted string
        		        g_stringContext=YY_START;
@@ -606,6 +626,9 @@ STARTDOCSYMS      "##"
                       }
     "@staticmethod"  {
        			gstat=TRUE;
+      		      }
+    {SCRIPTCOMMENT}   { // Unix type script comment
+                        if (yyLineNr != 1) REJECT;
       		      }
     {POUNDCOMMENT}    { // normal comment 
 			g_packageCommentAllowed = FALSE;
@@ -636,6 +659,12 @@ STARTDOCSYMS      "##"
 			g_packageCommentAllowed = FALSE;
 			initSpecialBlock();
 			BEGIN(SpecialComment);
+                      }
+    [(]               { // we have to do something with (
+                        g_search_count += 1;
+                      }
+    [)]               { // we have to do something with )
+                        g_search_count -= 1;
                       }
     [^\n]             { // any other character...
                         // This is the major default
@@ -737,7 +766,7 @@ STARTDOCSYMS      "##"
 
 <SearchMemVars>{
     "self."{IDENTIFIER}/{B}"=" {
-                        DBG_CTX((stderr,"Found member variable %s in %s at %d\n",&yytext[5],current_root->name.data(),yyLineNr));
+                        DBG_CTX((stderr,"Found instance method variable %s in %s at %d\n",&yytext[5],current_root->name.data(),yyLineNr));
 			current->name=&yytext[5];
 			current->section=Entry::VARIABLE_SEC;
 			current->fileName  = yyFileName;
@@ -748,9 +777,19 @@ STARTDOCSYMS      "##"
 			{
 			  current->protection=Private;
 			}
-			else
+			newEntry();
+                      }
+    "cls."{IDENTIFIER}/{B}"=" {
+                        DBG_CTX((stderr,"Found class method variable %s in %s at %d\n",&yytext[4],current_root->name.data(),yyLineNr));
+			current->name=&yytext[4];
+			current->section=Entry::VARIABLE_SEC;
+			current->fileName  = yyFileName;
+			current->startLine = yyLineNr;
+			current->bodyLine  = yyLineNr;
+			current->type.resize(0);
+			if (current->name.at(0)=='_') // mark as private
 			{
-			  current->protection=Public;
+			  current->protection=Private;
 			}
 			newEntry();
                       }
@@ -931,13 +970,13 @@ STARTDOCSYMS      "##"
     "="		        { // default value
                           // TODO: this rule is too simple, need to be able to
                           // match things like =")" as well!
-      			  QCString defVal=&yytext[1];
 			  g_defVal.resize(0);
 			  g_braceCount=0;
 			  BEGIN(FunctionParamDefVal);
       			}
 
      ")"                { // end of parameter list
+        		  current->args = argListToString(current->argList);
                         }
 
      ":"{B}             {
@@ -966,11 +1005,13 @@ STARTDOCSYMS      "##"
 			    {
 			      current->argList->getLast()->defval=g_defVal.stripWhiteSpace();
 			    }
-       			    BEGIN(FunctionParams);
+			    if (*yytext == ')')
+			      current->args = argListToString(current->argList);
+			    BEGIN(FunctionParams);
 			  }
 			  else // continue
 			  {
-			    g_braceCount--;
+			    if (*yytext == ')')g_braceCount--;
 			    g_defVal+=*yytext;
 			  }
        			}
@@ -1161,54 +1202,58 @@ STARTDOCSYMS      "##"
 <VariableDec>{
    "="                { // the assignment operator
                         //printf("====== VariableDec at line %d\n",yyLineNr);
+                        g_start_init = TRUE;
 			current->initializer = yytext;
 			current->initializer += " ";
                       }
    {B}                { // spaces
+			current->initializer += yytext;
 	              }
    {INTNUMBER}	      { // integer value
-			current->type = "int";
+			if (current-> type.isEmpty()) current->type = "int";
 			current->initializer += yytext;
-			BEGIN(VariableEnd);
 		      }
    {FLOATNUMBER}      { // floating point value
-			current->type = "float";
+			if (current->type.isEmpty()) current->type = "float";
 			current->initializer += yytext;
-			BEGIN(VariableEnd);
+		      }
+   {BOOL}             { // boolean value
+			if (current->type.isEmpty()) current->type = "bool";
+			current->initializer += yytext;
 		      }
    {STRINGPREFIX}?"'" { // string
-			current->type = "string";
+			if (current->type.isEmpty()) current->type = "string";
 			current->initializer += yytext;
 			g_copyString=&current->initializer;
-       			g_stringContext=VariableEnd;
+       			g_stringContext=VariableDec;
                         BEGIN( SingleQuoteString );
      		      }
    {STRINGPREFIX}?"\"" { // string
-			current->type = "string";
+			if (current->type.isEmpty()) current->type = "string";
 			current->initializer += yytext;
 			g_copyString=&current->initializer;
-       			g_stringContext=VariableEnd;
+       			g_stringContext=VariableDec;
                         BEGIN( DoubleQuoteString );
      		      }
    {TRIDOUBLEQUOTE}   { // start of a comment block
-			current->type = "string";
+			if (current->type.isEmpty()) current->type = "string";
 			current->initializer += yytext;
 			g_doubleQuote=TRUE;
 			g_copyString=&current->initializer;
-       			g_stringContext=VariableEnd;
+       			g_stringContext=VariableDec;
 			BEGIN(TripleString);
                       }
 
    {TRISINGLEQUOTE}   { // start of a comment block
-			current->type = "string";
+			if (current->type.isEmpty()) current->type = "string";
 			current->initializer += yytext;
 			g_doubleQuote=FALSE;
 			g_copyString=&current->initializer;
-       			g_stringContext=VariableEnd;
+       			g_stringContext=VariableDec;
 			BEGIN(TripleString);
                       }
-   "("		      { // tuple
-                        if (current->mtype!=Property)
+   "("		      { // tuple, only when direct after =
+                        if (current->mtype!=Property && g_start_init)
 			{
 			  current->type = "tuple";
 			}
@@ -1219,7 +1264,7 @@ STARTDOCSYMS      "##"
 			BEGIN( VariableAtom );
                       }
    "["                { // list
-			current->type = "list";
+                        if (g_start_init) current->type = "list";
       		        current->initializer+=*yytext;
                         g_atomStart='[';
 			g_atomEnd=']';
@@ -1227,7 +1272,7 @@ STARTDOCSYMS      "##"
 			BEGIN( VariableAtom );
                       }
    "{"		      { // dictionary
-			current->type = "dictionary";
+                        if (g_start_init) current->type = "dictionary";
       		        current->initializer+=*yytext;
                         g_atomStart='{';
 			g_atomEnd='}';
@@ -1238,9 +1283,25 @@ STARTDOCSYMS      "##"
                         BEGIN( VariableEnd ); 
                       }
    {IDENTIFIER}	      {
+			// do something based on the type of the IDENTIFIER
+			if (current->type.isEmpty())
+                        {
+                          QListIterator<Entry> eli(*(current_root->children()));
+                          Entry *child;
+                          for (eli.toFirst();(child=eli.current());++eli)
+                          {
+                            if (child->name == QCString(yytext))
+                            {
+                               current->type = child->type;
+                               break;
+                            }
+                          }
+                        }
+                        g_start_init = FALSE;
       		        current->initializer+=yytext;
 	              }
    .		      {
+                        g_start_init = FALSE;
       		        current->initializer+=*yytext;
                       }
    \n		      {
@@ -1265,8 +1326,28 @@ STARTDOCSYMS      "##"
 			}
 			if (g_atomCount==0)
 			{
-			  BEGIN(VariableEnd);
+                          g_start_init = FALSE;
+			  BEGIN(VariableDec);
 			}
+                      }
+    {TRIDOUBLEQUOTE}  { // start of a comment block
+                        g_specialBlock = FALSE;
+			current->program+=yytext;
+			initTriDoubleQuoteBlock();
+			BEGIN(TripleComment);
+                      }
+
+    {TRISINGLEQUOTE}  { // start of a comment block
+                        g_specialBlock = FALSE;
+			current->program+=yytext;
+			initTriSingleQuoteBlock();
+			BEGIN(TripleComment);
+                      }
+   "'"	              {
+       			g_stringContext=YY_START;
+			current->initializer+="'";
+			g_copyString=&current->initializer;
+                        BEGIN( SingleQuoteString );
                       }
    "\""	              {
        			g_stringContext=YY_START;
@@ -1304,8 +1385,8 @@ STARTDOCSYMS      "##"
 }
 
 <TripleComment>{
-    {TRIDOUBLEQUOTE}   | 
-    {TRISINGLEQUOTE}   {
+    {ENDTRIDOUBLEQUOTE}   | 
+    {ENDTRISINGLEQUOTE}   {
 			  // printf("Expected module block %d special=%d\n",g_expectModuleDocs,g_specialBlock);
 			  if (g_doubleQuote==(yytext[0]=='"')) 
 			  {
@@ -1366,11 +1447,14 @@ STARTDOCSYMS      "##"
 			    docBlock += yytext;
 			  }
       			}
-    [^"'\n \t]+          {
+    [^"'\n \t\\]+       {
 			  docBlock += yytext;
                         }
     \n			{
       			  incLineNr();
+			  docBlock += yytext;
+      			}
+    \\.		        { // espaced char
 			  docBlock += yytext;
       			}
     .			{
@@ -1447,8 +1531,8 @@ STARTDOCSYMS      "##"
 }
 
 <TripleString>{
-    {TRIDOUBLEQUOTE}    | 
-    {TRISINGLEQUOTE}    {
+    {ENDTRIDOUBLEQUOTE}    | 
+    {ENDTRISINGLEQUOTE}    {
                           *g_copyString += yytext;
 			  if (g_doubleQuote==(yytext[0]=='"')) 
 			  {

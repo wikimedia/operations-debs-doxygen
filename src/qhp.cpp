@@ -53,7 +53,7 @@ static QCString makeRef(const char * withoutExtension, const char * anchor)
   return result+"#"+anchor;
 }
 
-Qhp::Qhp() : m_prevSectionLevel(0), m_sectionLevel(0)
+Qhp::Qhp() : m_prevSectionLevel(0), m_sectionLevel(0), m_skipMainPageSection(FALSE)
 {
   m_doc.setIndentLevel(0);
   m_toc.setIndentLevel(2);
@@ -81,8 +81,8 @@ void Qhp::initialize()
       <filterAttribute>1.0</filterAttribute>
   ..
   */
-  QCString nameSpace       = Config_getString("QHP_NAMESPACE");
-  QCString virtualFolder   = Config_getString("QHP_VIRTUAL_FOLDER");
+  QCString nameSpace       = Config_getString(QHP_NAMESPACE);
+  QCString virtualFolder   = Config_getString(QHP_VIRTUAL_FOLDER);
 
   m_doc.declaration("1.0", "UTF-8");
 
@@ -94,14 +94,14 @@ void Qhp::initialize()
   m_doc.openCloseContent("virtualFolder", virtualFolder);
 
   // Add custom filter
-  QCString filterName = Config_getString("QHP_CUST_FILTER_NAME");
+  QCString filterName = Config_getString(QHP_CUST_FILTER_NAME);
   if (!filterName.isEmpty())
   {
     const char * tagAttributes[] = 
     { "name", filterName, 0 };
     m_doc.open("customFilter", tagAttributes);
 
-    QStringList customFilterAttributes = QStringList::split(QChar(' '), Config_getString("QHP_CUST_FILTER_ATTRS"));
+    QStringList customFilterAttributes = QStringList::split(QChar(' '), Config_getString(QHP_CUST_FILTER_ATTRS));
     for (int i = 0; i < (int)customFilterAttributes.count(); i++)
     {
       m_doc.openCloseContent("filterAttribute", customFilterAttributes[i].utf8());
@@ -113,7 +113,7 @@ void Qhp::initialize()
 
   // Add section attributes
   QStringList sectionFilterAttributes = QStringList::split(QChar(' '),
-      Config_getString("QHP_SECT_FILTER_ATTRS"));
+      Config_getString(QHP_SECT_FILTER_ATTRS));
   if (!sectionFilterAttributes.contains(QString("doxygen")))
   {
     sectionFilterAttributes << "doxygen";
@@ -164,7 +164,7 @@ void Qhp::finalize()
   m_doc.close("filterSection");
   m_doc.close("QtHelpProject");
 
-  QCString fileName = Config_getString("HTML_OUTPUT") + "/" + getQhpFileName();
+  QCString fileName = Config_getString(HTML_OUTPUT) + "/" + getQhpFileName();
   QFile file(fileName);
   if (!file.open(IO_WriteOnly))
   {
@@ -177,14 +177,13 @@ void Qhp::finalize()
 void Qhp::incContentsDepth()
 {
   m_sectionLevel++;
-  //printf("Qhp::incContentsDepth() %d->%d\n",m_sectionLevel-1,m_sectionLevel);
 }
 
 void Qhp::decContentsDepth()
 {
-  //printf("Qhp::decContentsDepth() %d->%d\n",m_sectionLevel,m_sectionLevel-1);
-  if (m_sectionLevel <= 0)
+  if (m_sectionLevel<=0 || (m_sectionLevel==1 && m_skipMainPageSection))
   {
+    m_skipMainPageSection=FALSE;
     return;
   }
   m_sectionLevel--;
@@ -208,6 +207,7 @@ void Qhp::addContentsItem(bool /*isDir*/, const char * name,
   setPrevSection(name, f, anchor, m_sectionLevel);
 
   // Close sections as needed
+  //printf("Qhp::addContentsItem() closing %d sections\n",diff);
   for (; diff > 0; diff--)
   {
     m_toc.close("section");
@@ -225,7 +225,7 @@ void Qhp::addIndexItem(Definition *context,MemberDef *md,
 
   if (md) // member
   {
-    static bool separateMemberPages = Config_getBool("SEPARATE_MEMBER_PAGES");
+    static bool separateMemberPages = Config_getBool(SEPARATE_MEMBER_PAGES);
     if (context==0) // global member
     {
       if (md->getGroupDef())
@@ -284,8 +284,8 @@ QCString Qhp::getQhpFileName()
 
 QCString Qhp::getFullProjectName()
 {
-  QCString projectName = Config_getString("PROJECT_NAME");
-  QCString versionText = Config_getString("PROJECT_NUMBER");
+  QCString projectName = Config_getString(PROJECT_NAME);
+  QCString versionText = Config_getString(PROJECT_NUMBER);
   if (projectName.isEmpty()) projectName="Root";
   return projectName + (versionText.isEmpty()
       ? QCString("")
@@ -330,6 +330,10 @@ void Qhp::handlePrevSection()
       // Section without children
       m_toc.openClose("section", attributes);
     }
+  }
+  else
+  {
+    m_skipMainPageSection=TRUE;
   }
 
   clearPrevSection();

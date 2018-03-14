@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -59,7 +59,7 @@ void TooltipManager::clearTooltips()
 static QCString escapeId(const char *s)
 {
   QCString res=s;
-  char *p=res.data();
+  char *p=res.rawData();
   while (*p)
   {
     if (!isId(*p)) *p='_';
@@ -70,7 +70,7 @@ static QCString escapeId(const char *s)
 
 void TooltipManager::addTooltip(Definition *d)
 {
-  static bool sourceTooltips = Config_getBool("SOURCE_TOOLTIPS");
+  static bool sourceTooltips = Config_getBool(SOURCE_TOOLTIPS);
   if (!sourceTooltips) return;
   QCString id = d->getOutputFileBase();
   int i=id.findRev('/');

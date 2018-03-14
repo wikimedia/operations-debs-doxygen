@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -118,13 +118,13 @@ class TranslatorKorean : public Translator
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
           return "필드 문서화";
       }
       else
       {
-          return "멤버 데이타 문서화";
+          return "멤버 데이터 문서화";
       }
     }
 
@@ -185,9 +185,9 @@ class TranslatorKorean : public Translator
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 구조";
+        return "데이터 구조";
       }
       else
       {
@@ -202,9 +202,9 @@ class TranslatorKorean : public Translator
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 필드";
+        return "데이터 필드";
       }
       else
       {
@@ -215,7 +215,7 @@ class TranslatorKorean : public Translator
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "전역";
       }
@@ -255,9 +255,9 @@ class TranslatorKorean : public Translator
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "다음은 데이타 구조들입니다. (간략한 설명만을 보여줍니다) :";
+        return "다음은 데이터 구조들입니다. (간략한 설명만을 보여줍니다) :";
       }
       else
       {
@@ -274,7 +274,7 @@ class TranslatorKorean : public Translator
       {
         result+="문서화된 ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="모든 구조체와 공용체의 필드들";
       }
@@ -286,7 +286,7 @@ class TranslatorKorean : public Translator
 
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="각 필드들은 해당 필드에 대한 구조체와 공용체의 "
 		  "문서화 페이지의 링크를 가지고 있습니다. :";
@@ -299,7 +299,7 @@ class TranslatorKorean : public Translator
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="각 필드들은 해당 필드가 속해 있는 구조체와 공용체에 "
 		  "대한 링크를 가지고 있습니다. :";
@@ -319,7 +319,7 @@ class TranslatorKorean : public Translator
       QCString result="다음은 ";
       if (!extractAll) result+="문서화된  ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="모든 함수, 변수, 매크로, 열거형, 타입정의들";
       }
@@ -372,9 +372,9 @@ class TranslatorKorean : public Translator
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 구조 색인";
+        return "데이터 구조 색인";
       }
       else
       {
@@ -399,9 +399,9 @@ class TranslatorKorean : public Translator
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 구조 문서화";
+        return "데이터 구조 문서화";
       }
       else
       {
@@ -502,9 +502,9 @@ class TranslatorKorean : public Translator
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 구조";
+        return "데이터 구조";
       }
       else
       {
@@ -677,10 +677,10 @@ class TranslatorKorean : public Translator
 
         if (i!=numEntries-1)  // not the last entry, so we need a separator
         {
-          if (i<numEntries-2) // not the fore last entry
+          //if (i<numEntries-2) // not the fore last entry
             result+=", ";
-          else                // the fore last entry
-            result+=", ";
+          //else                // the fore last entry
+          //  result+=", ";     // TODO: does the 'and' need to be translated here?
         }
       }
       return result;
@@ -911,9 +911,9 @@ class TranslatorKorean : public Translator
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 필드";
+        return "데이터 필드";
       }
       else
       {
@@ -1035,7 +1035,7 @@ class TranslatorKorean : public Translator
         "};\n"
         "\\endcode\n"
         "다음과 같은 그래프가 출력될 것입니다. :"
-        "<p><center><img alt=\"\" src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img alt=\"\" src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "위 그래프의 박스들은 다음과 같은 의미를 가집니다. :\n"
         "<ul>\n"
@@ -1100,9 +1100,9 @@ class TranslatorKorean : public Translator
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
-        return "데이타 구조";
+        return "데이터 구조";
       }
       else
       {
@@ -1203,9 +1203,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trClass(bool first_capital, bool singular)
+    virtual QCString trClass(bool, bool singular)
     {
-      QCString result((first_capital ? "클래스" : "클래스"));
+      QCString result("클래스");
       if (!singular)  result+="들";
       return result;
     }
@@ -1214,9 +1214,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trFile(bool first_capital, bool singular)
+    virtual QCString trFile(bool, bool singular)
     {
-      QCString result((first_capital ? "파일" : "파일"));
+      QCString result("파일");
       if (!singular)  result+="들";
       return result;
     }
@@ -1225,9 +1225,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trNamespace(bool first_capital, bool singular)
+    virtual QCString trNamespace(bool, bool singular)
     {
-      QCString result((first_capital ? "네임스페이스" : "네임스페이스"));
+      QCString result("네임스페이스");
       if (!singular)  result+="들";
       return result;
     }
@@ -1236,9 +1236,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trGroup(bool first_capital, bool singular)
+    virtual QCString trGroup(bool, bool singular)
     {
-      QCString result((first_capital ? "그룹" : "그룹"));
+      QCString result("그룹");
       if (!singular)  result+="들";
       return result;
     }
@@ -1247,9 +1247,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trPage(bool first_capital, bool singular)
+    virtual QCString trPage(bool, bool singular)
     {
-      QCString result((first_capital ? "페이지" : "페이지"));
+      QCString result("페이지");
       if (!singular)  result+="들";
       return result;
     }
@@ -1258,9 +1258,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trMember(bool first_capital, bool singular)
+    virtual QCString trMember(bool, bool singular)
     {
-      QCString result((first_capital ? "멤버" : "멤버"));
+      QCString result("멤버");
       if (!singular)  result+="들";
       return result;
     }
@@ -1269,9 +1269,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trGlobal(bool first_capital, bool singular)
+    virtual QCString trGlobal(bool, bool singular)
     {
-      QCString result((first_capital ? "전역" : "전역"));
+      QCString result("전역");
       if (!singular)  result+="";
       return result;
     }
@@ -1282,9 +1282,9 @@ class TranslatorKorean : public Translator
 
     /*! This text is generated when the \\author command is used and
      *  for the author section in man pages. */
-    virtual QCString trAuthor(bool first_capital, bool singular)
+    virtual QCString trAuthor(bool, bool singular)
     {
-      QCString result((first_capital ? "작성자" : "작성자"));
+      QCString result("작성자");
       if (!singular)  result+="들";
       return result;
     }
@@ -1509,9 +1509,9 @@ class TranslatorKorean : public Translator
     /*! This returns the word directory with or without starting capital
      *  (\a first_capital) and in sigular or plural form (\a singular).
      */
-    virtual QCString trDir(bool first_capital, bool singular)
+    virtual QCString trDir(bool, bool singular)
     {
-      QCString result((first_capital ? "디렉토리" : "디렉토리"));
+      QCString result("디렉토리");
       if (singular) result+=""; else result+="들";
       return result;
     }
@@ -1555,15 +1555,15 @@ class TranslatorKorean : public Translator
 
     /*! This is put above each page as a link to the list of annotated data types (Fortran). */
     virtual QCString trCompoundListFortran()
-    { return "데이타 타입 목록"; }
+    { return "데이터 타입 목록"; }
 
     /*! This is put above each page as a link to all members of compounds (Fortran). */
     virtual QCString trCompoundMembersFortran()
-    { return "데이타 필드"; }
+    { return "데이터 필드"; }
 
     /*! This is an introduction to the annotated compound list (Fortran). */
     virtual QCString trCompoundListDescriptionFortran()
-    { return "대략적인 설명과 함께 데이타 타입들의 목록입니다.:"; }
+    { return "대략적인 설명과 함께 데이터 타입들의 목록입니다.:"; }
 
     /*! This is an introduction to the page with all data types (Fortran). */
     virtual QCString trCompoundMembersDescriptionFortran(bool extractAll)
@@ -1573,16 +1573,16 @@ class TranslatorKorean : public Translator
       {
         result+="문서화된 ";
       }
-      result+="모든 데이타 타입 멤버들의 목록입니다. ";
+      result+="모든 데이터 타입 멤버들의 목록입니다. ";
 
       result+="각 항목은 ";
       if (!extractAll)
       {
-         result+="각 멤버에 대한 데이타 구조 문서화 페이지의 링크를 가지고 있습니다.";
+         result+="각 멤버에 대한 데이터 구조 문서화 페이지의 링크를 가지고 있습니다.";
       }
       else
       {
-         result+="그들이 속한 데이타 타입의 링크를 가지고 있습니다. :";
+         result+="그들이 속한 데이터 타입의 링크를 가지고 있습니다. :";
       }
       return result;
     }
@@ -1591,13 +1591,13 @@ class TranslatorKorean : public Translator
      * annotated compound index (Fortran).
      */
     virtual QCString trCompoundIndexFortran()
-    { return "데이타 타입 색인"; }
+    { return "데이터 타입 색인"; }
 
     /*! This is used in LaTeX as the title of the chapter containing
      *  the documentation of all data types (Fortran).
      */
     virtual QCString trTypeDocumentation()
-    { return "데이타 타입 문서화"; }
+    { return "데이터 타입 문서화"; }
 
     /*! This is used in the documentation of a file as a header before the
      *  list of (global) subprograms (Fortran).
@@ -1615,7 +1615,7 @@ class TranslatorKorean : public Translator
      *  the list of links to documented compounds (Fortran)
      */
      virtual QCString trDataTypes()
-    { return "데이타 타입들"; }
+    { return "데이터 타입들"; }
 
     /*! used as the title of page containing all the index of all modules (Fortran). */
     virtual QCString trModulesList()
@@ -1690,9 +1690,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trModule(bool first_capital, bool singular)
+    virtual QCString trModule(bool, bool singular)
     {
-      QCString result((first_capital ? "모듈" : "모듈"));
+      QCString result("모듈");
       if (!singular)  result+="들";
       return result;
     }
@@ -1725,9 +1725,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trType(bool first_capital, bool singular)
+    virtual QCString trType(bool, bool singular)
     {
-      QCString result((first_capital ? "타입" : "타입"));
+      QCString result("타입");
       if (!singular)  result+="들";
       return result;
     }
@@ -1735,9 +1735,9 @@ class TranslatorKorean : public Translator
      *  be followed by a single name or by a list of names
      *  of the category.
      */
-    virtual QCString trSubprogram(bool first_capital, bool singular)
+    virtual QCString trSubprogram(bool, bool singular)
     {
-      QCString result((first_capital ? "서브프로그램" : "서브프로그램"));
+      QCString result("서브프로그램");
       if (!singular)  result+="들";
       return result;
     }
@@ -1903,7 +1903,7 @@ class TranslatorKorean : public Translator
      */
     virtual QCString trProvidedByCategory()
     {
-      return "카테고리 @1에 의해 제공됨.";
+      return "카테고리 @0에 의해 제공됨.";
     }
 
     /*! Used in a method of an Objective-C category that extends a class.
@@ -1912,7 +1912,7 @@ class TranslatorKorean : public Translator
      */
     virtual QCString trExtendsClass()
     {
-      return "클래스 @1 확장.";
+      return "클래스 @0 확장.";
     }
 
     /*! Used as the header of a list of class methods in Objective-C.

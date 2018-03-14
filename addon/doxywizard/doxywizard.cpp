@@ -1,8 +1,27 @@
-#include <QtGui>
 #include "doxywizard.h"
 #include "version.h"
 #include "expert.h"
 #include "wizard.h"
+
+#include <QMenu>
+#include <QMenuBar>
+#include <QPushButton>
+#include <QMessageBox>
+#include <QVBoxLayout>
+#include <QLineEdit>
+#include <QLabel>
+#include <QTextBrowser>
+#include <QStatusBar>
+#include <QProcess>
+#include <QTimer>
+#include <QCloseEvent>
+#include <QApplication>
+#include <QDir>
+#include <QFileDialog>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QTextStream>
+#include <QDebug>
 
 #ifdef WIN32
 #include <windows.h>
@@ -10,7 +29,11 @@
 
 #define MAX_RECENT_FILES 10
 
-const int messageTimeout = 5000; //!< status bar message timeout in millisec.
+const int messageTimeout = 5000; //!< status bar message timeout in milliseconds.
+
+#define APPQT(x) QString::fromLatin1("<qt><pre>") + x + QString::fromLatin1("</pre></qt>")
+
+static QString text1  = QString::fromLatin1("");
 
 MainWindow &MainWindow::instance()
 {
@@ -19,7 +42,7 @@ MainWindow &MainWindow::instance()
 }
 
 MainWindow::MainWindow()
-  : m_settings(QString::fromAscii("Doxygen.org"), QString::fromAscii("Doxywizard"))
+  : m_settings(QString::fromLatin1("Doxygen.org"), QString::fromLatin1("Doxywizard"))
 {
   QMenu *file = menuBar()->addMenu(tr("File"));
   file->addAction(tr("Open..."), 
@@ -78,13 +101,15 @@ MainWindow::MainWindow()
   runLayout->addWidget(showSettings);
   runLayout->addWidget(m_saveLog);
 
-  // output produced by doxygen
+  // output produced by Doxygen
   runTabLayout->addLayout(runLayout);
   runTabLayout->addWidget(new QLabel(tr("Output produced by doxygen")));
   QGridLayout *grid = new QGridLayout;
-  m_outputLog = new QTextEdit;
+  //m_outputLog = new QTextEdit;
+  m_outputLog = new QTextBrowser;
+  //m_outputLog = new QPlainTextEdit;
   m_outputLog->setReadOnly(true);
-  m_outputLog->setFontFamily(QString::fromAscii("courier"));
+  m_outputLog->setFontFamily(QString::fromLatin1("courier"));
   m_outputLog->setMinimumWidth(600);
   grid->addWidget(m_outputLog,0,0);
   grid->setColumnStretch(0,1);
@@ -183,17 +208,17 @@ void MainWindow::updateWorkingDir()
 
 void MainWindow::manual()
 {
-  QDesktopServices::openUrl(QUrl(QString::fromAscii("http://www.doxygen.org/manual.html")));
+  QDesktopServices::openUrl(QUrl(QString::fromLatin1("http://www.doxygen.org/manual.html")));
 }
 
 void MainWindow::about()
 {
   QString msg;
   QTextStream t(&msg,QIODevice::WriteOnly);
-  t << QString::fromAscii("<qt><center>A tool to configure and run doxygen version ")+
-       QString::fromAscii(versionString)+
-       QString::fromAscii(" on your source files.</center><p><br>"
-       "<center>Written by<br> Dimitri van Heesch<br>&copy; 2000-2014</center><p>"
+  t << QString::fromLatin1("<qt><center>A tool to configure and run doxygen version ")+
+       QString::fromLatin1(versionString)+
+       QString::fromLatin1(" on your source files.</center><p><br>"
+       "<center>Written by<br> Dimitri van Heesch<br>&copy; 2000-2015</center><p>"
        "</qt>");
   QMessageBox::about(this,tr("Doxygen GUI"),msg);
 }
@@ -273,7 +298,7 @@ bool MainWindow::saveConfig()
 bool MainWindow::saveConfigAs()
 {
   QString fileName = QFileDialog::getSaveFileName(this, QString(), 
-             m_workingDir->text()+QString::fromAscii("/Doxyfile"));
+             m_workingDir->text()+QString::fromLatin1("/Doxyfile"));
   if (fileName.isEmpty()) return false;
   saveConfig(fileName);
   return true;
@@ -289,7 +314,7 @@ void MainWindow::makeDefaults()
   {
     //printf("MainWindow:makeDefaults()\n");
     m_expert->saveSettings(&m_settings);
-    m_settings.setValue(QString::fromAscii("wizard/loadsettings"), true);
+    m_settings.setValue(QString::fromLatin1("wizard/loadsettings"), true);
     m_settings.sync();
   }
 }
@@ -306,7 +331,7 @@ void MainWindow::clearRecent()
     m_recentFiles.clear();
     for (int i=0;i<MAX_RECENT_FILES;i++)
     {
-      m_settings.setValue(QString().sprintf("recent/config%d",i++),QString::fromAscii(""));
+      m_settings.setValue(QString().sprintf("recent/config%d",i++),QString::fromLatin1(""));
     }
     m_settings.sync();
   }
@@ -323,7 +348,7 @@ void MainWindow::resetToDefaults()
   {
     //printf("MainWindow:resetToDefaults()\n");
     m_expert->resetToDefaults();
-    m_settings.setValue(QString::fromAscii("wizard/loadsettings"), false);
+    m_settings.setValue(QString::fromLatin1("wizard/loadsettings"), false);
     m_settings.sync();
     m_wizard->refresh();
   }
@@ -331,11 +356,11 @@ void MainWindow::resetToDefaults()
 
 void MainWindow::loadSettings()
 {
-  QVariant geometry     = m_settings.value(QString::fromAscii("main/geometry"), QVariant::Invalid);
-  QVariant state        = m_settings.value(QString::fromAscii("main/state"),    QVariant::Invalid);
-  QVariant wizState     = m_settings.value(QString::fromAscii("wizard/state"),  QVariant::Invalid);
-  QVariant loadSettings = m_settings.value(QString::fromAscii("wizard/loadsettings"),  QVariant::Invalid);
-  QVariant workingDir   = m_settings.value(QString::fromAscii("wizard/workingdir"), QVariant::Invalid);
+  QVariant geometry     = m_settings.value(QString::fromLatin1("main/geometry"), QVariant::Invalid);
+  QVariant state        = m_settings.value(QString::fromLatin1("main/state"),    QVariant::Invalid);
+  QVariant wizState     = m_settings.value(QString::fromLatin1("wizard/state"),  QVariant::Invalid);
+  QVariant loadSettings = m_settings.value(QString::fromLatin1("wizard/loadsettings"),  QVariant::Invalid);
+  QVariant workingDir   = m_settings.value(QString::fromLatin1("wizard/workingdir"), QVariant::Invalid);
 
   if (geometry  !=QVariant::Invalid) restoreGeometry(geometry.toByteArray());
   if (state     !=QVariant::Invalid) restoreState   (state.toByteArray());
@@ -349,25 +374,27 @@ void MainWindow::loadSettings()
     }
   }
 
-  for (int i=0;i<MAX_RECENT_FILES;i++)
+  /* due to prepend use list in reversed order */
+  for (int i=MAX_RECENT_FILES;i>=0;i--)
   {
     QString entry = m_settings.value(QString().sprintf("recent/config%d",i)).toString();
     if (!entry.isEmpty() && QFileInfo(entry).exists())
     {
-      addRecentFile(entry);
+      addRecentFileList(entry);
     }
   }
+  updateRecentFile();
 
 }
 
 void MainWindow::saveSettings()
 {
-  QSettings settings(QString::fromAscii("Doxygen.org"), QString::fromAscii("Doxywizard"));
+  QSettings settings(QString::fromLatin1("Doxygen.org"), QString::fromLatin1("Doxywizard"));
 
-  m_settings.setValue(QString::fromAscii("main/geometry"), saveGeometry());
-  m_settings.setValue(QString::fromAscii("main/state"),    saveState());
-  m_settings.setValue(QString::fromAscii("wizard/state"),  m_wizard->saveState());
-  m_settings.setValue(QString::fromAscii("wizard/workingdir"), m_workingDir->text());
+  m_settings.setValue(QString::fromLatin1("main/geometry"), saveGeometry());
+  m_settings.setValue(QString::fromLatin1("main/state"),    saveState());
+  m_settings.setValue(QString::fromLatin1("wizard/state"),  m_wizard->saveState());
+  m_settings.setValue(QString::fromLatin1("wizard/workingdir"), m_workingDir->text());
 }
 
 void MainWindow::selectTab(int id)
@@ -383,6 +410,11 @@ void MainWindow::selectRunTab()
 
 void MainWindow::addRecentFile(const QString &fileName)
 {
+  addRecentFileList(fileName);
+  updateRecentFile();
+}
+void MainWindow::addRecentFileList(const QString &fileName)
+{
   int i=m_recentFiles.indexOf(fileName);
   if (i!=-1) m_recentFiles.removeAt(i);
   
@@ -396,8 +428,11 @@ void MainWindow::addRecentFile(const QString &fileName)
     m_recentFiles.removeLast();
     m_recentFiles.prepend(fileName);
   }
+}
+void MainWindow::updateRecentFile(void)
+{
   m_recentMenu->clear();
-  i=0;
+  int i=0;
   foreach( QString str, m_recentFiles ) 
   {
     m_recentMenu->addAction(str);
@@ -405,7 +440,7 @@ void MainWindow::addRecentFile(const QString &fileName)
   }
   for (;i<MAX_RECENT_FILES;i++)
   {
-    m_settings.setValue(QString().sprintf("recent/config%d",i++),QString::fromAscii(""));
+    m_settings.setValue(QString().sprintf("recent/config%d",i++),QString::fromLatin1(""));
   }
 }
 
@@ -423,19 +458,19 @@ void MainWindow::runDoxygen()
   {
     QString doxygenPath; 
 #if defined(Q_OS_MACX)
-    doxygenPath = qApp->applicationDirPath()+QString::fromAscii("/../Resources/");
+    doxygenPath = qApp->applicationDirPath()+QString::fromLatin1("/../Resources/");
     qDebug() << tr("Doxygen path: ") << doxygenPath;
-    if ( !QFile(doxygenPath + QString::fromAscii("doxygen")).exists() ) 
+    if ( !QFile(doxygenPath + QString::fromLatin1("doxygen")).exists() ) 
     {
-      // No doygen binary in the resources, if there is a system doxygen binary, use that instead
-      if ( QFile(QString::fromAscii("/usr/local/bin/doxygen")).exists() )
+      // No Doxygen binary in the resources, if there is a system Doxygen binary, use that instead
+      if ( QFile(QString::fromLatin1("/usr/local/bin/doxygen")).exists() )
       {
-        doxygenPath = QString::fromAscii("/usr/local/bin/");
+        doxygenPath = QString::fromLatin1("/usr/local/bin/");
       }
       else 
       {
         qDebug() << tr("Can't find the doxygen command, make sure it's in your $$PATH");
-        doxygenPath = QString::fromAscii("");
+        doxygenPath = QString::fromLatin1("");
       }
     }
     qDebug() << tr("Getting doxygen from: ") << doxygenPath;
@@ -446,20 +481,21 @@ void MainWindow::runDoxygen()
     m_runProcess->setWorkingDirectory(m_workingDir->text());
     QStringList env=QProcess::systemEnvironment();
     // set PWD environment variable to m_workingDir
-    env.replaceInStrings(QRegExp(QString::fromAscii("^PWD=(.*)"),Qt::CaseInsensitive), 
-                         QString::fromAscii("PWD=")+m_workingDir->text());
+    env.replaceInStrings(QRegExp(QString::fromLatin1("^PWD=(.*)"),Qt::CaseInsensitive), 
+                         QString::fromLatin1("PWD=")+m_workingDir->text());
     m_runProcess->setEnvironment(env);
 
     QStringList args;
-    args << QString::fromAscii("-b"); // make stdout unbuffered
-    args << QString::fromAscii("-");  // read config from stdin
+    args << QString::fromLatin1("-b"); // make stdout unbuffered
+    args << QString::fromLatin1("-");  // read config from stdin
 
     m_outputLog->clear();
-    m_runProcess->start(doxygenPath + QString::fromAscii("doxygen"), args);
+    text1  = QString::fromLatin1("");
+    m_runProcess->start(doxygenPath + QString::fromLatin1("doxygen"), args);
 
     if (!m_runProcess->waitForStarted())
     {
-      m_outputLog->append(QString::fromAscii("*** Failed to run doxygen\n"));
+      m_outputLog->append(APPQT(QString::fromLatin1("*** Failed to run doxygen\n")));
       return;
     }
     QTextStream t(m_runProcess);
@@ -468,7 +504,7 @@ void MainWindow::runDoxygen()
 
     if (m_runProcess->state() == QProcess::NotRunning)
     {
-      m_outputLog->append(QString::fromAscii("*** Failed to run doxygen\n"));
+      m_outputLog->append(APPQT(QString::fromLatin1("*** Failed to run doxygen\n")));
     }
     else
     {
@@ -498,7 +534,9 @@ void MainWindow::readStdout()
     QString text = QString::fromUtf8(data);
     if (!text.isEmpty())
     {
-      m_outputLog->append(text.trimmed());
+      text1 += text;
+      m_outputLog->clear();
+      m_outputLog->append(APPQT(text1.trimmed()));
     }
   }
 }
@@ -507,11 +545,11 @@ void MainWindow::runComplete()
 {
   if (m_running)
   {
-    m_outputLog->append(tr("*** Doxygen has finished\n"));
+    m_outputLog->append(APPQT(tr("*** Doxygen has finished\n")));
   }
   else
   {
-    m_outputLog->append(tr("*** Cancelled by user\n"));
+    m_outputLog->append(APPQT(tr("*** Cancelled by user\n")));
   }
   m_outputLog->ensureCursorVisible();
   m_run->setText(tr("Run doxygen"));
@@ -536,10 +574,10 @@ void MainWindow::showHtmlOutput()
   QFileInfo fi(indexFile);
   // TODO: the following doesn't seem to work with IE
 #ifdef WIN32
-  //QString indexUrl(QString::fromAscii("file:///"));
+  //QString indexUrl(QString::fromLatin1("file:///"));
   ShellExecute(NULL, L"open", (LPCWSTR)fi.absoluteFilePath().utf16(), NULL, NULL, SW_SHOWNORMAL);
 #else
-  QString indexUrl(QString::fromAscii("file://"));
+  QString indexUrl(QString::fromLatin1("file://"));
   indexUrl+=fi.absoluteFilePath();
   QDesktopServices::openUrl(QUrl(indexUrl));
 #endif
@@ -549,7 +587,7 @@ void MainWindow::saveLog()
 {
   QString fn = QFileDialog::getSaveFileName(this, tr("Save log file"), 
         m_workingDir->text()+
-        QString::fromAscii("/doxygen_log.txt"));
+        QString::fromLatin1("/doxygen_log.txt"));
   if (!fn.isEmpty())
   {
     QFile f(fn);
@@ -573,7 +611,7 @@ void MainWindow::showSettings()
   QTextStream t(&text);
   m_expert->writeConfig(t,true);
   m_outputLog->clear();
-  m_outputLog->append(text);
+  m_outputLog->append(APPQT(text));
   m_outputLog->ensureCursorVisible();
   m_saveLog->setEnabled(true);
 }
@@ -589,11 +627,11 @@ void MainWindow::updateTitle()
   QString title = tr("Doxygen GUI frontend");
   if (m_modified)
   {
-    title+=QString::fromAscii(" +");
+    title+=QString::fromLatin1(" +");
   }
   if (!m_fileName.isEmpty())
   {
-    title+=QString::fromAscii(" (")+m_fileName+QString::fromAscii(")");
+    title+=QString::fromLatin1(" (")+m_fileName+QString::fromLatin1(")");
   }
   setWindowTitle(title);
 }

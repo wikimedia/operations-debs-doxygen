@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -87,7 +87,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     /*! header that is put before the list of member attributes. */
     virtual QCString trMemberDataDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatmezők dokumentációja";
       }
@@ -151,7 +151,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to the list of annotated classes */
     virtual QCString trCompoundList()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatszerkezetek";
       }
@@ -168,7 +168,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to all members of compounds. */
     virtual QCString trCompoundMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatmezők";
       }
@@ -181,7 +181,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     /*! This is put above each page as a link to all members of files. */
     virtual QCString trFileMembers()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Globális elemek";
       }
@@ -222,7 +222,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     virtual QCString trCompoundListDescription()
     {
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Az összes adatszerkezet listája rövid leírásokkal:";
       }
@@ -241,7 +241,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
       {
         result+="dokumentált ";
       }
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="struktúra- és úniómező";
       }
@@ -252,7 +252,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
       result+=" listája, valamint hivatkozás ";
       if (!extractAll)
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="a megfelelő struktúra-/úniódokumentációra minden mezőnél:";
         }
@@ -263,7 +263,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
       }
       else
       {
-        if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+        if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
         {
           result+="a struktúrákra/úniókra, amikhez tartoznak:";
         }
@@ -281,7 +281,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
       QCString result="Az összes ";
       if (!extractAll) result+="dokumentált ";
 
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         result+="függvény, változó, makródefiníció, enumeráció és típusdefiníció";
       }
@@ -333,7 +333,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trCompoundIndex()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatszerkezet-mutató";
       }
@@ -360,7 +360,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trClassDocumentation()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatszerkezetek dokumentációja";
       }
@@ -463,7 +463,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
      */
     virtual QCString trCompounds()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatszerkezetek";
       }
@@ -872,7 +872,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     }
     virtual QCString trPublicAttribs()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatmezők";
       }
@@ -997,7 +997,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
         "\\endcode\n"
         "Ha a konfigurációs fájl \\c MAX_DOT_GRAPH_HEIGHT elemének értékét "
         "240-re állítjuk, az eredmény a következő ábra lesz:"
-        "<p><center><img src=\"graph_legend."+Config_getEnum("DOT_IMAGE_FORMAT")+"\"></center>\n"
+        "<p><center><img src=\"graph_legend."+getDotImageExtension()+"\"></center>\n"
         "<p>\n"
         "Az ábrán levő dobozok jelentése:\n"
         "<ul>\n"
@@ -1064,7 +1064,7 @@ class TranslatorHungarian : public TranslatorAdapter_1_4_6
     /*! Used for Java classes in the summary section of Java packages */
     virtual QCString trClasses()
     {
-      if (Config_getBool("OPTIMIZE_OUTPUT_FOR_C"))
+      if (Config_getBool(OPTIMIZE_OUTPUT_FOR_C))
       {
         return "Adatszerkezetek";
       }

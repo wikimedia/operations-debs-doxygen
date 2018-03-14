@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -54,7 +54,8 @@ enum SrcLangExt
   SrcLangExt_VHDL     = 0x02000,
   SrcLangExt_XML      = 0x04000,
   SrcLangExt_Tcl      = 0x08000,
-  SrcLangExt_Markdown = 0x10000
+  SrcLangExt_Markdown = 0x10000,
+  SrcLangExt_SQL = 0x20000
 };
 
 /** Grouping info */

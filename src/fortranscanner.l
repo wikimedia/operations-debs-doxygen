@@ -37,6 +37,9 @@
  *
  * - Must track yyLineNr when using REJECT, unput() or similar commands.
  */
+%option never-interactive
+%option case-insensitive
+%option prefix="fortranscannerYY"
 
 %{
 
@@ -48,7 +51,6 @@
 #include <qarray.h>
 #include <qstack.h>
 #include <qregexp.h>
-#include <unistd.h> 
 #include <qfile.h>
 #include <qmap.h>
   
@@ -69,10 +71,10 @@
 //#define DBG_CTX(x) fprintf x
 #define DBG_CTX(x) do { } while(0)
 
-#define YY_NEVER_INTERACTIVE 1
 #define YY_NO_INPUT 1
+#define YY_NO_UNISTD_H 1
 
-enum ScanVar { V_IGNORE, V_VARIABLE, V_PARAMETER};
+enum ScanVar { V_IGNORE, V_VARIABLE, V_PARAMETER, V_RESULT};
 enum InterfaceType { IF_NONE, IF_SPECIFIC, IF_GENERIC, IF_ABSTRACT };
 
 // {{{ ----- Helper structs -----
@@ -99,13 +101,16 @@ struct SymbolModifiers {
   bool nonoverridable;
   bool nopass;
   bool pass;
+  bool contiguous;
+  bool volat; /* volatile is a reserverd name */
+  bool value; /* volatile is a reserverd name */
   QCString passVar;
 
   SymbolModifiers() : type(), returnName(), protection(NONE_P), direction(NONE_D),
     optional(FALSE), protect(FALSE), dimension(), allocatable(FALSE),
     external(FALSE), intrinsic(FALSE), parameter(FALSE),
     pointer(FALSE), target(FALSE), save(FALSE), deferred(FALSE), nonoverridable(FALSE),
-    nopass(FALSE), pass(FALSE), passVar() {}
+    nopass(FALSE), pass(FALSE), contiguous(FALSE), volat(FALSE), value(FALSE), passVar() {}
 
   SymbolModifiers& operator|=(const SymbolModifiers &mdfs);
   SymbolModifiers& operator|=(QCString mdfrString);
@@ -163,7 +168,6 @@ static ScanVar          v_type       = V_IGNORE; // type of parsed variable
 static QList<Entry>     moduleProcedures; // list of all interfaces which contain unresolved 
                                           // module procedures
 static QCString         docBlock;
-static QCString         docBlockName;
 static bool             docBlockInBody = FALSE;
 static bool             docBlockJavaStyle;
 
@@ -200,6 +204,7 @@ static int yyread(char *buf,int max_size);
 static void startCommentBlock(bool);
 static void handleCommentBlock(const QCString &doc,bool brief);
 static void subrHandleCommentBlock(const QCString &doc,bool brief);
+static void subrHandleCommentBlockResult(const QCString &doc,bool brief);
 static void addCurrentEntry(int case_insens);
 static void addModule(const char *name, bool isModule=FALSE);
 static void addSubprogram(const char *text);
@@ -212,7 +217,7 @@ static bool endScope(Entry *scope, bool isGlobalRoot=FALSE);
 //static bool isTypeName(QCString name);
 static void resolveModuleProcedures(QList<Entry> &moduleProcedures, Entry *current_root);
 static int getAmpersandAtTheStart(const char *buf, int length);
-static int getAmpOrExclAtTheEnd(const char *buf, int length);
+static int getAmpOrExclAtTheEnd(const char *buf, int length, char ch);
 static void truncatePrepass(int index);
 static void pushBuffer(QCString &buffer);
 static void popBuffer();
@@ -258,11 +263,12 @@ CHAR      (CHARACTER{ARGS}?|CHARACTER{BS}"*"({BS}[0-9]+|{ARGS}))
 TYPE_SPEC (({NUM_TYPE}({BS}"*"{BS}[0-9]+)?)|({NUM_TYPE}{KIND})|DOUBLE{BS}COMPLEX|DOUBLE{BS}PRECISION|{CHAR}|TYPE{ARGS}|CLASS{ARGS}|PROCEDURE{ARGS}?)
 
 INTENT_SPEC intent{BS}"("{BS}(in|out|in{BS}out){BS}")"
-ATTR_SPEC (ALLOCATABLE|DIMENSION{ARGS}|EXTERNAL|{INTENT_SPEC}|INTRINSIC|OPTIONAL|PARAMETER|POINTER|PROTECTED|PRIVATE|PUBLIC|SAVE|TARGET|NOPASS|PASS{ARGS}?|DEFERRED|NON_OVERRIDABLE)
+ATTR_SPEC (EXTERNAL|ALLOCATABLE|DIMENSION{ARGS}|{INTENT_SPEC}|INTRINSIC|OPTIONAL|PARAMETER|POINTER|PROTECTED|PRIVATE|PUBLIC|SAVE|TARGET|NOPASS|PASS{ARGS}?|DEFERRED|NON_OVERRIDABLE|CONTIGUOUS|VOLATILE|VALUE)
 ACCESS_SPEC (PRIVATE|PUBLIC)
 LANGUAGE_BIND_SPEC BIND{BS}"("{BS}C{BS}(,{BS}NAME{BS}"="{BS}"\""(.*)"\""{BS})?")"
 /* Assume that attribute statements are almost the same as attributes. */
 ATTR_STMT {ATTR_SPEC}|DIMENSION|{ACCESS_SPEC}
+EXTERNAL_STMT (EXTERNAL)
 
 CONTAINS  CONTAINS
 PREFIX    (RECURSIVE{BS_}|IMPURE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,3}(RECURSIVE|IMPURE|PURE|ELEMENTAL)?
@@ -319,13 +325,19 @@ SCOPENAME ({ID}{BS}"::"{BS})*
 
  /*-----------------------------------------------------------------------------------*/
 
+<Prepass>^{BS}[&]*{BS}!.*\n             { /* skip lines with just comment. Note code was in free format or has been converted to it */
+                                          lineCountPrepass ++;
+                                        }
+<Prepass>^{BS}\n                        { /* skip empty lines */
+                                          lineCountPrepass ++;
+                                        }
 <*>^.*\n                                { // prepass: look for line continuations
   					  functionLine = FALSE;
 
                                           DBG_CTX((stderr, "---%s", yytext));
 
                                             int indexStart = getAmpersandAtTheStart(yytext, (int)yyleng);
-                                            int indexEnd = getAmpOrExclAtTheEnd(yytext, (int)yyleng);
+                                            int indexEnd = getAmpOrExclAtTheEnd(yytext, (int)yyleng, '\0');
 					    if (indexEnd>=0 && yytext[indexEnd]!='&') //we are only interested in amp
 					      indexEnd=-1;
 
@@ -469,6 +481,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                         }
 
 ^{BS}interface{BS_}{ID}{ARGS}?          { ifType = IF_GENERIC;
+				          current->bodyLine = yyLineNr + lineCountPrepass + 1; // we have to be at the line after the definition and we have to take continuation lines into account.
                                           yy_push_state(InterfaceBody);
 
                                           // extract generic name
@@ -481,6 +494,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
 
 <InterfaceBody>^{BS}end{BS}interface({BS_}{ID})? {
                                           // end scope only if GENERIC interface
+                                          if (ifType == IF_GENERIC)last_entry->parent()->endBodyLine = yyLineNr - 1;
                                           if (ifType == IF_GENERIC && !endScope(current_root))
                                             yyterminate();
 
@@ -608,6 +622,7 @@ private                                 {
                                           current->name = yytext;
                                           current->fileName = yyFileName;
                                           current->bodyLine  = yyLineNr; 
+                                          current->startLine  = yyLineNr;
 
                                           /* if type is part of a module, mod name is necessary for output */
                                           if ((current_root) && 
@@ -648,6 +663,7 @@ private                                 {
                                           current->name     = name;
                                           current->fileName = yyFileName;
                                           current->bodyLine = yyLineNr;
+                                          current->startLine  = yyLineNr;
                                           addCurrentEntry(1);
                                         }
 {BS}"=>"[^(\n|\!)]*                     { /* Specific bindings come after the ID. */
@@ -663,6 +679,7 @@ private                                 {
 
 <TypedefBody,TypedefBodyContains>{
 ^{BS}"end"{BS}"type"({BS_}{ID})?{BS}/(\n|!) { /* end type definition */
+                                          last_entry->parent()->endBodyLine = yyLineNr;
                                           if (!endScope(current_root))
                                             yyterminate();
                                           typeMode = false;
@@ -679,7 +696,11 @@ private                                 {
                                            // are group in one INTERFACE/END INTERFACE block.
                                            //
                                            if (ifType == IF_ABSTRACT || ifType == IF_SPECIFIC)
+                                           {
                                              endScope(current_root);
+                                             last_entry->endBodyLine = yyLineNr - 1;
+                                           }
+                                           current_root->endBodyLine = yyLineNr - 1;
 
 					   if (!endScope(current_root))
 					     yyterminate();
@@ -692,6 +713,8 @@ private                                 {
 }
 <Start,ModuleBody,TypedefBody,SubprogBody>{
 ^{BS}{TYPE_SPEC}/{SEPARATE}             {
+				          current->bodyLine = yyLineNr + 1;
+				          current->endBodyLine = yyLineNr + lineCountPrepass;
                                           /* variable declaration starts */
                                           if(YY_START == Start)
                                           {
@@ -726,6 +749,18 @@ private                                 {
 					  }
 					}
   */
+{EXTERNAL_STMT}/({BS}"::"|{BS_}{ID})   { 
+                                          /* external can be a "type" or an attribute */
+                                          if(YY_START == Start)
+                                          {
+                                            addModule(NULL); 
+                                            yy_push_state(ModuleBody); //anon program
+                                          }
+                                          QCString tmp = yytext;
+                                          currentModifiers |= tmp.stripWhiteSpace();
+					  argType = QCString(yytext).simplifyWhiteSpace().lower();
+					  yy_push_state(AttributeList);
+  				       }
 {ATTR_STMT}/{BS_}{ID}		       |
 {ATTR_STMT}/{BS}"::"                   { 
                                           /* attribute statement starts */
@@ -744,7 +779,7 @@ private                                 {
 <AttributeList>{
 {COMMA}					{}
 {BS}					{}
-{ATTR_SPEC}.				{ /* update current modifierswhen it is an ATTR_SPEC and not a variable name */
+{ATTR_SPEC}.				{ /* update current modifiers when it is an ATTR_SPEC and not a variable name */
             				  /* bug_625519 */
                                           QChar chr = yytext[(int)yyleng-1];
                                           if (chr.isLetter() || chr.isDigit() || (chr == '_'))
@@ -791,6 +826,7 @@ private                                 {
 					    current->type = argType;
 					    current->fileName = yyFileName;
 					    current->bodyLine  = yyLineNr; // used for source reference
+                                            current->startLine  = yyLineNr;
                                             addCurrentEntry(1);
                                           } 
 					  else if (!argType.isEmpty())
@@ -820,6 +856,7 @@ private                                 {
 						QCString rght;
 						if (strt != -1)
 						{
+                                                  v_type = V_RESULT;
 						  lft = "";
 						  rght = "";
 						  if (strt != 0) lft = current_root->type.left(strt).stripWhiteSpace();
@@ -840,6 +877,10 @@ private                                 {
 						  }
 						  if (current_root->type.length() > 0) current_root->type += " ";
 						  current_root->type += "function";
+					          if (!docBlock.isNull()) 
+					          {
+  					            subrHandleCommentBlockResult(docBlock,TRUE);
+					          }
 						}
 						else
 						{
@@ -870,7 +911,8 @@ private                                 {
 					  // locate !< comment
 					  updateVariablePrepassComment(yyColNr-(int)yyleng, yyColNr);
 					}
-<Variable>{BS}"="                       { yy_push_state(YY_START);
+<Variable>{BS}"="                       {
+                                          yy_push_state(YY_START);
                                           initializer="=";
                                           initializerScope = initializerArrayScope = 0;
 					  BEGIN(Initialization);
@@ -957,6 +999,8 @@ private                                 {
                                          result=result.stripWhiteSpace();
                                          addSubprogram(result);
                                          BEGIN(Subprog);
+				         current->bodyLine = yyLineNr + lineCountPrepass + 1; // we have to be at the line after the definition and we have to take continuation lines into account.
+				         current->startLine = yyLineNr;
                                        }
 
 <Start,ModuleBody,SubprogBody,InterfaceBody,ModuleBodyContains,SubprogBodyContains>^{BS}({PREFIX}{BS_})?{SUBPROG}{BS_} {
@@ -971,6 +1015,8 @@ private                                 {
                                          result = QCString(yytext).stripWhiteSpace();
                                          addSubprogram(result);
                                          yy_push_state(Subprog);
+				         current->bodyLine = yyLineNr + lineCountPrepass + 1; // we have to be at the line after the definition and we have to take continuation lines into account.
+				         current->startLine = yyLineNr;
                                        }
 
 <Subprog>{BS}                          {   /* ignore white space */   }
@@ -1037,7 +1083,7 @@ private                                 {
 					   current->docLine  = yyLineNr;
  					   docBlockJavaStyle = FALSE;
 					   docBlock.resize(0);
-					   docBlockJavaStyle = Config_getBool("JAVADOC_AUTOBRIEF");
+					   docBlockJavaStyle = Config_getBool(JAVADOC_AUTOBRIEF);
 					   startCommentBlock(TRUE);
                                            yy_push_state(DocBackLine);
                                           }
@@ -1078,6 +1124,10 @@ private                                 {
 					  {
 					    subrHandleCommentBlock(docBlock,TRUE);
                                           }
+					  else if (v_type == V_RESULT) 
+					  {
+					    subrHandleCommentBlockResult(docBlock,TRUE);
+                                          }
 					  yy_pop_state();
 					  docBlock.resize(0);
                                         }
@@ -1088,7 +1138,7 @@ private                                 {
  					  docBlockJavaStyle = FALSE;
 					  if (YY_START==SubprogBody) docBlockInBody = TRUE;
 					  docBlock.resize(0);
-					  docBlockJavaStyle = Config_getBool("JAVADOC_AUTOBRIEF");
+					  docBlockJavaStyle = Config_getBool(JAVADOC_AUTOBRIEF);
 					  startCommentBlock(TRUE);
 					  BEGIN(DocBlock);
                                           //cout << "start DocBlock " << endl;
@@ -1235,13 +1285,15 @@ static int getAmpersandAtTheStart(const char *buf, int length)
 }
 
 /* Returns ampersand index, comment start index or -1 if neither exist.*/ 
-static int getAmpOrExclAtTheEnd(const char *buf, int length)
+static int getAmpOrExclAtTheEnd(const char *buf, int length, char ch)
 {
   // Avoid ampersands in string and comments
   int parseState = Start;
   char quoteSymbol = 0;
   int ampIndex = -1;
   int commentIndex = -1;
+  quoteSymbol = ch;
+  if (ch != '\0') parseState = String;
 
   for(int i=0; i<length && parseState!=Comment; i++)
   {
@@ -1372,12 +1424,19 @@ static const char* prepassFixedForm(const char* contents)
   int column=0;
   int prevLineLength=0;
   int prevLineAmpOrExclIndex=-1;
+  char prevQuote = '\0';
+  char thisQuote = '\0';
   bool emptyLabel=TRUE;
+  bool commented=FALSE;
+  bool inSingle=FALSE;
+  bool inDouble=FALSE;
+  bool inBackslash=FALSE;
+  bool fullCommentLine=TRUE;
   int newContentsSize = strlen(contents)+3; // \000, \n (when necessary) and one spare character (to avoid reallocation)
   char* newContents = (char*)malloc(newContentsSize);
 
   for(int i=0, j=0;;i++,j++) {
-    if(j>=newContentsSize-1) { // check for one spare character, which may be eventually used below (by &)
+    if(j>=newContentsSize-3) { // check for spare characters, which may be eventually used below (by & and '! ')
       newContents = (char*)realloc(newContents, newContentsSize+1000);
       newContentsSize = newContentsSize+1000;
     }
@@ -1386,13 +1445,25 @@ static const char* prepassFixedForm(const char* contents)
     char c = contents[i];
     switch(c) {
       case '\n':
-        prevLineLength=column;
-        prevLineAmpOrExclIndex=getAmpOrExclAtTheEnd(&contents[i-prevLineLength+1], prevLineLength);
+        if (!fullCommentLine)
+        {
+          prevLineLength=column;
+          prevLineAmpOrExclIndex=getAmpOrExclAtTheEnd(&contents[i-prevLineLength+1], prevLineLength,prevQuote);
+          if (prevLineAmpOrExclIndex == -1) prevLineAmpOrExclIndex = column - 1;
+        }
+        else
+        {
+          prevLineLength+=column;
+        }
+        fullCommentLine=TRUE;
         column=0;
 	emptyLabel=TRUE;
+        commented=FALSE;
         newContents[j]=c;
+        prevQuote = thisQuote;
         break;
       case ' ':
+      case '\t':
         newContents[j]=c;
         break;
       case '\000':
@@ -1406,21 +1477,71 @@ static const char* prepassFixedForm(const char* contents)
           newContents[newContentsSize + 1] = '\000';
         }
         return newContents;
+      case '"':
+      case '\'':
+      case '\\':
+        if ((column <= fixedCommentAfter) && (column!=6) && !commented)
+	{
+          // we have some special cases in respect to strings and escaped string characters
+          fullCommentLine=FALSE;
+	  newContents[j]=c;
+          if (c == '\\')
+          {
+            inBackslash = !inBackslash;
+            break;
+          }
+          else if (c == '\'')
+          {
+            if (!inDouble)
+            {
+              inSingle = !inSingle;
+              if (inSingle) thisQuote = c;
+              else thisQuote = '\0';
+            }
+            break;
+          }
+          else if (c == '"')
+          {
+            if (!inSingle)
+            {
+              inDouble = !inDouble; 
+              if (inDouble) thisQuote = c; 
+              else thisQuote = '\0';
+            }
+            break;
+          }
+        }
+        inBackslash = FALSE;
+        // fallthrough
       case 'C':
       case 'c':
       case '*':
-        if (column!=6)
+      case '!':
+        if ((column <= fixedCommentAfter) && (column!=6))
 	{
 	  emptyLabel=FALSE;
 	  if(column==1)
+          {
 	    newContents[j]='!';
-	  else
+            commented = TRUE;
+          }
+	  else if ((c == '!') && !inDouble && !inSingle)
+          {
 	    newContents[j]=c;
+            commented = TRUE;
+          }
+	  else
+          {
+            if (!commented) fullCommentLine=FALSE;
+	    newContents[j]=c;
+          }
 	  break;
 	}
+        // fallthrough
       default:
         if(column==6 && emptyLabel) { // continuation
-          if (c != '0') { // 0 not allowed as continuatioin character, see f95 standard paragraph 3.3.2.3
+          if (!commented) fullCommentLine=FALSE;
+          if (c != '0') { // 0 not allowed as continuation character, see f95 standard paragraph 3.3.2.3
             newContents[j]=' ';
 
             if(prevLineAmpOrExclIndex==-1) { // add & just before end of previous line
@@ -1433,7 +1554,18 @@ static const char* prepassFixedForm(const char* contents)
 	  } else {
 	    newContents[j]=c; // , just handle like space
           }
+          prevLineLength=0;
+	} else if ((column > fixedCommentAfter) && !commented) {
+          // first non commented non blank character after position fixedCommentAfter
+          if (c != '!') {
+            // I'm not a possible start of doxygen comment
+	    newContents[j++]='!';
+	    newContents[j++]=' '; // so that '<' and '>' as first character are not converted to doxygen comment
+          }
+	  newContents[j]=c;
+          commented = TRUE;
 	} else {
+          if (!commented) fullCommentLine=FALSE;
 	  newContents[j]=c;
 	  emptyLabel=FALSE;
 	}
@@ -1478,7 +1610,9 @@ static void copyEntry(Entry *dest, Entry *src)
 {
    dest->type     = src->type;
    dest->fileName = src->fileName;
+   dest->startLine = src->startLine;
    dest->bodyLine = src->bodyLine;
+   dest->endBodyLine = src->endBodyLine;
    dest->args     = src->args;
    dest->argList  = new ArgumentList(*src->argList);
    dest->doc      = src->doc;
@@ -1559,6 +1693,9 @@ SymbolModifiers& SymbolModifiers::operator|=(const SymbolModifiers &mdfs)
   nopass |= mdfs.nopass;
   pass |= mdfs.pass;
   passVar = mdfs.passVar;
+  contiguous |= mdfs.contiguous;
+  volat |= mdfs.volat;
+  value |= mdfs.value;
   return *this;
 }
 
@@ -1636,6 +1773,18 @@ SymbolModifiers& SymbolModifiers::operator|=(QCString mdfString)
   else if (mdfString=="non_overridable")
   {
     newMdf.nonoverridable = TRUE;
+  }
+  else if (mdfString=="contiguous")
+  {
+    newMdf.contiguous = TRUE;
+  }
+  else if (mdfString=="volatile")
+  {
+    newMdf.volat = TRUE;
+  }
+  else if (mdfString=="value")
+  {
+    newMdf.value = TRUE;
   }
   else if (mdfString.contains("pass"))
   {
@@ -1723,8 +1872,11 @@ static QCString applyModifiers(QCString typeName, SymbolModifiers& mdfs)
   }
   if (mdfs.external) 
   {
-    if (!typeName.isEmpty()) typeName += ", ";
-    typeName += "external";
+    if (!typeName.contains("external"))
+    {
+      if (!typeName.isEmpty()) typeName += ", ";
+      typeName += "external";
+    }
   }
   if (mdfs.intrinsic) 
   {
@@ -1787,6 +1939,21 @@ static QCString applyModifiers(QCString typeName, SymbolModifiers& mdfs)
   {
     if (!typeName.isEmpty()) typeName += ", ";
     typeName += "protected";
+  }
+  if (mdfs.contiguous)
+  {
+    if (!typeName.isEmpty()) typeName += ", ";
+    typeName += "contiguous";
+  }
+  if (mdfs.volat)
+  {
+    if (!typeName.isEmpty()) typeName += ", ";
+    typeName += "volatile";
+  }
+  if (mdfs.value)
+  {
+    if (!typeName.isEmpty()) typeName += ", ";
+    typeName += "value";
   }
 
   return typeName;
@@ -1991,7 +2158,7 @@ static void addModule(const char *name, bool isModule)
   DBG_CTX((stderr, "0=========> got module %s\n", name));
 
   if (isModule)
-    current->section = Entry::CLASS_SEC;
+    current->section = Entry::NAMESPACE_SEC;
   else
     current->section = Entry::FUNCTION_SEC;
 
@@ -2010,6 +2177,7 @@ static void addModule(const char *name, bool isModule)
   current->type = "program";
   current->fileName  = yyFileName;
   current->bodyLine  = yyLineNr; // used for source reference
+  current->startLine  = yyLineNr;
   current->protection = Public ;
   addCurrentEntry(1);
   startScope(last_entry);
@@ -2026,8 +2194,8 @@ static void addSubprogram(const char *text)
   current->type += " " + subtype;
   current->type = current->type.stripWhiteSpace();
   current->fileName  = yyFileName;
-  current->bodyLine  = yyLineNr; // used for source reference
-  current->startLine = -1; // ??? what is startLine for?
+  current->bodyLine  = yyLineNr; // used for source reference start of body of routine
+  current->startLine  = yyLineNr; // used for source reference start of definition
   current->args.resize(0);
   current->argList->clear();
   docBlock.resize(0);
@@ -2075,6 +2243,7 @@ static void addInterface(QCString name, InterfaceType type)
 
   current->fileName = yyFileName;
   current->bodyLine  = yyLineNr; 
+  current->startLine  = yyLineNr;
   addCurrentEntry(1);
 }
 
@@ -2122,7 +2291,7 @@ static void startCommentBlock(bool brief)
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
   bool needsEntry = FALSE;
-  static bool hideInBodyDocs = Config_getBool("HIDE_IN_BODY_DOCS");
+  static bool hideInBodyDocs = Config_getBool(HIDE_IN_BODY_DOCS);
   int position=0;
   if (docBlockInBody && hideInBodyDocs)
   {
@@ -2155,79 +2324,147 @@ static void handleCommentBlock(const QCString &doc,bool brief)
 }
 
 //----------------------------------------------------------------------------
-
+/// Handle parameter description as defined after the declaration of the parameter
 static void subrHandleCommentBlock(const QCString &doc,bool brief)
 {
   QCString loc_doc;
+  loc_doc = doc.stripWhiteSpace();
+
   Entry *tmp_entry = current; 
   current = subrCurrent.getFirst(); // temporarily switch to the entry of the subroutine / function
 
   // Still in the specification section so no inbodyDocs yet, but parameter documentation
   current->inbodyDocs = "";
 
-  if (docBlock.stripWhiteSpace().find("\\param") == 0)
+  // strip \\param or @param, so we can do some extra checking. We will add it later on again.
+  if (!loc_doc.stripPrefix("\\param") &&
+      !loc_doc.stripPrefix("@param")
+     ) (void)loc_doc; // Do nothing work has been done by stripPrefix; (void)loc_doc: to overcome 'empty controlled statement' warning
+  loc_doc.stripWhiteSpace();
+
+  // direction as defined with the declaration of the parameter
+  int dir1 = modifiers[current_root][argName.lower()].direction;
+  // in description [in] is specified
+  if (loc_doc.lower().find(directionParam[SymbolModifiers::IN]) == 0)
   {
-    handleCommentBlock("\n\n"+doc,brief);
-  }
-  else if (docBlock.stripWhiteSpace().find("@param") == 0)
-  {
-    handleCommentBlock("\n\n"+doc,brief);
-  }
-  else 
-  {
-    int dir1 = modifiers[current_root][argName.lower()].direction;
-    loc_doc = doc.stripWhiteSpace();
-    if (loc_doc.lower().find(directionParam[SymbolModifiers::IN]) == 0)
+    // check if with the declaration intent(in) or nothing has been specified
+    if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+        (directionParam[dir1] == directionParam[SymbolModifiers::IN]))
     {
-      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
-          (directionParam[dir1] == directionParam[SymbolModifiers::IN]))
+      // strip direction
+      loc_doc = loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::IN]));
+      loc_doc.stripWhiteSpace();
+      // in case of emty documentation or (now) just name, consider it as no documemntation
+      if (loc_doc.isEmpty() || (loc_doc.lower() == argName.lower()))
       {
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::IN] + " " + 
-	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::IN])),brief);
+        // reset current back to the part inside the routine
+        current=tmp_entry;
+        return;
       }
-      else
-      {
-        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
-	                   argName + " " + doc,brief);
-      }
-    }
-    else if (loc_doc.lower().find(directionParam[SymbolModifiers::OUT]) == 0)
-    {
-      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
-          (directionParam[dir1] == directionParam[SymbolModifiers::OUT]))
-      {
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::OUT] + " " + 
-	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::OUT])),brief);
-      }
-      else
-      {
-        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
-	                   argName + " " + doc,brief);
-      }
-    }
-    else if (loc_doc.lower().find(directionParam[SymbolModifiers::INOUT]) == 0)
-    {
-      if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
-          (directionParam[dir1] == directionParam[SymbolModifiers::INOUT]))
-      {
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::INOUT] + " " + 
-	                   argName + " " + loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::INOUT])),brief);
-      }
-      else
-      {
-        warn(yyFileName,yyLineNr, "inconsistency between intent attribute and documentation for variable: "+argName);
-        handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
-	                   argName + " " + doc,brief);
-      }
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::IN] + " " + 
+                         argName + " " + loc_doc,brief);
     }
     else
     {
+      // something different specified, give warning and leave error.
+      warn(yyFileName,yyLineNr, "Routine: " + current->name + current->args +
+           " inconsistency between intent attribute and documentation for parameter: " + argName);
       handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
-	                 argName + " " + doc,brief);
+                         argName + " " + loc_doc,brief);
     }
   }
+  // analogous to the [in] case, here [out] direction specified
+  else if (loc_doc.lower().find(directionParam[SymbolModifiers::OUT]) == 0)
+  {
+    if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+        (directionParam[dir1] == directionParam[SymbolModifiers::OUT]))
+    {
+      loc_doc = loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::OUT]));
+      loc_doc.stripWhiteSpace();
+      if (loc_doc.isEmpty() || (loc_doc.lower() == argName.lower()))
+      {
+        current=tmp_entry;
+        return;
+      }
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::OUT] + " " + 
+                         argName + " " + loc_doc,brief);
+    }
+    else
+    {
+      warn(yyFileName,yyLineNr, "Routine: " + current->name + current->args +
+           " inconsistency between intent attribute and documentation for parameter: " + argName);
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+                         argName + " " + loc_doc,brief);
+    }
+  }
+  // analogous to the [in] case, here [in,out] direction specified
+  else if (loc_doc.lower().find(directionParam[SymbolModifiers::INOUT]) == 0)
+  {
+    if ((directionParam[dir1] == directionParam[SymbolModifiers::NONE_D]) ||
+        (directionParam[dir1] == directionParam[SymbolModifiers::INOUT]))
+    {
+      loc_doc = loc_doc.right(loc_doc.length()-strlen(directionParam[SymbolModifiers::INOUT]));
+      loc_doc.stripWhiteSpace();
+      if (loc_doc.isEmpty() || (loc_doc.lower() == argName.lower()))
+      {
+        current=tmp_entry;
+        return;
+      }
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[SymbolModifiers::INOUT] + " " + 
+                         argName + " " + loc_doc,brief);
+    }
+    else
+    {
+      warn(yyFileName,yyLineNr, "Routine: " + current->name + current->args +
+           " inconsistency between intent attribute and documentation for parameter: " + argName);
+      handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+                         argName + " " + loc_doc,brief);
+    }
+  }
+  // analogous to the [in] case; here no direction specified
+  else
+  {
+    if (loc_doc.isEmpty() || (loc_doc.lower() == argName.lower()))
+    {
+      current=tmp_entry;
+      return;
+    }
+    handleCommentBlock(QCString("\n\n@param ") + directionParam[dir1] + " " + 
+                       argName + " " + loc_doc,brief);
+  }
+
+  // reset current back to the part inside the routine
+  current=tmp_entry;
+}
+//----------------------------------------------------------------------------
+/// Handle result description as defined after the declaration of the parameter
+static void subrHandleCommentBlockResult(const QCString &doc,bool brief)
+{
+  QCString loc_doc;
+  loc_doc = doc.stripWhiteSpace();
+
+  Entry *tmp_entry = current; 
+  current = subrCurrent.getFirst(); // temporarily switch to the entry of the subroutine / function
+
+  // Still in the specification section so no inbodyDocs yet, but parameter documentation
+  current->inbodyDocs = "";
+
+  // strip \\returns or @returns. We will add it later on again.
+  if (!loc_doc.stripPrefix("\\returns") &&
+      !loc_doc.stripPrefix("\\return") &&
+      !loc_doc.stripPrefix("@returns") &&
+      !loc_doc.stripPrefix("@return")
+     ) (void)loc_doc; // Do nothing work has been done by stripPrefix; (void)loc_doc: to overcome 'empty controlled statement' warning
+  loc_doc.stripWhiteSpace();
+
+  if (loc_doc.isEmpty() || (loc_doc.lower() == argName.lower()))
+  {
+    current=tmp_entry;
+    return;
+  }
+  handleCommentBlock(QCString("\n\n@returns ") + loc_doc,brief);
+
+  // reset current back to the part inside the routine
   current=tmp_entry;
 }
 
@@ -2278,7 +2515,11 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt, Fortra
       //printf("---strlen=%d\n", strlen(fileBuf));
       //clock_t start=clock();
 
+      //printf("Input fixed form string:\n%s\n", fileBuf);
+      //printf("===========================\n");
       inputString = prepassFixedForm(fileBuf);
+      //printf("Resulting free form string:\n%s\n", inputString);
+      //printf("===========================\n");
 
       //clock_t end=clock();
       //printf("CPU time used=%f\n", ((double) (end-start))/CLOCKS_PER_SEC);

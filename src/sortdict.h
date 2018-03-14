@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2014 by Dimitri van Heesch.
+ * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -590,7 +590,7 @@ class SIntDict
 
     /*! Returns the number of items stored in the dictionary
      */
-    int count()
+    int count() const
     {
       return m_list->count();
     }
