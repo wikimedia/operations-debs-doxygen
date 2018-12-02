@@ -1,10 +1,10 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: doxygen
 Upstream-Contact: Dimitri van Heesch <dimitri@stack.nl>
-Source: http://www.stack.nl/~dimitri/doxygen/download.html
+Source: https://github.com/doxygen/doxygen
 
 Files: *
-Copyright: 1997-2014, Dimitri van Heesch and others
+Copyright: 1997-2018, Dimitri van Heesch and others
 License: GPL-2 with Qt exception
 
 Files: debian/*
@@ -12,6 +12,7 @@ Copyright:
  2000-2003, Luca Filipozzi
  2004-2016, Matthias Klose
  2013-2014, Helmut Grohne
+ 2018, Paolo Greppi <paolo.greppi@libpf.com>
  and others
 License: GPL-2
 Comment: no license was ever declared by the authors, so assuming a derivative work
@@ -19,7 +20,7 @@ Comment: no license was ever declared by the authors, so assuming a derivative w
 Files: debian/dh-doxygen/dh_doxygen
 Copyright: 2011, Jakub Wilk
  2013, Helmut Grohne
-License: BSD-2
+License: BSD-2-clause
 
 Files: jquery/*
 Copyright:
@@ -28,7 +29,7 @@ Copyright:
  2011, John Resig
  2011, The Dojo Foundation
  2013, Steven Benner
-License: MIT or GPL-2
+License: Expat or GPL-2
 
 Files: libmd5/*c libmd5/*.h
 Copyright: no copyright claimed by Colin Plumb or Ian Jackson
@@ -49,7 +50,7 @@ Files: src/lodepng.*
 Copyright: 2005-2008, Lode Vandevenne
 License: Zlib
 
-License: BSD-2
+License: BSD-2-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
  met:
@@ -140,7 +141,7 @@ License: LGPL-2.1
  License version 2.1 can be found in the file
  `/usr/share/common-licenses/LGPL-2.1'.
 
-License: MIT
+License: Expat
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
  "Software"), to deal in the Software without restriction, including
