@@ -541,8 +541,8 @@ doxygen (1.5.9-1) unstable; urgency=low
 doxygen (1.5.8-1.1) unstable; urgency=low
 
   * Non-maintainer upload to fix Segmentation Fault.
-  * Applied patch from Gentoo to fix a Segmentation Fault as 
-    debian/patches/path-prefix.dpatch.  Thanks to Martin von Gagern for 
+  * Applied patch from Gentoo to fix a Segmentation Fault as
+    debian/patches/path-prefix.dpatch.  Thanks to Martin von Gagern for
     the patch and Leandro Lucarella for the pointer.  Closes: #518031
 
  -- Margarita Manterola <marga@debian.org>  Tue, 28 Apr 2009 13:01:30 +0000
@@ -706,7 +706,7 @@ doxygen (1.4.6-1) unstable; urgency=low
 doxygen (1.4.5-1.1) unstable; urgency=low
 
   * Remove unused code (QChar::row, QChar::col) that does not build with
-    gcc 4.0 (closes: #338099).  
+    gcc 4.0 (closes: #338099).
 
  -- Jeremy Nimmer <jwnimmer@alum.mit.edu>  Sun,  4 Dec 2005 15:18:45 -0500
 
@@ -872,7 +872,7 @@ doxygen (1.3.6.20040222-0.1) unstable; urgency=medium
 
   * NMU
   * New upstream version (CVS tarball). Closes: #234348.
-  * Fixing termination problems in 1.3.5 and 1.3.6 (closes: #232598). 
+  * Fixing termination problems in 1.3.5 and 1.3.6 (closes: #232598).
 
  -- Matthias Klose <doko@debian.org>  Thu, 26 Feb 2004 22:07:36 +0100
 
@@ -947,7 +947,7 @@ doxygen (1.3-rc1-1) unstable; urgency=low
 
 doxygen (1.2.18-2) unstable; urgency=low
 
-  * fixed signed/unsigned compiler warning (Closes: Bug#161990) 
+  * fixed signed/unsigned compiler warning (Closes: Bug#161990)
 
  -- Luca Filipozzi <lfilipoz@debian.org>  Mon, 14 Oct 2002 14:45:20 -0700
 
@@ -979,7 +979,7 @@ doxygen (1.2.16-1) unstable; urgency=low
 
 doxygen (1.2.15-2) unstable; urgency=low
 
-  * debian/watch: added uscan version 2 compliant watch file 
+  * debian/watch: added uscan version 2 compliant watch file
 
  -- Luca Filipozzi <lfilipoz@debian.org>  Sat, 13 Apr 2002 15:30:43 -0700
 
@@ -997,7 +997,7 @@ doxygen (1.2.14-3) unstable; urgency=low
 
 doxygen (1.2.14-2) unstable; urgency=low
 
-  * Fixed Section for doxygen-docs: from devel to docs 
+  * Fixed Section for doxygen-docs: from devel to docs
 
  -- Luca Filipozzi <lfilipoz@debian.org>  Sun, 24 Feb 2002 12:33:53 -0800
 
@@ -1059,7 +1059,7 @@ doxygen (1.2.6-3) unstable; urgency=low
 
 doxygen (1.2.6-2) unstable; urgency=low
 
-  * enable xml support 
+  * enable xml support
   * fixed a typo that put docs into /usr/share/doc/doxygeen (Closes: #90374)
 
  -- Luca Filipozzi <lfilipoz@debian.org>  Mon, 19 Mar 2001 18:34:07 -0800
@@ -1129,7 +1129,7 @@ doxygen (1.2.1-1) unstable; urgency=low
 
 doxygen (1.0.0-2) unstable; urgency=low
 
-  * Compiled against libqt2. 
+  * Compiled against libqt2.
 
  -- Luca Filipozzi <lfilipoz@emyr.net>  Wed, 19 Jul 2000 18:02:38 -0700
 

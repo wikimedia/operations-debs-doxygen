@@ -81,7 +81,7 @@ Description: Documentation for doxygen
  (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
  documented source files. There is also support for generating man pages
  and for converting the generated output into Postscript, hyperlinked PDF
- or compressed HTML.  The documentation is extracted directly from the sources. 
+ or compressed HTML. The documentation is extracted directly from the sources.
  .
  This package contains the documentation for doxygen.
 
@@ -97,6 +97,6 @@ Description: GUI configuration tool for doxygen
  (in HTML) and/or an off-line reference manual (in LaTeX) from a set of
  documented source files. There is also support for generating man pages
  and for converting the generated output into Postscript, hyperlinked PDF
- or compressed HTML.  The documentation is extracted directly from the sources. 
+ or compressed HTML. The documentation is extracted directly from the sources.
  .
  This package contains doxywizard, a GUI configuration tool for doxygen.
