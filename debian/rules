@@ -122,9 +122,6 @@ ifeq ($(with_doxywizard),yes)
 		usr/share/man/man1/doxywizard.1
 endif
 	rm -rf debian/doxygen/usr/share/doc/packages
-
-	rm -f debian/doxygen/usr/share/man/man1/doxyindexer.1
-	rm -f debian/doxygen/usr/share/man/man1/doxysearch.1
 	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
 	touch $@
 
