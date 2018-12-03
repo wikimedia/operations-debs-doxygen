@@ -69,6 +69,9 @@ clean:
 	rm -rf jquery/.sass-cache
 	rm -f qtools/Makefile.qtools
 	rm -f doxygen_sqlite3.db
+	rm -f jquery/*-min.js
+	rm -f jquery/jquery.js
+	rm -f jquery/doxmenu-min.css
 	dh_clean
 
 uninstall:
