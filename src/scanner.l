@@ -1723,7 +1723,8 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                           bool isVolatile=decl.find("volatile")!=-1;
   					  current->section = Entry::CLASS_SEC ;
 					  current->spec    = Entry::Struct |
-					    (current->spec & Entry::Published); // preserve UNO IDL
+					    (current->spec & Entry::Published) |
+                                            (current->spec & Entry::Inline); // preserve UNO IDL & Inline attributes
 					  // bug 582676: can be a struct nested in an interface so keep insideObjC state
 					  //current->objc    = insideObjC = FALSE;
 					  addType( current ) ;
@@ -5028,6 +5029,11 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    }
 					  }
                                         }
+<SkipInits>">"{BN}*"{"                  { // C++11 style initializer (see bug 790788)
+                                          lineCount();
+                                          curlyCount=1;
+                                          BEGIN(SkipC11Inits);
+                                        }
 <SkipInits>{ID}{BN}*"{"                 { // C++11 style initializer (see bug 688647)
                                           lineCount();
                                           curlyCount=1;
@@ -6197,6 +6203,14 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  }
   					}
 <CSAccessorDecl>"{"			{ curlyCount++; }
+<CSAccessorDecl>"}"{B}*"="		{
+					  // fall back to next rule if it's not the right bracket
+					  if (curlyCount != 0) REJECT;
+					  current->initializer = "=";
+					  current->endBodyLine=yyLineNr;
+					  lastInitializerContext = FindMembers;
+					  BEGIN(ReadInitializer);
+					}
 <CSAccessorDecl>"}"			{ 
                                           if (curlyCount) 
                                           {
@@ -6206,6 +6220,8 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  {
   					    mtype = Method;
                                             virt = Normal;
+					    // not really important, but while we are at it
+					    current->endBodyLine=yyLineNr;
                                             unput(';');
 					    BEGIN(FindMembers);
 					  }
@@ -6563,7 +6579,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					}
 <SkipComment>[^\*\n]+
 
-"[["                                    { // C++11 attribute
+<*>"[["                                 { // C++11 attribute
                                           lastC11AttributeContext = YY_START;
                                           BEGIN( SkipC11Attribute );
                                         }

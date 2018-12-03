@@ -426,7 +426,7 @@ static struct
   QCString file_name; // name of used file
   ParserInterface *this_parser; // myself
   int command; // true if command was found
-  int comment; // set true if comment was scaned
+  int comment; // set true if comment was scanned
   int brace_level; // bookkeeping of braces
   int bracket_level; // bookkeeping of brackets
   int bracket_quote; // bookkeeping of quotes (toggles)
@@ -542,7 +542,7 @@ static void tcl_name(const QCString &ns0, const QCString &name0, QCString &ns, Q
 static void tcl_name_SnippetAware(const QCString &ns0, const QCString &name0, QCString &ns, QCString &name)
 {
   // If we are inside an inlined code snippet then ns0
-  // already containes the complete namespace path.
+  // already contains the complete namespace path.
   // Any namespace qualifiers in name0 are redundant.
   int i = name0.findRev("::");
   if (i>=0 && tcl.memberdef)
