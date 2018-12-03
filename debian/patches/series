@@ -1,4 +1,3 @@
-fix-issue-776791.diff
 manpages.diff
 dot-config.diff
 #doxygen_direct_dot_run.diff
@@ -7,6 +6,5 @@ doxygen-jquery.patch
 #dot_num_threads.diff
 #sqlite3-configure.diff
 no-timestamps.diff
-no-rpath.diff
 #issue759241.diff
 avoid-compass.diff

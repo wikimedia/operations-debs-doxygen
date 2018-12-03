@@ -1,8 +1,8 @@
-Index: b/src/htmlgen.cpp
+Index: doxygen/src/htmlgen.cpp
 ===================================================================
---- a/src/htmlgen.cpp
-+++ b/src/htmlgen.cpp
-@@ -741,6 +741,7 @@ void HtmlGenerator::init()
+--- doxygen.orig/src/htmlgen.cpp
++++ doxygen/src/htmlgen.cpp
+@@ -754,6 +754,7 @@ void HtmlGenerator::init()
      mgr.copyResource("menu.js",dname);
    }
  
