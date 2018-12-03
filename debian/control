@@ -1,7 +1,7 @@
 Source: doxygen
 Section: devel
 Priority: optional
-Maintainer: Debian QA Group <packages@qa.debian.org>
+Maintainer: Paolo Greppi <paolo.greppi@libpf.com>
 Build-Depends: debhelper (>= 11),
   dpkg-dev (>= 1.17.14),
   qtbase5-dev <!stage1>,
