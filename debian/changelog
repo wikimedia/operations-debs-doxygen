@@ -9,6 +9,7 @@ doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
   * Fix lintian P file-contains-trailing-whitespace.
   * Move repo to salsa.
   * Bump standard version
+  * Disable LLVM support on alpha. Closes: #916532.
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 13:11:06 +0100
 
