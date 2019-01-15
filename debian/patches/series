@@ -8,3 +8,4 @@ doxygen-jquery.patch
 no-timestamps.diff
 #issue759241.diff
 avoid-compass.diff
+llvm_libs.diff
