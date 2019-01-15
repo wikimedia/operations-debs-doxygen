@@ -10,8 +10,9 @@ doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
   * Move repo to salsa.
   * Bump standard version
   * Disable LLVM support on alpha. Closes: #916532.
+  * Switch to llvm-toolchain-7. Closes #912799.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 13:11:06 +0100
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 16:14:28 +0100
 
 doxygen (1.8.13-10) unstable; urgency=medium
 
