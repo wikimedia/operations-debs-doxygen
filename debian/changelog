@@ -11,6 +11,7 @@ doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
   * Bump standard version
   * Disable LLVM support on alpha. Closes: #916532.
   * Switch to llvm-toolchain-7. Closes #912799.
+  * Make the output of $year reproducible. Closes: #863054
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 16:14:28 +0100
 
