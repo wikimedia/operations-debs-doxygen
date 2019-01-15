@@ -24,7 +24,7 @@ Build-Depends-Indep: texlive-fonts-recommended,
   ghostscript,
   graphviz,
   rdfind
-Standards-Version: 4.1.3
+Standards-Version: 4.3.0
 Homepage: http://www.doxygen.nl/
 XS-Testsuite: autopkgtest
 Vcs-Browser: https://salsa.debian.org/paolog-guest/doxygen

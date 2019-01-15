@@ -1,6 +1,6 @@
-doxygen (1.8.14-1~exp1) UNRELEASED; urgency=medium
+doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
 
-  * doxygen 1.8.14 release.
+  * doxygen 1.8.15 release.
   * Do not produce "Directory Reference" man pages. Closes: #742871.
   * Bump debhelper compat.
   * New maintainer. Closes: #888580.
@@ -8,8 +8,9 @@ doxygen (1.8.14-1~exp1) UNRELEASED; urgency=medium
   * Fix lintian W binary-without-manpagefix.
   * Fix lintian P file-contains-trailing-whitespace.
   * Move repo to salsa.
+  * Bump standard version
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Mon, 03 Dec 2018 10:12:04 +0100
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 13:11:06 +0100
 
 doxygen (1.8.13-10) unstable; urgency=medium
 

@@ -1,8 +1,8 @@
-Index: b/doc/doxygen.1
+Index: doxygen/doc/doxygen.1
 ===================================================================
---- a/doc/doxygen.1
-+++ b/doc/doxygen.1
-@@ -48,3 +48,6 @@ If configName is omitted `Doxyfile' will
+--- doxygen.orig/doc/doxygen.1
++++ doxygen/doc/doxygen.1
+@@ -52,3 +52,6 @@ If configName is omitted `Doxyfile' will
  Doxygen version @VERSION@, Copyright Dimitri van Heesch 1997-2015
  .SH SEE ALSO
  doxywizard(1).
