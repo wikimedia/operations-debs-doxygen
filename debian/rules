@@ -114,6 +114,10 @@ install-arch-stamp:
 	: # FIXME: man pages not installed when building without docs
 	[ -f debian/doxygen/usr/share/man/man1/doxygen.1 ] \
 	  || install -D doc/doxygen.1 debian/doxygen/usr/share/man/man1/doxygen.1
+	[ -f debian/doxygen/usr/share/man/man1/doxyindexer.1 ] \
+	  || install -D doc/doxyindexer.1 debian/doxygen/usr/share/man/man1/doxyindexer.1
+	[ -f debian/doxygen/usr/share/man/man1/doxysearch.cgi.1 ] \
+	  || install -D doc/doxysearch.1 debian/doxygen/usr/share/man/man1/doxysearch.cgi.1
 ifeq ($(with_doxywizard),yes)
 	[ -f debian/doxygen/usr/share/man/man1/doxywizard.1 ] \
 	  || install -D doc/doxywizard.1 debian/doxygen/usr/share/man/man1/doxywizard.1
