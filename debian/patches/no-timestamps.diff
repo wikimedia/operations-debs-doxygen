@@ -1,5 +1,6 @@
 Description: do not add timestamps to documentation
 Author: Helmut Grohne
+Forwarded: https://github.com/doxygen/doxygen/issues/5751
 Last-Update: 2015-01-01
 
 In order to improve reproducibility of the doxygen-doc package, elide
