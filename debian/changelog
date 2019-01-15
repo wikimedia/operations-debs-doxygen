@@ -1,4 +1,4 @@
-doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
+doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
   * doxygen 1.8.15 release.
   * Do not produce "Directory Reference" man pages. Closes: #742871.
@@ -13,7 +13,7 @@ doxygen (1.8.15-1~exp1) UNRELEASED; urgency=medium
   * Switch to llvm-toolchain-7. Closes #912799.
   * Make the output of $year reproducible. Closes: #863054
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 16:14:28 +0100
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 15 Jan 2019 18:17:17 +0100
 
 doxygen (1.8.13-10) unstable; urgency=medium
 
