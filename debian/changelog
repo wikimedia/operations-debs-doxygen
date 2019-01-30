@@ -1,6 +1,6 @@
 doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
-  * doxygen 1.8.15 release.
+  * doxygen 1.8.15 release. Closes: #920447.
   * Do not produce "Directory Reference" man pages. Closes: #742871.
   * Bump debhelper compat.
   * New maintainer. Closes: #888580.
@@ -13,7 +13,7 @@ doxygen (1.8.15-1~exp1) experimental; urgency=medium
   * Switch to llvm-toolchain-7. Closes: #912799.
   * Make the output of $year reproducible. Closes: #863054
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 27 Jan 2019 15:08:09 +0100
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Wed, 30 Jan 2019 09:33:26 +0100
 
 doxygen (1.8.13-10) unstable; urgency=medium
 
