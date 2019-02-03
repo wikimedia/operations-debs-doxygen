@@ -12,7 +12,7 @@ Index: doxygen/src/latexdocvisitor.cpp
    else
    {
 -    t << "\\tabulinesep=1mm\n\\begin{longtabu}spread 0pt [c]{*{" << cols << "}{|X[-1]}|}\n";
-+    t << "\\tabulinesep=1mm\n\\begin{longtabu}spread 0pt [c]{*{" << cols << "}{|c}|}\n";
++    t << "\\tabulinesep=1mm\n\\begin{longtabu}spread 0pt [c]{*{" << cols << "}{|p{1cm}}|}\n";
    }
    //return isNested ? "TabularNC" : "TabularC";
  }
@@ -25,12 +25,12 @@ Index: doxygen/templates/latex/doxygen.sty
      \par%
      \ifthenelse{\equal{#1}{}}%
 -      {\begin{longtabu*}spread 0pt [l]{|X[-1,l]|X[-1,l]|}}% name + description
-+      {\begin{longtabu*}spread 0pt [l]{|c|c|}}% name + description
++      {\begin{longtabu*}spread 0pt [l]{|c|p{1cm}|}}% name + description
      {\ifthenelse{\equal{#1}{1}}%
 -      {\begin{longtabu*}spread 0pt [l]{|X[-1,l]|X[-1,l]|X[-1,l]|}}% in/out + name + desc
 -      {\begin{longtabu*}spread 0pt [l]{|X[-1,l]|X[-1,l]|X[-1,l]|X[-1,l]|}}% in/out + type + name + desc
-+      {\begin{longtabu*}spread 0pt [l]{|c|c|c|}}% in/out + name + desc
-+      {\begin{longtabu*}spread 0pt [l]{|c|c|c|c|}}% in/out + type + name + desc
++      {\begin{longtabu*}spread 0pt [l]{|c|c|p{1cm}|}}% in/out + name + desc
++      {\begin{longtabu*}spread 0pt [l]{|c|c|c|p{1cm}|}}% in/out + type + name + desc
      }
      \multicolumn{2}{l}{\hspace{-6pt}\bfseries\fontseries{bc}\selectfont\color{darkgray} #2}\\[1ex]%
      \hline%
