@@ -48,7 +48,7 @@ Index: doxygen/templates/latex/doxygen.sty
      \tabulinesep=1mm%
      \par%
 -    \begin{longtabu*}spread 0pt [l]{|X[-1,r]|X[-1,l]|}%
-+    \begin{longtabu*}spread 0pt [l]{|c|c|}%
++    \begin{longtabu*}spread 0pt [l]{|c|p{1cm}|}%
      \multicolumn{2}{l}{\hspace{-6pt}\bfseries\fontseries{bc}\selectfont\color{darkgray} #1}\\[1ex]%
      \hline%
      \endfirsthead%
