@@ -1,4 +1,4 @@
-doxygen (1.8.15-1) unstable; urgency=medium
+doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
   [ Paolo Greppi ]
   * doxygen 1.8.15 release. Closes: #920447.
