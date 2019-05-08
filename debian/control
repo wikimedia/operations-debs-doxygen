@@ -26,8 +26,8 @@ Build-Depends-Indep: texlive-fonts-recommended,
   rdfind
 Standards-Version: 4.3.0
 Homepage: http://www.doxygen.nl/
-Vcs-Browser: https://salsa.debian.org/paolog-guest/doxygen
-Vcs-Git: https://salsa.debian.org/paolog-guest/doxygen.git
+Vcs-Browser: https://salsa.debian.org/debian/doxygen
+Vcs-Git: https://salsa.debian.org/debian/doxygen.git
 
 Package: doxygen
 Architecture: any
