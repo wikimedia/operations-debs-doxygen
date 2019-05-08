@@ -2,8 +2,10 @@ doxygen (1.8.15-1~exp2) UNRELEASED; urgency=medium
 
   * Move VCS fields to salsa.d.o/debian namespace
   * Switch build to llvm-8
+  * Strip archs where llvm-8 is not available from build
+  * Bump compat level to 12
 
- -- Gianfranco Costamagna <locutusofborg@debian.org>  Wed, 08 May 2019 12:05:53 +0200
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Wed, 08 May 2019 12:11:50 +0200
 
 doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
