@@ -1,11 +1,16 @@
-doxygen (1.8.15-1~exp2) UNRELEASED; urgency=medium
+doxygen (1.8.15-1~exp2) experimental; urgency=medium
 
+  [ Gianfranco Costamagna ]
   * Move VCS fields to salsa.d.o/debian namespace
   * Switch build to llvm-8
   * Strip archs where llvm-8 is not available from build
   * Bump compat level to 12
 
- -- Gianfranco Costamagna <locutusofborg@debian.org>  Wed, 08 May 2019 12:11:50 +0200
+  [ Paolo Greppi ]
+  * Remove longtabu patch; thanks to tabu patch in texlive-latex-extra closes:
+    #920982, #921273, #921293, #921297, #921298 and #921300
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Mon, 13 May 2019 11:26:13 +0200
 
 doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
