@@ -2,14 +2,14 @@ Description: Fix clang / cmake setup
  Fix error in generated doxygen binary:
  CommandLine Error: Option 'help-list' registered more than once!
 Author: Paolo Greppi <paolo.greppi@libpf.com>
-Last-Update: 2019-01-15
+Last-Update: 2019-08-13
 Forwarded: https://github.com/doxygen/doxygen/issues/6379
 
 Index: doxygen/src/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/src/CMakeLists.txt
 +++ doxygen/src/CMakeLists.txt
-@@ -261,7 +261,7 @@ if (use_libclang)
+@@ -268,7 +268,7 @@ if (use_libclang)
      endif()
      include_directories(${LLVM_INCLUDE_DIRS})
      add_definitions(${LLVM_DEFINITIONS})

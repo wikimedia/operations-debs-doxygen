@@ -1,12 +1,12 @@
 Description: Make the output of $year reproducible
 Author: Paolo Greppi <paolo.greppi@libpf.com>
-Last-Update: 2019-01-15
+Last-Update: 2019-08-13
 
 Index: doxygen/src/util.cpp
 ===================================================================
 --- doxygen.orig/src/util.cpp
 +++ doxygen/src/util.cpp
-@@ -2578,7 +2578,7 @@ QCString fileToString(const char *name,b
+@@ -2590,7 +2590,7 @@ QCString fileToString(const char *name,b
    return "";
  }
  
@@ -15,7 +15,7 @@ Index: doxygen/src/util.cpp
  {
    QDateTime current = QDateTime::currentDateTime();
    QCString sourceDateEpoch = portable_getenv("SOURCE_DATE_EPOCH");
-@@ -2610,6 +2610,12 @@ QCString dateToString(bool includeTime)
+@@ -2622,6 +2622,12 @@ QCString dateToString(bool includeTime)
        current.setTimeUtc_t((ulong)epoch); // TODO: add support for 64bit epoch value
      }
    }
@@ -28,7 +28,7 @@ Index: doxygen/src/util.cpp
    return theTranslator->trDateTime(current.date().year(),
                                     current.date().month(),
                                     current.date().day(),
-@@ -2622,9 +2628,8 @@ QCString dateToString(bool includeTime)
+@@ -2634,9 +2640,8 @@ QCString dateToString(bool includeTime)
  
  QCString yearToString()
  {

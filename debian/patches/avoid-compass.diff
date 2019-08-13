@@ -12,12 +12,14 @@ Description: Avoid use of compass
  If the reference Ruby implementation of Sass is preferred over sassc,
  simply replace "sassc" with "scss" in the Makefile rule.
 Author: Jonas Smedegaard <dr@jones.dk>
-Last-Update: 2017-09-11
+Last-Update: 2019-08-13
 ---
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
---- a/jquery/Makefile
-+++ b/jquery/Makefile
-@@ -35,10 +35,7 @@
+Index: doxygen/jquery/Makefile
+===================================================================
+--- doxygen.orig/jquery/Makefile
++++ doxygen/jquery/Makefile
+@@ -28,10 +28,7 @@ doxmenu-min.css: sm-core-css.css \
                   sass/_round-corners-last-item.scss \
                   sass/_sm-dox.scss \
                   sass/_sub-items-indentation.scss
@@ -27,10 +29,12 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -	rm -f sm-dox.css doxmenu.css
 +	cat sm-core-css.css sass/sm-dox.scss | sassc -I sass --style compressed > doxmenu-min.css
  
- scripts: $(SCRIPTS_MIN)
- 
---- a/jquery/sass/_round-corners-last-item.scss
-+++ b/jquery/sass/_round-corners-last-item.scss
+ clean:
+ 	rm -rf $(RESULTS) doxmenu.css .sass-cache
+Index: doxygen/jquery/sass/_round-corners-last-item.scss
+===================================================================
+--- doxygen.orig/jquery/sass/_round-corners-last-item.scss
++++ doxygen/jquery/sass/_round-corners-last-item.scss
 @@ -8,7 +8,7 @@
  		$selector: $selector + ', ' + $chain + ' a, ' + $chain + '*:not(ul) a, ' + $chain + ' ul';
  	}
@@ -48,15 +52,17 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +		border-radius: 0;
  	}
  }
---- a/jquery/sass/_sm-dox.scss
-+++ b/jquery/sass/_sm-dox.scss
+Index: doxygen/jquery/sass/_sm-dox.scss
+===================================================================
+--- doxygen.orig/jquery/sass/_sm-dox.scss
++++ doxygen/jquery/sass/_sm-dox.scss
 @@ -1,5 +1,3 @@
 -@import 'compass';
 -
  // This file is best viewed with Tab size 4 code indentation
  
  
-@@ -164,7 +162,7 @@
+@@ -164,7 +162,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
  // Main menu box
  .sm-dox {
      background-image: $sm-dox__collapsible-bg;
@@ -65,7 +71,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      // Main menu items
      a {
-@@ -215,7 +213,7 @@
+@@ -215,7 +213,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
              text-align: center;
              text-shadow: none;
              background: $sm-dox__collapsible-toggle-bg;
@@ -74,7 +80,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
          }
          // Change + to - on sub menu expand
          &.highlighted span.sub-arrow:before {
-@@ -226,7 +224,7 @@
+@@ -226,7 +224,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
  
      // round the corners of the first item
      > li:first-child > a, > li:first-child > :not(ul) a {
@@ -83,7 +89,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      }
      // round the corners of the last item
      @include sm-dox__round-corners-last-item($sm-dox__collapsible-border-radius);
-@@ -303,7 +301,7 @@
+@@ -303,7 +301,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
          padding: 0 $sm-dox__desktop-padding-horizontal;
          background-image: $sm-dox__desktop-bg;
          line-height: 36px;
@@ -92,7 +98,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          // Main menu items
          a {
-@@ -318,7 +316,7 @@
+@@ -318,7 +316,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
                  border-style: solid dashed dashed dashed;
                  border-color: $sm-dox__main-text-color transparent transparent transparent;
                  background: transparent;
@@ -101,7 +107,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              }
  
              &,
-@@ -331,7 +329,7 @@
+@@ -331,7 +329,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
                  background-image:url('tab_s.png');
                  background-repeat:no-repeat;
                  background-position:right;
@@ -110,7 +116,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              }
              &:hover {
                background-image: url('tab_a.png');
-@@ -380,8 +378,8 @@
+@@ -380,8 +378,8 @@ $sm-dox__toggle-spacing: floor($sm-dox__
              border: $sm-dox__border-width solid $sm-dox__gray-dark;
              padding: $sm-dox__desktop-sub-padding-vertical $sm-dox__desktop-sub-padding-horizontal;
              background: $sm-dox__desktop-sub-bg;
@@ -121,7 +127,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
              // Sub menus items
              a {
-@@ -536,7 +534,7 @@
+@@ -536,7 +534,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
          // Main menu box
          &.sm-vertical {
              padding: $sm-dox__desktop-vertical-padding-vertical 0;

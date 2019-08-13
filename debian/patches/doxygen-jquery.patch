@@ -2,7 +2,7 @@ Index: doxygen/src/htmlgen.cpp
 ===================================================================
 --- doxygen.orig/src/htmlgen.cpp
 +++ doxygen/src/htmlgen.cpp
-@@ -758,6 +758,7 @@ void HtmlGenerator::init()
+@@ -785,6 +785,7 @@ void HtmlGenerator::init()
      mgr.copyResource("menu.js",dname);
    }
  

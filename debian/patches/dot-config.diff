@@ -1,10 +1,10 @@
-Last-Update: 2014-05-16
+Last-Update: 2019-08-13
 
 Index: doxygen/src/config.xml
 ===================================================================
 --- doxygen.orig/src/config.xml
 +++ doxygen/src/config.xml
-@@ -3271,7 +3271,7 @@ to be found in the default search path.
+@@ -3270,7 +3270,7 @@ to be found in the default search path.
  ]]>
        </docs>
      </option>
@@ -13,7 +13,7 @@ Index: doxygen/src/config.xml
        <docs>
  <![CDATA[
   If you set the \c HAVE_DOT tag to \c YES then doxygen will assume the \c dot tool is
-@@ -3460,8 +3460,21 @@ to be found in the default search path.
+@@ -3459,8 +3459,21 @@ to be found in the default search path.
  ]]>
        </docs>
        <value name='png'/>
