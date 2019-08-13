@@ -106,7 +106,7 @@ QCString LayoutNavEntry::url() const
   }
   else if (url.left(5)=="@ref " || url.left(5)=="\\ref ")
   {
-    Definition *d;
+    const Definition *d = 0;
     QCString anchor;
     bool found=FALSE;
     if (resolveLink(0,url.mid(5).stripWhiteSpace(),TRUE,&d,anchor))
@@ -1395,7 +1395,7 @@ class LayoutParser : public QXmlDefaultHandler
       }
       else
       {
-        err("Unexpected start tag `%s' found in scope='%s'!\n",
+        err("Unexpected start tag '%s' found in scope='%s'!\n",
             name.data(),m_scope.data());
       }
       return TRUE;
@@ -1538,10 +1538,11 @@ void LayoutDocManager::clear(LayoutDocManager::LayoutPart p)
   d->docEntries[(int)p].clear();
 }
 
-void LayoutDocManager::parse(QTextStream &t,const char *fileName)
+void LayoutDocManager::parse(const char *fileName)
 {
   LayoutErrorHandler errorHandler(fileName);
-  QXmlInputSource source( t );
+  QXmlInputSource source;
+  source.setData(fileToString(fileName));
   QXmlSimpleReader reader;
   reader.setContentHandler( &LayoutParser::instance() );
   reader.setErrorHandler( &errorHandler );
@@ -1560,7 +1561,7 @@ void writeDefaultLayoutFile(const char *fileName)
     return;
   }
   QTextStream t(&f);
-  t << substitute(layout_default,"$doxygenversion",versionString);
+  t << substitute(layout_default,"$doxygenversion",getVersion());
 }
 
 //----------------------------------------------------------------------------------

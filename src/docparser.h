@@ -65,7 +65,7 @@ QCString getJsDirEmbedingChar(QString::Direction textDir);
  *                   pointer is handed over to the caller.
  */
 DocRoot *validatingParseDoc(const char *fileName,int startLine,
-                            Definition *context, MemberDef *md,
+                            const Definition *context, const MemberDef *md,
                             const char *input,bool indexWords,
                             bool isExample,const char *exampleName=0,
                             bool singleLine=FALSE,bool linkFromIndex=FALSE);
@@ -141,7 +141,8 @@ class DocNode
                 Kind_VhdlFlow       = 50,
                 Kind_ParBlock       = 51,
                 Kind_DiaFile        = 52,
-                Kind_Emoji          = 53
+                Kind_Emoji          = 53,
+                Kind_Sep            = 54
               };
     /*! Creates a new node */
     DocNode() : m_parent(0), m_insidePre(FALSE) {}
@@ -300,22 +301,31 @@ class DocURL : public DocNode
 class DocLineBreak : public DocNode
 {
   public:
-    DocLineBreak(DocNode *parent) { m_parent=parent; }
+    DocLineBreak(DocNode *parent) { m_parent = parent; }
+    DocLineBreak(DocNode *parent,const HtmlAttribList &attribs)
+      : m_attribs(attribs) { m_parent = parent; }
     Kind kind() const          { return Kind_LineBreak; }
     void accept(DocVisitor *v) { v->visit(this); }
 
+    const HtmlAttribList &attribs() const { return m_attribs; }
+
   private:
+    HtmlAttribList m_attribs;
 };
 
 /** Node representing a horizontal ruler */
 class DocHorRuler : public DocNode
 {
   public:
-    DocHorRuler(DocNode *parent) { m_parent = parent; }
+    DocHorRuler(DocNode *parent,const HtmlAttribList &attribs)
+      : m_attribs(attribs) { m_parent = parent; }
     Kind kind() const          { return Kind_HorRuler; }
     void accept(DocVisitor *v) { v->visit(this); }
 
+    const HtmlAttribList &attribs() const { return m_attribs; }
+
   private:
+    HtmlAttribList m_attribs;
 };
 
 /** Node representing an anchor */
@@ -328,9 +338,12 @@ class DocAnchor : public DocNode
     QCString file() const      { return m_file; }
     void accept(DocVisitor *v) { v->visit(this); }
 
+    const HtmlAttribList &attribs() const { return m_attribs; }
+
   private:
     QCString  m_anchor;
     QCString  m_file;
+    HtmlAttribList m_attribs;
 };
 
 /** Node representing a citation of some bibliographic reference */
@@ -370,7 +383,9 @@ class DocStyleChange : public DocNode
                  Span          = (1<<8),
                  Div           = (1<<9),
                  Strike        = (1<<10),
-                 Underline     = (1<<11)
+                 Underline     = (1<<11),
+                 Del           = (1<<12),
+                 Ins           = (1<<13)
                };
 
     DocStyleChange(DocNode *parent,uint position,Style s,bool enable,
@@ -504,6 +519,19 @@ class DocWhiteSpace : public DocNode
     QCString  m_chars;
 };
 
+/** Node representing a separator */
+class DocSeparator : public DocNode
+{
+  public:
+    DocSeparator(DocNode *parent,const QCString &chars) :
+      m_chars(chars) { m_parent = parent; }
+    Kind kind() const          { return Kind_Sep; }
+    QCString chars() const     { return m_chars; }
+    void accept(DocVisitor *v) { }
+  private:
+    QCString  m_chars;
+};
+
 /** Node representing a verbatim, unparsed text fragment */
 class DocVerbatim : public DocNode
 {
@@ -551,7 +579,8 @@ class DocInclude : public DocNode
 {
   public:
   enum Type { Include, DontInclude, VerbInclude, HtmlInclude, LatexInclude,
-	      IncWithLines, Snippet , IncludeDoc, SnippetDoc, SnipWithLines};
+	      IncWithLines, Snippet , IncludeDoc, SnippetDoc, SnipWithLines,
+	      DontIncWithLines};
     DocInclude(DocNode *parent,const QCString &file,
                const QCString context, Type t,
                bool isExample,const QCString exampleFile,
@@ -595,11 +624,24 @@ class DocIncOperator : public DocNode
     enum Type { Line, SkipLine, Skip, Until };
     DocIncOperator(DocNode *parent,Type t,const QCString &pat,
                    const QCString &context,bool isExample,const QCString &exampleFile) : 
-      m_type(t), m_pattern(pat), m_context(context), 
+      m_type(t), m_pattern(pat), m_context(context),
       m_isFirst(FALSE), m_isLast(FALSE),
       m_isExample(isExample), m_exampleFile(exampleFile) { m_parent = parent; }
     Kind kind() const           { return Kind_IncOperator; }
     Type type() const           { return m_type; }
+    const char *typeAsString() const
+    {
+      switch(m_type)
+      {
+        case Line:     return "line";
+        case SkipLine: return "skipline";
+        case Skip:     return "skip";
+        case Until:    return "until";
+      }
+      return "";
+    }
+    int line() const             { return m_line; }
+    bool showLineNo() const      { return m_showLineNo; }
     QCString text() const        { return m_text; }
     QCString pattern() const     { return m_pattern; }
     QCString context() const     { return m_context; }
@@ -615,6 +657,8 @@ class DocIncOperator : public DocNode
 
   private:
     Type     m_type;
+    int      m_line;
+    bool     m_showLineNo;
     QCString  m_text;
     QCString  m_pattern;
     QCString  m_context;
@@ -649,40 +693,22 @@ class DocFormula : public DocNode
 class DocIndexEntry : public DocNode
 {
   public:
-    DocIndexEntry(DocNode *parent,Definition *scope,MemberDef *md) 
+    DocIndexEntry(DocNode *parent,const Definition *scope,const MemberDef *md) 
       : m_scope(scope), m_member(md){ m_parent = parent; }
     Kind kind() const { return Kind_IndexEntry; }
     int parse();
-    Definition *scope() const    { return m_scope;  }
-    MemberDef *member() const    { return m_member; }
+    const Definition *scope() const    { return m_scope;  }
+    const MemberDef *member() const    { return m_member; }
     QCString entry() const        { return m_entry;  }
     void accept(DocVisitor *v)   { v->visit(this);  }
 
   private:
     QCString     m_entry;
-    Definition *m_scope;
-    MemberDef  *m_member;
+    const Definition *m_scope;
+    const MemberDef  *m_member;
 };
 
 //-----------------------------------------------------------------------
-
-/** Node representing a copy of documentation block. */
-class DocCopy : public DocNode
-{
-  public:
-    DocCopy(DocNode *parent,const QCString &link,bool copyBrief,bool copyDetails) 
-      : m_link(link), 
-        m_copyBrief(copyBrief), m_copyDetails(copyDetails) { m_parent = parent; }
-    Kind kind() const          { return Kind_Copy; }
-    QCString link() const       { return m_link; }
-    void accept(DocVisitor * /*v*/) { /*CompAccept<DocCopy>::accept(this,v);*/ }
-    void parse(QList<DocNode> &children);
-
-  private:
-    QCString  m_link;
-    bool     m_copyBrief;
-    bool     m_copyDetails;
-};
 
 /** Node representing an auto List */
 class DocAutoList : public CompAccept<DocAutoList>
@@ -768,6 +794,7 @@ class DocImage : public CompAccept<DocImage>
     QCString relPath() const    { return m_relPath; }
     QCString url() const        { return m_url; }
     bool isInlineImage() const  { return m_inlineImage; }
+    bool isSVG() const;
     const HtmlAttribList &attribs() const { return m_attribs; }
     void parse();
 
@@ -787,7 +814,7 @@ class DocDotFile : public CompAccept<DocDotFile>
 {
   public:
     DocDotFile(DocNode *parent,const QCString &name,const QCString &context);
-    void parse();
+    bool parse();
     Kind kind() const          { return Kind_DotFile; }
     QCString name() const       { return m_name; }
     QCString file() const       { return m_file; }
@@ -810,7 +837,7 @@ class DocMscFile : public CompAccept<DocMscFile>
 {
   public:
     DocMscFile(DocNode *parent,const QCString &name,const QCString &context);
-    void parse();
+    bool parse();
     Kind kind() const          { return Kind_MscFile; }
     QCString name() const      { return m_name; }
     QCString file() const      { return m_file; }
@@ -833,7 +860,7 @@ class DocDiaFile : public CompAccept<DocDiaFile>
 {
   public:
     DocDiaFile(DocNode *parent,const QCString &name,const QCString &context);
-    void parse();
+    bool parse();
     Kind kind() const          { return Kind_DiaFile; }
     QCString name() const      { return m_name; }
     QCString file() const      { return m_file; }
@@ -1198,11 +1225,14 @@ class DocPara : public CompAccept<DocPara>
     int handleHtmlHeader(const HtmlAttribList &tagHtmlAttribs,int level);
 
     bool injectToken(int tok,const QCString &tokText);
+    const HtmlAttribList &attribs() const { return m_attribs; }
+    void setAttribs(const HtmlAttribList &attribs) { m_attribs = attribs; }
 
   private:
     QCString  m_sectionId;
     bool     m_isFirst;
     bool     m_isLast;
+    HtmlAttribList m_attribs;
 };
 
 /** Node representing a parameter list. */
