@@ -282,6 +282,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 <CopyArgSharp>"<<"                      {
                                           if (g_argRoundCount>0)
                                           {
+                                            // for e.g. < typename A = (i<<3) >
 					    *g_copyArgValue += yytext;
                                           }
                                           else
@@ -289,17 +290,10 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
                                             REJECT;
                                           }
                                         }
-<CopyArgSharp>">>)"                     { // combined token (see bug 790320)
-					  *g_copyArgValue += yytext;
-					  if (g_argSharpCount>0) g_argSharpCount--;
-					  else BEGIN( g_readArgContext );
-					  if (g_argSharpCount>0) g_argSharpCount--;
-					  else BEGIN( g_readArgContext );
-                                          g_argRoundCount--;
-                                        }
 <CopyArgSharp>">>"                      {
                                           if (g_argRoundCount>0)
                                           {
+                                            // for e.g. < typename A = (i>>3) >
 					    *g_copyArgValue += yytext;
                                           }
                                           else
@@ -308,12 +302,14 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
                                           }
                                         }
 <CopyArgSharp>"<"			{
-  					  g_argSharpCount++;
+                                          // don't count < inside (, e.g. for things like: < typename A=(i<6) >
+  					  if (g_argRoundCount==0) g_argSharpCount++;
 					  *g_copyArgValue += *yytext;
   					}
 <CopyArgSharp>">"			{
 					  *g_copyArgValue += *yytext;
-					  if (g_argSharpCount>0) g_argSharpCount--;
+                                          // don't count > inside )
+					  if (g_argSharpCount>0 && g_argRoundCount==0) g_argSharpCount--;
 					  else BEGIN( g_readArgContext );
   					}
 <CopyArgSharp>"("                       {
@@ -371,7 +367,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					  {
 					    g_curArgTypeName=removeRedundantWhiteSpace(g_curArgTypeName);
 					    g_curArgDefValue=g_curArgDefValue.stripWhiteSpace();
-					    //printf("curArgType=`%s' curArgDefVal=`%s'\n",g_curArgTypeName.data(),g_curArgDefValue.data());
+					    //printf("curArgType='%s' curArgDefVal='%s'\n",g_curArgTypeName.data(),g_curArgDefValue.data());
 					    int l=g_curArgTypeName.length();
 					    if (l>0)
 					    {
@@ -451,7 +447,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					      a->defval = g_curArgDefValue.copy();
 					      //printf("a->type=%s a->name=%s a->defval=\"%s\"\n",a->type.data(),a->name.data(),a->defval.data());
 					      a->docs   = g_curArgDocs.stripWhiteSpace();
-					      //printf("Argument `%s' `%s' adding docs=`%s'\n",a->type.data(),a->name.data(),a->docs.data());
+					      //printf("Argument '%s' '%s' adding docs='%s'\n",a->type.data(),a->name.data(),a->docs.data());
 					      g_argList->append(a);
 					    }
 					    g_curArgAttrib.resize(0);
@@ -483,7 +479,7 @@ RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 					    g_curArgTypeName+=" []";
 					    g_curArgArray.resize(0);
 					  }
-					  //printf("resolveName `%s'->`%s'\n",yytext,name.data());
+					  //printf("resolveName '%s'->'%s'\n",yytext,name.data());
   					  g_curArgTypeName+=name;
 					}
 <ReadFuncArgType,ReadFuncArgPtr>.	{ 
