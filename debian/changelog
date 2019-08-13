@@ -1,4 +1,4 @@
-doxygen (1.8.15-1~exp2) experimental; urgency=medium
+doxygen (1.8.16-1~exp1) UNRELEASED; urgency=medium
 
   [ Gianfranco Costamagna ]
   * Move VCS fields to salsa.d.o/debian namespace
@@ -9,8 +9,10 @@ doxygen (1.8.15-1~exp2) experimental; urgency=medium
   [ Paolo Greppi ]
   * Remove longtabu patch; thanks to tabu patch in texlive-latex-extra closes:
     #920982, #921273, #921293, #921297, #921298 and #921300
+  * doxygen 1.8.16 release.
+  * License is now plain GPL-2
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Mon, 13 May 2019 11:26:13 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 13 Aug 2019 15:03:32 +0200
 
 doxygen (1.8.15-1~exp1) experimental; urgency=medium
 
