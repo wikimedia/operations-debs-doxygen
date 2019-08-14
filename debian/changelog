@@ -7,6 +7,10 @@ doxygen (1.8.16-1~exp3) UNRELEASED; urgency=medium
 
 doxygen (1.8.16-1~exp2) experimental; urgency=medium
 
+  [ Joenio Costa ]
+  * new package (doxygen-doxyparse)
+
+  [ Paolo Greppi ]
   * Set DEB_LDFLAGS_MAINT_APPEND early to fix armel build
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 13 Aug 2019 23:02:08 +0200

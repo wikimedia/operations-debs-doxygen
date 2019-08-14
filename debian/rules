@@ -37,6 +37,7 @@ CONFIGUREFLAGS += -Dbuild_doc=$(if $(filter yes, $(with_docs)),ON,OFF)
 CONFIGUREFLAGS += -DPYTHON_EXECUTABLE=/usr/bin/python3
 CONFIGUREFLAGS += -Duse_libclang=$(if $(filter $(DEB_HOST_ARCH),$(clang_archs)),ON,OFF)
 CONFIGUREFLAGS += -Dbuild_search=ON
+CONFIGUREFLAGS += -Dbuild_parse=ON
 # still experimental according to upstream
 #CONFIGUREFLAGS += -Duse_sqlite3=ON
 
@@ -131,6 +132,7 @@ ifeq ($(with_doxywizard),yes)
 endif
 	rm -rf debian/doxygen/usr/share/doc/packages
 	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
+	dh_movefiles -Ndoxygen -Ndoxygen-gui -pdoxygen-doxyparse --sourcedir=debian/doxygen usr/bin/doxyparse
 	touch $@
 
 install: install-indep install-arch
@@ -160,7 +162,7 @@ binary-indep: install-indep
 ifeq ($(with_doxywizard),yes)
 binary-arch:
 else
-binary-arch: DH_OPTIONS=-Ndoxygen-gui
+binary-arch: DH_OPTIONS=-Ndoxygen-gui -Ndoxygen-doxyparse
 endif
 binary-arch: install-arch
 	dh_testdir
