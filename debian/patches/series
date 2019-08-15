@@ -10,3 +10,4 @@ no-timestamps.diff
 avoid-compass.diff
 llvm_libs.diff
 reproducible_year.diff
+faketime_pdflatex.diff

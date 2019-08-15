@@ -1,0 +1,16 @@
+Description: Make the output of latex \year macro reproducible
+Author: Paolo Greppi <paolo.greppi@libpf.com>
+Last-Update: 2019-08-15
+
+Index: doxygen/doc/Makefile.latex
+===================================================================
+--- doxygen.orig/doc/Makefile.latex
++++ doxygen/doc/Makefile.latex
+@@ -20,6 +20,6 @@ doxygen_manual.pdf: doxygen_manual.tex d
+ 	echo "Running makeindex..."
+ 	makeindex doxygen_manual.idx
+ 	echo "Rerunning latex...."
+-	pdflatex doxygen_manual.tex
++	faketime @$(SOURCE_DATE_EPOCH) pdflatex doxygen_manual.tex
+ clean:
+ 	rm -f *.ps *.dvi *.aux *.toc *.idx *.ind *.ilg *.log doxygen_manual.pdf

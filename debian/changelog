@@ -1,6 +1,7 @@
 doxygen (1.8.16-1~exp3) UNRELEASED; urgency=medium
 
   * Forward DEB_LDFLAGS_MAINT_APPEND to dpkg-buildflags to fix armel build
+  * Make latex's \year macro and doxygen_manual.pdf reproducible
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 15 Aug 2019 04:39:19 +0200
 
