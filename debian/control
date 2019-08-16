@@ -110,15 +110,15 @@ Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: multi-language source code parser based on Doxygen
  Doxygen is a documentation system for C, C++, Java, Objective-C, Python, IDL
- and to some extent PHP, C#, and D. Doxyparse builts on doxygen's great source
+ and to some extent PHP, C#, and D. Doxyparse builds on doxygen's great source
  code parsing infrastructure and provides a command-line tool that can be used
- to obtain informatin from source code, such as:
+ to obtain information from source code, such as:
  .
   * which functions/methods and variables/attributes a module/class contains
   * which functions/methods calls/uses which functions/methods/variables
   * etc
  .
- doxyparses's main goal is to be used by higher-level source code analyzis
+ doxyparses's main goal is to be used by higher-level source code analysis
  tools.
  .
  This package contains doxyparse binary, a source code parser based on Doxygen
