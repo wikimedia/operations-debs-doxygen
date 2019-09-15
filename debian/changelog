@@ -1,13 +1,14 @@
-doxygen (1.8.16-1~exp3) UNRELEASED; urgency=medium
+doxygen (1.8.16-1~exp3) experimental; urgency=medium
 
   [ Joenio Costa ]
   * new package (doxygen-doxyparse)
 
   [ Paolo Greppi ]
-  * Forward DEB_LDFLAGS_MAINT_APPEND to dpkg-buildflags to fix armel build
+  * Inject atomic lib through cmake to fix armel build
   * Make latex's \year macro and doxygen_manual.pdf reproducible
+  * SHOW_NAMESPACES = NO breaks latex PDF fixed in 1.8.16. Closes: #929143
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 15 Aug 2019 04:39:19 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 15 Sep 2019 07:32:11 +0200
 
 doxygen (1.8.16-1~exp2) experimental; urgency=medium
 

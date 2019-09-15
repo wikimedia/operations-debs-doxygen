@@ -8,14 +8,9 @@ endif
 #export DH_VERBOSE=1
 export DH_OPTIONS=
 
-# to fix a build failure with latomic and llvm build
-ifneq (,$(filter $(DEB_HOST_ARCH), armel))
-export DEB_LDFLAGS_MAINT_APPEND = -latomic
-endif
-
 CFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CFLAGS)
 CXXFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CXXFLAGS)
-LDFLAGS := $(shell DEB_LDFLAGS_MAINT_APPEND=$(DEB_LDFLAGS_MAINT_APPEND) dpkg-buildflags --get LDFLAGS)
+LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
 export CFLAGS
 export CXXFLAGS
 export LDFLAGS
