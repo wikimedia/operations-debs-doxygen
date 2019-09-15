@@ -1,5 +1,9 @@
 doxygen (1.8.16-1~exp3) UNRELEASED; urgency=medium
 
+  [ Joenio Costa ]
+  * new package (doxygen-doxyparse)
+
+  [ Paolo Greppi ]
   * Forward DEB_LDFLAGS_MAINT_APPEND to dpkg-buildflags to fix armel build
   * Make latex's \year macro and doxygen_manual.pdf reproducible
 

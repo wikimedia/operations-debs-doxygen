@@ -50,6 +50,11 @@ Files: liblodepng/*
 Copyright: 2005-2008, Lode Vandevenne
 License: Zlib
 
+Files: addon/doxyparse/*
+Copyright: 2009, Antonio Terceiro <terceiro@softwarelivre.org>
+ 2009-2019, Joenio Costa <joenio@joenio.me>
+License: GPL-2
+
 License: BSD-2-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
