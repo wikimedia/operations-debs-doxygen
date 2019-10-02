@@ -1,3 +1,10 @@
+doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
+
+  * Build-depend on texlive-plain-generic instead of obsolete texlive-
+    generic-recommended.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Wed, 02 Oct 2019 09:25:55 +0200
+
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
 
   [ Joenio Costa ]
