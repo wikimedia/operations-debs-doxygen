@@ -1,3 +1,10 @@
+doxygen (1.8.13-12) unstable; urgency=medium
+
+  * QA upload.
+  * Build using LLVM 9.0.
+
+ -- Steve Langasek <vorlon@debian.org>  Sun, 20 Oct 2019 06:34:45 +0000
+
 doxygen (1.8.13-11) unstable; urgency=medium
 
   * QA upload.
