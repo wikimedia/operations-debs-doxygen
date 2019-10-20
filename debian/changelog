@@ -2,8 +2,9 @@ doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
 
   * Build-depend on texlive-plain-generic instead of obsolete texlive-
     generic-recommended.
+  * Make the output of $year reproducible. Closes: #942671.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Wed, 02 Oct 2019 09:25:55 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 20 Oct 2019 10:25:43 +0200
 
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
 

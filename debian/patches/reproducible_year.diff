@@ -1,5 +1,6 @@
 Description: Make the output of $year reproducible
 Author: Paolo Greppi <paolo.greppi@libpf.com>
+Forwarded: https://github.com/doxygen/doxygen/pull/7341
 Last-Update: 2019-08-13
 
 Index: doxygen/src/util.cpp
