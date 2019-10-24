@@ -3,8 +3,10 @@ doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
   * Build-depend on texlive-plain-generic instead of obsolete texlive-
     generic-recommended.
   * Make the output of $year reproducible. Closes: #942671.
+  * Fix a regression whereby if the Doxyfile has a blank FILE_PATTERNS then
+    no files are processed.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 20 Oct 2019 10:25:43 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 24 Oct 2019 17:04:24 +0200
 
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
 

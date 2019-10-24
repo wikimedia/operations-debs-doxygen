@@ -12,3 +12,4 @@ llvm_libs.diff
 reproducible_year.diff
 faketime_pdflatex.diff
 libatomic.diff
+blank-file-patterns.diff
