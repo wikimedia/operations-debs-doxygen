@@ -1,12 +1,25 @@
+Description: Conditionally skip copying jquery.
+ When either GENERATE_TREEVIEW or SEARCHENGINE are set, there is no need to
+ embed jquery.js into the generated documentation.
+Forwarded: https://github.com/doxygen/doxygen/issues/7367
+Author: Paolo Greppi <paolo.greppi@libpf.com>
+Last-Update: 2019-10-31
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+
 Index: doxygen/src/htmlgen.cpp
 ===================================================================
 --- doxygen.orig/src/htmlgen.cpp
 +++ doxygen/src/htmlgen.cpp
-@@ -785,6 +785,7 @@ void HtmlGenerator::init()
-     mgr.copyResource("menu.js",dname);
-   }
- 
-+  if (Config_getBool(GENERATE_TREEVIEW) || Config_getBool(SEARCHENGINE))
+@@ -775,7 +775,10 @@ void HtmlGenerator::init()
    {
-     QFile f(dname+"/dynsections.js");
-     if (f.open(IO_WriteOnly))
+     mgr.copyResourceAs("fixed_tabs.css",dname,"tabs.css");
+   }
+-  mgr.copyResource("jquery.js",dname);
++  if (Config_getBool(GENERATE_TREEVIEW) || Config_getBool(SEARCHENGINE))
++  {
++    mgr.copyResource("jquery.js",dname);
++  }
+   if (Config_getBool(INTERACTIVE_SVG))
+   {
+     mgr.copyResource("svgpan.js",dname);
