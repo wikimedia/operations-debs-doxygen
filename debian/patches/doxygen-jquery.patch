@@ -1,6 +1,7 @@
 Description: Conditionally skip copying jquery.
- When either GENERATE_TREEVIEW or SEARCHENGINE are set, there is no need to
- embed jquery.js into the generated documentation.
+ This patch tried to reduce the footprint of the generated docs and to avoid
+ embedding unnecessary JavaScript libraries but it breaks things.
+ It should be disabled or deleted.
 Forwarded: https://github.com/doxygen/doxygen/issues/7367
 Author: Paolo Greppi <paolo.greppi@libpf.com>
 Last-Update: 2019-10-31

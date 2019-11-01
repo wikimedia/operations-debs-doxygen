@@ -2,7 +2,7 @@ manpages.diff
 dot-config.diff
 #doxygen_direct_dot_run.diff
 #gcc-g.diff
-doxygen-jquery.patch
+#doxygen-jquery.patch
 #dot_num_threads.diff
 #sqlite3-configure.diff
 no-timestamps.diff
