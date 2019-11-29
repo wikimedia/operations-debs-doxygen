@@ -1,0 +1,3 @@
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=919413
+doxygen source: source-is-missing *.min.js
+doxygen source: source-is-missing *.js*line length*

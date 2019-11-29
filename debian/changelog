@@ -1,3 +1,12 @@
+doxygen (1.8.16-1~exp4~deb10+wmf1) buster-wikimedia; urgency=medium
+
+  * Rebuild for buster based on f562715. Fix: T239482
+  * Build using LLVM 7
+  * Add git buildpackage configuration to enable pristine tar.
+  * Ignore some lintian errors for the source package.
+
+ -- Antoine Musso <hashar@free.fr>  Fri, 29 Nov 2019 22:39:12 +0100
+
 doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
 
   * Build-depend on texlive-plain-generic instead of obsolete texlive-
