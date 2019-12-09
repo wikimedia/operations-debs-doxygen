@@ -1,2 +1,2 @@
 Tests: run
-Depends: apt, dpkg-dev, doxygen, graphviz
+Depends: apt:native, dpkg-dev, doxygen, graphviz:native
