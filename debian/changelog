@@ -1,4 +1,4 @@
-doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
+doxygen (1.8.16-1) unstable; urgency=medium
 
   [ Steve Langasek ]
   * Make autopkgtests cross-test-friendly.
@@ -12,11 +12,12 @@ doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
     no files are processed.
   * Disable patch to conditionally skip copying jquery. Closes: #943890.
   * Fix lintian W: doxygen source: tab-in-license-text debian/copyright.
+  * Upload to unstable.
 
   [ Norbert Lange ]
   * Improve d/rules to pick llvm version from d/control. Closes: #945427.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 10 Dec 2019 19:17:56 +0100
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 10 Dec 2019 23:48:20 +0100
 
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
 
