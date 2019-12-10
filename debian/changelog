@@ -11,7 +11,10 @@ doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
   * Fix a regression whereby if the Doxyfile has a blank FILE_PATTERNS then
     no files are processed.
   * Disable patch to conditionally skip copying jquery. Closes: #943890.
- 
+
+  [ Norbert Lange ]
+  * Improve d/rules to pick llvm version from d/control. Closes: #945427.
+
  -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 10 Dec 2019 19:17:56 +0100
 
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
