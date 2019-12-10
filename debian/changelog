@@ -11,6 +11,7 @@ doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
   * Fix a regression whereby if the Doxyfile has a blank FILE_PATTERNS then
     no files are processed.
   * Disable patch to conditionally skip copying jquery. Closes: #943890.
+  * Fix lintian W: doxygen source: tab-in-license-text debian/copyright.
 
   [ Norbert Lange ]
   * Improve d/rules to pick llvm version from d/control. Closes: #945427.
