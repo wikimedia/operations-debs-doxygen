@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Paolo Greppi <paolo.greppi@libpf.com>
 Build-Depends: debhelper-compat (= 12),
   dpkg-dev (>= 1.17.14),
-  qtbase5-dev <!stage1>,
+  qtbase5-dev (>= 5.12.5+dfsg-3) <!stage1>,
   flex, bison (>= 1.875a),
   python3,
   zlib1g-dev,
