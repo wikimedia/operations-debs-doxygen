@@ -36,9 +36,6 @@ CONFIGUREFLAGS += -Dbuild_parse=ON
 # still experimental according to upstream
 #CONFIGUREFLAGS += -Duse_sqlite3=ON
 
-# used by jquery/Makefile
-export MINIFIER=/usr/share/yui-compressor/yui-compressor
-
 configure-stamp:
 	dh_testdir
 	$(MAKE) -C jquery install

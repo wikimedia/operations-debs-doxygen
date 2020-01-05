@@ -1,3 +1,10 @@
+doxygen (1.8.16-3) UNRELEASED; urgency=medium
+
+  [ Samuel Thibault ]
+  * Drop unused build dependency. Closes: #947897.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 05 Jan 2020 18:48:03 +0100
+
 doxygen (1.8.16-2) unstable; urgency=medium
 
   * Build-depend on qtbase5-dev version that fixes 947117.
