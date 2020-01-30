@@ -1,7 +1,10 @@
-doxygen (1.8.16-3) UNRELEASED; urgency=medium
+doxygen (1.8.17-1) UNRELEASED; urgency=medium
 
   [ Samuel Thibault ]
   * Drop unused build dependency. Closes: #947897.
+
+  [ Paolo Greppi ]
+  * doxygen 1.8.17 release.
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 05 Jan 2020 18:48:03 +0100
 
