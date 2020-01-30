@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: doxygen
-Upstream-Contact: Dimitri van Heesch <dimitri@stack.nl>
+Upstream-Contact: Dimitri van Heesch <doxygen@gmail.com)>
 Source: https://github.com/doxygen/doxygen
 
 Files: *
