@@ -128,6 +128,7 @@ Extension | Language | Extension | Language     | Extension | Language
 .hpp      |C / C++   | | | | |
 .h++      |C / C++   | | | | |
 .mm       |C / C++   | | | | |
+.txt      |C / C++   | | | | |
 
 Any other extension is not parsed unless it is added to
 \ref cfg_file_patterns "FILE_PATTERNS" and the appropriate
@@ -186,7 +187,7 @@ IE8, IE9, and Opera to test the generated output).
 
 Some of the features the HTML section (such as 
 \ref cfg_generate_treeview "GENERATE_TREEVIEW" or the search engine) 
-require a browser that supports Dynamic HTML and Javascript enabled. 
+require a browser that supports Dynamic HTML and JavaScript enabled. 
 
 \subsection latex_out LaTeX output
 \addindex LaTeX

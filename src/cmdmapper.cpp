@@ -55,7 +55,7 @@ CommandMap cmdMap[] =
   { "endverbatim",   CMD_ENDVERBATIM },
   { "endxmlonly",    CMD_ENDXMLONLY },
   { "exception",     CMD_EXCEPTION },
-  { "form",          CMD_FORMULA },
+  { "_form",         CMD_FORMULA },
   { "htmlinclude",   CMD_HTMLINCLUDE },
   { "htmlonly",      CMD_HTMLONLY },
   { "image",         CMD_IMAGE },
@@ -196,6 +196,7 @@ CommandMap htmlTagMap[] =
   { "div",        HTML_DIV },
   { "blockquote", HTML_BLOCKQUOTE },
   { "strike",     HTML_STRIKE },
+  { "s",          HTML_S },
   { "u",          HTML_UNDERLINE },
   { "ins",        HTML_INS },
   { "del",        HTML_DEL },
@@ -239,14 +240,14 @@ int Mapper::map(const char *n)
   return !name.isEmpty() && (result=m_map.find(name)) ? *result: 0;
 }
 
-QString Mapper::find(const int n)
+QCString Mapper::find(const int n)
 {
   QDictIterator<int> mapIterator(m_map);
   for (int *curVal = mapIterator.toFirst();(curVal = mapIterator.current());++mapIterator)
   {
     if (*curVal == n || (*curVal == (n | SIMPLESECT_BIT))) return mapIterator.currentKey();
   }
-  return NULL;
+  return QCString();
 }
 
 Mapper::Mapper(const CommandMap *cm,bool caseSensitive) : m_map(89), m_cs(caseSensitive)
