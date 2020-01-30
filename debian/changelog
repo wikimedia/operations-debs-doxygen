@@ -5,6 +5,7 @@ doxygen (1.8.17-1) UNRELEASED; urgency=medium
 
   [ Paolo Greppi ]
   * doxygen 1.8.17 release.
+  * Bump standards version to 4.5.0: No changes needed.
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 05 Jan 2020 18:48:03 +0100
 
