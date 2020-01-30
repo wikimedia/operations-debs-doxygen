@@ -4,7 +4,7 @@ Upstream-Contact: Dimitri van Heesch <dimitri@stack.nl>
 Source: https://github.com/doxygen/doxygen
 
 Files: *
-Copyright: 1997-2018, Dimitri van Heesch and others
+Copyright: 1997-2019, Dimitri van Heesch and others
 License: GPL-2
 
 Files: debian/*
@@ -12,7 +12,7 @@ Copyright:
  2000-2003, Luca Filipozzi
  2004-2016, Matthias Klose
  2013-2014, Helmut Grohne
- 2018-2019, Paolo Greppi <paolo.greppi@libpf.com>
+ 2018-2020, Paolo Greppi <paolo.greppi@libpf.com>
  and others
 License: GPL-2
 Comment: no license was ever declared by the authors, so assuming a derivative work
@@ -22,13 +22,24 @@ Copyright: 2011, Jakub Wilk
  2013, Helmut Grohne
 License: BSD-2-clause
 
-Files: jquery/*
-Copyright:
- 2007-2009, Ariel Flesler
- 2010, "Cowboy" Ben Alman
- 2011, John Resig
- 2011, The Dojo Foundation
- 2013, Steven Benner
+Files: jquery/jquery*.js
+Copyright: 2006-2019, OpenJS Foundation
+License: Expat
+
+Files: jquery/jquery.powertip*.js
+Copyright: 2018, Steven Benner (http://stevenbenner.com/).
+License: Expat
+
+Files: jquery/jquery.scrollTo*.js
+Copyright: 2007-2009, Ariel Flesler
+License: Expat
+
+Files: jquery/jquery.smartmenus*.js
+Copyright: 2013-2017, Vasil Dinkov, Vadikom Web Ltd. http://vadikom.com
+License: Expat
+
+Files: jquery/jquery.ui.touch-punch*.js
+Copyright: 2011–2014, Dave Furfero
 License: Expat or GPL-2
 
 Files: libmd5/*c libmd5/*.h
