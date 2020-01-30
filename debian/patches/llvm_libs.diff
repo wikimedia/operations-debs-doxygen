@@ -9,7 +9,7 @@ Index: doxygen/src/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/src/CMakeLists.txt
 +++ doxygen/src/CMakeLists.txt
-@@ -268,7 +268,7 @@ if (use_libclang)
+@@ -310,7 +310,7 @@ if (use_libclang)
      endif()
      include_directories(${LLVM_INCLUDE_DIRS})
      add_definitions(${LLVM_DEFINITIONS})
