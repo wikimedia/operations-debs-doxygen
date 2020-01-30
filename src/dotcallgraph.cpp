@@ -24,6 +24,14 @@
 #define DOT_GRAPH_MAX_NODES   Config_getInt(DOT_GRAPH_MAX_NODES)
 #define MAX_DOT_GRAPH_DEPTH   Config_getInt(MAX_DOT_GRAPH_DEPTH)
 
+static QCString getUniqueId(const MemberDef *md)
+{
+  QCString result = md->getReference()+"$"+
+         md->getOutputFileBase()+"#"+
+         md->anchor();
+  return result;
+}
+
 void DotCallGraph::buildGraph(DotNode *n,const MemberDef *md,int distance)
 {
   MemberSDict *refs = m_inverse ? md->getReferencedByMembers() : md->getReferencesMembers();
@@ -36,9 +44,7 @@ void DotCallGraph::buildGraph(DotNode *n,const MemberDef *md,int distance)
     {
       if (rmd->showInCallGraph())
       {
-        QCString uniqueId;
-        uniqueId=rmd->getReference()+"$"+
-          rmd->getOutputFileBase()+"#"+rmd->anchor();
+        QCString uniqueId = getUniqueId(rmd);
         DotNode *bn  = m_usedNodes->find(uniqueId);
         if (bn) // file is already a node in the graph
         {
@@ -131,9 +137,7 @@ DotCallGraph::DotCallGraph(const MemberDef *md,bool inverse)
   m_inverse = inverse;
   m_diskName = md->getOutputFileBase()+"_"+md->anchor();
   m_scope    = md->getOuterScope();
-  QCString uniqueId;
-  uniqueId = md->getReference()+"$"+
-    md->getOutputFileBase()+"#"+md->anchor();
+  QCString uniqueId = getUniqueId(md);
   QCString name;
   if (HIDE_SCOPE_NAMES)
   {
@@ -212,6 +216,11 @@ bool DotCallGraph::isTrivial() const
 
 bool DotCallGraph::isTooBig() const
 {
-  int numNodes = m_startNode->children() ? m_startNode->children()->count() : 0;
-  return numNodes>=DOT_GRAPH_MAX_NODES;
+  return numNodes()>=DOT_GRAPH_MAX_NODES;
 }
+
+int DotCallGraph::numNodes() const
+{
+  return m_startNode->children() ? m_startNode->children()->count() : 0;
+}
+
