@@ -12,3 +12,4 @@ llvm_libs.diff
 faketime_pdflatex.diff
 libatomic.diff
 reproducible_changelog.diff
+reproducible_manpages.diff
