@@ -1,0 +1,25 @@
+Description: Import upstream patch to use eps2eps rather than ps2epsi
+Origin: https://github.com/doxygen/doxygen/pull/7496/files
+Last-Update: 2020-02-01
+
+Index: doxygen/src/formula.cpp
+===================================================================
+--- doxygen.orig/src/formula.cpp
++++ doxygen/src/formula.cpp
+@@ -151,13 +151,13 @@ void FormulaList::generateBitmaps(const
+         return;
+       }
+       Portable::sysTimerStop();
+-      // run ps2epsi to convert to an encapsulated postscript file with
++      // run eps2eps to convert to an encapsulated postscript file with
+       // boundingbox (dvips with -E has some problems here).
+       sprintf(psArgs,"%s_tmp.ps %s.eps",formBase.data(),formBase.data()); 
+       Portable::sysTimerStart();
+-      if (Portable::system("ps2epsi",psArgs)!=0)
++      if (Portable::system("eps2eps",psArgs)!=0)
+       {
+-        err("Problems running ps2epsi. Check your installation!\n");
++        err("Problems running eps2eps. Check your installation!\n");
+         Portable::sysTimerStop();
+         QDir::setCurrent(oldDir);
+         return;

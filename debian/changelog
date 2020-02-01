@@ -9,6 +9,7 @@ doxygen (1.8.17-1) UNRELEASED; urgency=medium
   * Make doxygen_manual.pdf build reproducibly with cmake.
   * Make the changelog reproducible.
   * Make the manpages reproducible when the timezone changes.
+  * Import upstream patch to use eps2eps rather than ps2epsi.
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 05 Jan 2020 18:48:03 +0100
 
