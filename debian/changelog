@@ -1,3 +1,9 @@
+doxygen (1.8.17-1~exp2) UNRELEASED; urgency=medium
+
+  * Fix sass compilation error. Closes: #954677.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 07 Apr 2020 11:39:44 +0200
+
 doxygen (1.8.17-1~exp1) experimental; urgency=medium
 
   [ Samuel Thibault ]

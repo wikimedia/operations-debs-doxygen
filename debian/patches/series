@@ -14,3 +14,4 @@ libatomic.diff
 reproducible_changelog.diff
 reproducible_manpages.diff
 eps2eps.diff
+sass_fix.diff
