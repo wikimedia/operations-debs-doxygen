@@ -55,6 +55,7 @@ build-stamp: configure-stamp
 	dh_testdir
 	$(MAKE) -C build $(NJOBS) VERBOSE=1
 	[ "$(with_docs)" = no ] || $(MAKE) -C build $(NJOBS) VERBOSE=1 docs
+	find build/html/examples/ -type f -iregex .*pdf -exec mat2 --inplace '{}' \;
 	touch $@
 
 clean:

@@ -1,3 +1,10 @@
+doxygen (1.8.17-1) UNRELEASED; urgency=medium
+
+  * Upload to unstable.
+  * Make examples reproducible by stripping metadata from pdf files.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Fri, 17 Apr 2020 19:14:51 +0200
+
 doxygen (1.8.17-1~exp2) experimental; urgency=medium
 
   * Fix sass compilation error. Closes: #954677.

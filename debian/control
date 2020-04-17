@@ -16,6 +16,7 @@ Build-Depends: debhelper-compat (= 12),
   sassc,
   git,
   faketime,
+  mat2
 Build-Depends-Indep: texlive-fonts-recommended,
   texlive-plain-generic,
   texlive-latex-extra,
