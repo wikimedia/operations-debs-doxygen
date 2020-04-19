@@ -5,6 +5,8 @@ ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
   NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
 endif
 
+export DEB_BUILD_MAINT_OPTIONS=reproducible=+fixfilepath
+
 #export DH_VERBOSE=1
 export DH_OPTIONS=
 
