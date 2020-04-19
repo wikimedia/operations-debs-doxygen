@@ -2,6 +2,8 @@ doxygen (1.8.17-1) UNRELEASED; urgency=medium
 
   * Upload to unstable.
   * Make examples reproducible by stripping metadata from pdf files.
+  * Dropping unused Build-Depends on yui-compressor also allows to bootstrap
+    doxygen without needing Java. Closes: #879695.
 
  -- Paolo Greppi <paolo.greppi@libpf.com>  Fri, 17 Apr 2020 19:14:51 +0200
 
