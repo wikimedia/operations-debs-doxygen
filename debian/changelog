@@ -1,4 +1,4 @@
-doxygen (1.8.17-1) UNRELEASED; urgency=medium
+doxygen (1.8.17-1) unstable; urgency=medium
 
   * Upload to unstable.
   * Make examples reproducible by stripping metadata from pdf files.
@@ -6,7 +6,7 @@ doxygen (1.8.17-1) UNRELEASED; urgency=medium
     doxygen without needing Java. Closes: #879695.
   * Make the GNU_BUILD_ID reproducible
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Fri, 17 Apr 2020 19:14:51 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 30 Apr 2020 19:36:59 +0200
 
 doxygen (1.8.17-1~exp2) experimental; urgency=medium
 
