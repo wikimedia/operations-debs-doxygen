@@ -10,7 +10,7 @@ Index: doxygen/Doxyfile
 ===================================================================
 --- doxygen.orig/Doxyfile
 +++ doxygen/Doxyfile
-@@ -158,7 +158,7 @@ HTML_EXTRA_FILES       =
+@@ -157,7 +157,7 @@ HTML_EXTRA_FILES       =
  HTML_COLORSTYLE_HUE    = 220
  HTML_COLORSTYLE_SAT    = 100
  HTML_COLORSTYLE_GAMMA  = 80
