@@ -152,10 +152,10 @@ void MemberGroup::addGroupedInheritedMembers(OutputList &ol,const ClassDef *cd,
     const MemberList *ml = md->getSectionList();
     if (ml && lt==ml->listType())
     {
-      MemberList ml(lt);
-      ml.append(md);
-      ml.countDecMembers();
-      ml.writePlainDeclarations(ol,cd,0,0,0,inheritedFrom,inheritId);
+      MemberList mml(lt);
+      mml.append(md);
+      mml.countDecMembers();
+      mml.writePlainDeclarations(ol,cd,0,0,0,inheritedFrom,inheritId);
     }
   }
 }
@@ -356,7 +356,7 @@ void MemberGroup::findSectionsInDocumentation(const Definition *d)
   memberList->findSectionsInDocumentation(d);
 }
 
-void MemberGroup::setRefItems(const std::vector<ListItemInfo> &sli)
+void MemberGroup::setRefItems(const std::vector<RefItem*> &sli)
 {
   m_xrefListItems.insert(m_xrefListItems.end(), sli.cbegin(), sli.cend());
 }
@@ -368,7 +368,7 @@ void MemberGroup::writeTagFile(FTextStream &tagFile)
 
 //--------------------------------------------------------------------------
 
-void MemberGroupInfo::setRefItems(const std::vector<ListItemInfo> &sli)
+void MemberGroupInfo::setRefItems(const std::vector<RefItem*> &sli)
 {
   m_sli.insert(m_sli.end(), sli.cbegin(), sli.cend());
 }

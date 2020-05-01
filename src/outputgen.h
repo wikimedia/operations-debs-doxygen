@@ -150,7 +150,7 @@ class BaseOutputDocInterface : public CodeOutputInterface
                         Examples 
                       };
 
-    virtual void parseText(const QCString &s) {}
+    virtual void parseText(const QCString &) {}
     
     /*! Start of a bullet list: e.g. \c \<ul\> in html. startItemListItem() is
      *  Used for the bullet items.
@@ -290,8 +290,8 @@ class BaseOutputDocInterface : public CodeOutputInterface
     virtual void endTitle()   = 0;
 
     virtual void writeAnchor(const char *fileName,const char *name) = 0;
-    virtual void startSection(const char *,const char *,SectionInfo::SectionType) = 0;
-    virtual void endSection(const char *,SectionInfo::SectionType) = 0;
+    virtual void startSection(const char *,const char *,SectionType) = 0;
+    virtual void endSection(const char *,SectionType) = 0;
 
     virtual void lineBreak(const char *style) = 0;
     virtual void addIndexItem(const char *s1,const char *s2) = 0;
@@ -447,8 +447,8 @@ class OutputGenerator : public BaseOutputDocInterface
     virtual void writeSummaryLink(const char *file,const char *anchor,const char *title,bool first) = 0;
     virtual void startContents() = 0;
     virtual void endContents() = 0;
-    virtual void startPageDoc(const char *pageTitle) {};
-    virtual void endPageDoc() {};
+    virtual void startPageDoc(const char *) {}
+    virtual void endPageDoc() {}
     virtual void startTextBlock(bool) = 0;
     virtual void endTextBlock(bool) = 0;
     virtual void lastIndexPage() = 0;

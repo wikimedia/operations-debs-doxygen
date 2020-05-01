@@ -35,7 +35,7 @@ class ClassDef;
 class FileDef;
 class MemberList;
 class NamespaceDef;
-class FileNameDict;
+class FileNameLinkedMap;
 class ArgumentList;
 class OutputList;
 class OutputDocInterface;
@@ -49,9 +49,8 @@ class ClassList;
 class MemberGroupSDict;
 struct TagInfo;
 class MemberNameInfoSDict;
-struct ListItemInfo;
 class PageDef;
-struct SectionInfo;
+class SectionInfo;
 class QDir;
 class Definition;
 class BufStr;
@@ -119,7 +118,6 @@ class LetterToIndexMap : public SIntDict<T>
 
 QCString langToString(SrcLangExt lang);
 QCString getLanguageSpecificSeparator(SrcLangExt lang,bool classScope=FALSE);
-QCString replaceScopeSeparator(QCString str);
 
 //--------------------------------------------------------------------
 
@@ -218,10 +216,10 @@ const ClassDef *getResolvedClass(const Definition *scope,
 
 NamespaceDef *getResolvedNamespace(const char *key);
 
-FileDef *findFileDef(const FileNameDict *fnDict,const char *n,
+FileDef *findFileDef(const FileNameLinkedMap *fnMap,const char *n,
                 bool &ambig);
 
-QCString showFileDefMatches(const FileNameDict *fnDict,const char *n);
+QCString showFileDefMatches(const FileNameLinkedMap *fnMap,const char *n);
 
 int guessSection(const char *name);
 
@@ -327,15 +325,19 @@ int getScopeFragment(const QCString &s,int p,int *l);
 
 int filterCRLF(char *buf,int len);
 
-void addRefItem(const std::vector<ListItemInfo> &sli,const char *prefix,
+void addRefItem(const std::vector<RefItem*> &sli,
                 const char *key,
-                const char *name,const char *title,const char *args,Definition *scope);
+                const char *prefix,
+                const char *name,
+                const char *title,
+                const char *args,
+                const Definition *scope);
 
 PageDef *addRelatedPage(const char *name,
                         const QCString &ptitle,
                         const QCString &doc,
                         const char *fileName,int startLine,
-                        const std::vector<ListItemInfo> &sli = std::vector<ListItemInfo>(),
+                        const std::vector<RefItem*> &sli = std::vector<RefItem*>(),
                         GroupDef *gd=0,
                         const TagInfo *tagInfo=0,
                         bool xref=FALSE,
@@ -437,9 +439,9 @@ QCString filterTitle(const QCString &title);
 
 bool patternMatch(const QFileInfo &fi,const QStrList *patList);
 
-QCString externalLinkTarget();
+QCString externalLinkTarget(const bool parent = false);
 QCString externalRef(const QCString &relPath,const QCString &ref,bool href);
-int nextUtf8CharPosition(const QCString &utf8Str,int len,int startPos);
+int nextUtf8CharPosition(const QCString &utf8Str,uint len,uint startPos);
 const char *writeUtf8Char(FTextStream &t,const char *s);
 
 
@@ -498,4 +500,5 @@ int usedTableLevels();
 void incUsedTableLevels();
 void decUsedTableLevels();
 
+QCString getFullVersion();
 #endif

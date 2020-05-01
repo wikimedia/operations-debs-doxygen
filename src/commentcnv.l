@@ -18,6 +18,9 @@
 %option prefix="commentcnvYY"
 %option reentrant
 %option extra-type="struct commentcnvYY_state *"
+%top{
+#include <stdint.h>
+}
 
 %{
 
@@ -45,6 +48,8 @@
 
 #define ADDCHAR(c)    yyextra->outBuf->addChar(c)
 #define ADDARRAY(a,s) yyextra->outBuf->addArray(a,s)
+
+#define USE_STATE2STRING 0
   
 struct CondCtx
 {
@@ -99,7 +104,9 @@ struct commentcnvYY_state
   bool       isFixedForm = FALSE; // For Fortran
 };
 
+#if USE_STATE2STRING
 static const char *stateToString(int state);
+#endif
 static inline int computeIndent(const char *s);
 
 static void replaceCommentMarker(yyscan_t yyscanner,const char *s,int len);
@@ -108,7 +115,7 @@ static void startCondSection(yyscan_t yyscanner,const char *sectId);
 static void endCondSection(yyscan_t yyscanner);
 static void handleCondSectionId(yyscan_t yyscanner,const char *expression);
 static void replaceAliases(yyscan_t yyscanner,const char *s);
-static int yyread(yyscan_t yyscanner,char *buf,int max_size);
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size);
 static void replaceComment(yyscan_t yyscanner,int offset);
 
 
@@ -284,7 +291,7 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
                                      copyToOutput(yyscanner,yytext,(int)yyleng);
                                    }
 <Scan>"/*"[*!]?			   { /* start of a C comment */
-                                     if ((yyextra->lang==SrcLangExt_Python) || (yyextra->lang==SrcLangExt_Tcl))
+                                     if (yyextra->lang==SrcLangExt_Python)
 				     {
 				       REJECT;
                                      }
@@ -349,6 +356,17 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
 				     yyextra->blockName=&yytext[1];
                                      BEGIN(VerbatimCode);
   				   }
+<CComment,ReadLine>^[ \t]*("```"[`]*|"~~~"[~]*) { /* start of markdown code block */
+                                     if (!Config_getBool(MARKDOWN_SUPPORT))
+                                     {
+                                       REJECT;
+                                     }
+                                     copyToOutput(yyscanner,yytext,(int)yyleng);
+                                     yyextra->lastCommentContext = YY_START;
+                                     yyextra->javaBlock=0;
+                                     yyextra->blockName=QCString(yytext).stripWhiteSpace().left(3);
+                                     BEGIN(VerbatimCode);
+                                   }
 <CComment,ReadLine>[\\@]("dot"|"code"|"msc"|"startuml")/[^a-z_A-Z0-9] { /* start of a verbatim block */
                                      copyToOutput(yyscanner,yytext,(int)yyleng); 
 				     yyextra->lastCommentContext = YY_START;
@@ -427,6 +445,13 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
 				       }
 				     }
   				   }
+<VerbatimCode>("```"[`]*|"~~~"[~]*) { /* end of markdown code block */
+                                     copyToOutput(yyscanner,yytext,(int)yyleng);
+                                     if (yytext[0]==yyextra->blockName[0])
+                                     {
+                                       BEGIN(yyextra->lastCommentContext);
+                                     }
+                                   }
 <VerbatimCode>[\\@]("enddot"|"endcode"|"endmsc"|"enduml") { /* end of verbatim block */
                                      copyToOutput(yyscanner,yytext,(int)yyleng);
 				     if (&yytext[4]==yyextra->blockName)
@@ -457,7 +482,7 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
                                        }
                                      }
   				   }
-<Verbatim,VerbatimCode>[^@\/\\\n{}]* { /* any character not a backslash or new line or } */
+<Verbatim,VerbatimCode>[^`~@\/\\\n{}]* { /* any character not a backslash or new line or } */
                                      copyToOutput(yyscanner,yytext,(int)yyleng); 
                                    }
 <Verbatim,VerbatimCode>\n	   { /* new line in verbatim block */
@@ -526,7 +551,7 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
                                      copyToOutput(yyscanner,yytext,(int)yyleng); 
                                    }
 
-<CComment>[^ <\\!@*\n{\"\/]*       { /* anything that is not a '*' or command */ 
+<CComment>[^ `~<\\!@*\n{\"\/]*     { /* anything that is not a '*' or command */ 
                                      copyToOutput(yyscanner,yytext,(int)yyleng); 
                                    }
 <CComment>"*"+[^*/\\@\n{\"]*       { /* stars without slashes */
@@ -546,7 +571,7 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
 				     }
   				   }
 <CComment>\n                       { /* new line in comment */
-                                     copyToOutput(yyscanner,yytext,(int)yyleng); 
+                                     copyToOutput(yyscanner,yytext,(int)yyleng);
                                      /* in case of Fortran always end of comment */
   				     if (yyextra->lang==SrcLangExt_Fortran)
 				     {
@@ -554,16 +579,18 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
 				     }
                                    }
 <CComment>"/"+"*"                  { /* nested C comment */
-                                     if ((yyextra->lang==SrcLangExt_Python) || (yyextra->lang==SrcLangExt_Tcl))
+                                     if (yyextra->lang==SrcLangExt_Python ||
+                                         yyextra->lang==SrcLangExt_Markdown)
 				     {
 				       REJECT;
                                      }
                                      yyextra->nestingCount++;
                                      yyextra->commentStack.push(new CommentCtx(yyextra->lineNr));
-                                     copyToOutput(yyscanner,yytext,(int)yyleng); 
+                                     copyToOutput(yyscanner,yytext,(int)yyleng);
                                    }
 <CComment>"*"+"/"                  { /* end of C comment */
-                                     if ((yyextra->lang==SrcLangExt_Python) || (yyextra->lang==SrcLangExt_Tcl))
+                                     if (yyextra->lang==SrcLangExt_Python ||
+                                         yyextra->lang==SrcLangExt_Markdown)
 				     {
 				       REJECT;
 				     }
@@ -1011,11 +1038,11 @@ static void replaceAliases(yyscan_t yyscanner,const char *s)
 }
 
 
-static int yyread(yyscan_t yyscanner,char *buf,int max_size)
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  int bytesInBuf = yyextra->inBuf->curPos()-yyextra->inBufPos;
-  int bytesToCopy = QMIN(max_size,bytesInBuf);
+  yy_size_t bytesInBuf = yyextra->inBuf->curPos()-yyextra->inBufPos;
+  yy_size_t bytesToCopy = QMIN(max_size,bytesInBuf);
   memcpy(buf,yyextra->inBuf->data()+yyextra->inBufPos,bytesToCopy);
   yyextra->inBufPos+=bytesToCopy;
   return bytesToCopy;
@@ -1039,7 +1066,7 @@ static void replaceComment(yyscan_t yyscanner,int offset)
     else
     {
       copyToOutput(yyscanner," */",3);
-      int i;for (i=(int)yyleng-1;i>=0;i--) unput(yytext[i]);
+      for (i=(int)yyleng-1;i>=0;i--) unput(yytext[i]);
       yyextra->inSpecialComment=FALSE;
       BEGIN(Scan);
     }
@@ -1175,4 +1202,6 @@ void convertCppComments(BufStr *inBuf,BufStr *outBuf,const char *fileName)
 
 //----------------------------------------------------------------------------
 
+#if USE_STATE2STRING
 #include "commentcnv.l.h"
+#endif

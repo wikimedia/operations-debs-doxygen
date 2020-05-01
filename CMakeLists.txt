@@ -11,7 +11,7 @@
 # Documents produced by Doxygen are derivative works derived from the
 # input used in their production; they are not affected by this license.
 
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.3)
 project(doxygen)
 
 option(build_wizard    "Build the GUI frontend for doxygen." OFF)
@@ -62,7 +62,8 @@ if (CMAKE_SYSTEM MATCHES "Darwin")
 endif()
 
 if (WIN32)
-    if (NOT CMAKE_GENERATOR MATCHES "MinGW Makefiles")
+    if ((NOT CMAKE_GENERATOR MATCHES "MinGW Makefiles") AND 
+        (NOT CMAKE_GENERATOR MATCHES "MSYS Makefiles"))
         if (NOT ICONV_DIR)
           set(ICONV_DIR "${CMAKE_SOURCE_DIR}/winbuild")
         endif()
@@ -157,6 +158,7 @@ if (win_static)
     endforeach()
 endif()
 
+include(cmake/CompilerWarnings.cmake)
 
 add_subdirectory(libmd5)
 add_subdirectory(liblodepng)

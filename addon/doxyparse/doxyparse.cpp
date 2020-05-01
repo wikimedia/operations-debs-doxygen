@@ -44,6 +44,7 @@
 #include <qcstring.h>
 #include <qregexp.h>
 #include "namespacedef.h"
+#include "portable.h"
 
 class Doxyparse : public CodeOutputInterface
 {
@@ -154,6 +155,9 @@ static void printDefinition(std::string type, std::string signature, int line) {
 static void printProtection(std::string protection) {
   printf("          protection: %s\n", protection.c_str());
 }
+static void printPrototypeYes() {
+  printf("          prototype: yes\n");
+}
 static void printNumberOfLines(int lines) {
   printf("          lines_of_code: %d\n", lines);
 }
@@ -232,6 +236,21 @@ static void referenceTo(MemberDef* md) {
   printReferenceTo(type, signature, defined_in);
 }
 
+void protectionInformation(Protection protection) {
+  if (protection == Public) {
+    printProtection("public");
+  }
+  else if (protection == Protected) {
+    printProtection("protected");
+  }
+  else if (protection == Private) {
+    printProtection("private");
+  }
+  else if (protection == Package) {
+    printProtection("package");
+  }
+}
+
 void cModule(ClassDef* cd) {
   MemberList* ml = cd->getMemberList(MemberListType_variableMembers);
   if (ml) {
@@ -245,9 +264,7 @@ void cModule(ClassDef* cd) {
     MemberDef* md;
     for (mli.toFirst(); (md=mli.current()); ++mli) {
       printDefinition("variable", cd->name().data() + std::string("::") + md->name().data(), md->getDefLine());
-      if (md->protection() == Public) {
-        printProtection("public");
-      }
+      protectionInformation(md->protection());
     }
   }
 }
@@ -274,7 +291,7 @@ void functionInformation(MemberDef* md) {
   if (!argList.empty())
   {
     temp = argumentData(argList.front());
-// TODO: This is a workaround; better not include "void" in argList, in the first place. 
+// TODO: This is a workaround; better not include "void" in argList, in the first place.
     if (temp!="void")
     {
       printNumberOfArguments(argList.size());
@@ -295,16 +312,23 @@ void functionInformation(MemberDef* md) {
   }
 }
 
+void prototypeInformation(MemberDef* md) {
+  printPrototypeYes();
+  const ArgumentList &argList = md->argumentList();
+  printNumberOfArguments(argList.size());
+}
+
 static void lookupSymbol(Definition *d) {
   if (d->definitionType() == Definition::TypeMember) {
     MemberDef *md = dynamic_cast<MemberDef*>(d);
     std::string type = md->memberTypeName().data();
     std::string signature = functionSignature(md);
     printDefinition(type, signature, md->getDefLine());
-    if (md->protection() == Public) {
-      printProtection("public");
+    protectionInformation(md->protection());
+    if (md->isFunction() && md->isPrototype()) {
+      prototypeInformation(md);
     }
-    if (md->isFunction()) {
+    else if (md->isFunction()) {
       functionInformation(md);
     }
   }
@@ -361,9 +385,8 @@ static bool checkLanguage(std::string& filename, std::string extension) {
 
 /* Detects the programming language of the project. Actually, we only care
  * about whether it is a C project or not. */
-static void detectProgrammingLanguage(FileNameListIterator& fnli) {
-  FileName* fn;
-  for (fnli.toFirst(); (fn=fnli.current()); ++fnli) {
+static void detectProgrammingLanguage(FileNameLinkedMap &fnli) {
+  for (const auto &fn : fnli) {
     std::string filename = fn->fileName();
     if (
         checkLanguage(filename, ".cc") ||
@@ -380,17 +403,11 @@ static void detectProgrammingLanguage(FileNameListIterator& fnli) {
 }
 
 static void listSymbols() {
+  detectProgrammingLanguage(*Doxygen::inputNameLinkedMap);
+
   // iterate over the input files
-  FileNameListIterator fnli(*Doxygen::inputNameList);
-  FileName *fn;
-
-  detectProgrammingLanguage(fnli);
-
-  // for each file
-  for (fnli.toFirst(); (fn=fnli.current()); ++fnli) {
-    FileNameIterator fni(*fn);
-    FileDef *fd;
-    for (; (fd=fni.current()); ++fni) {
+  for (const auto &fn : *Doxygen::inputNameLinkedMap) {
+    for (const auto &fd : *fn) {
       printFile(fd->absFilePath().data());
       MemberList *ml = fd->getMemberList(MemberListType_allMembersList);
       if (ml && ml->count() > 0) {
@@ -421,7 +438,7 @@ int main(int argc,char **argv) {
     exit(1);
   }
   if (qstrcmp(&argv[1][2], "version") == 0) {
-    QCString versionString = getVersion();
+    QCString versionString = getDoxygenVersion();
     printf("%s\n", versionString.data());
     exit(0);
   }
@@ -437,12 +454,14 @@ int main(int argc,char **argv) {
 
   // we need a place to put intermediate files
   std::ostringstream tmpdir;
-#if !defined(_WIN32) || defined(__CYGWIN__)
-  unsigned int pid = (uint)getpid();
-#else
-  unsigned int pid = (uint)GetCurrentProcessId();
-#endif
-  tmpdir << "/tmp/doxyparse-" << pid;
+  unsigned int pid = Portable::pid();
+  if (Portable::getenv("TMP"))
+    tmpdir << Portable::getenv("TMP") << "/doxyparse-" << pid;
+  else if (Portable::getenv("TEMP"))
+    tmpdir << Portable::getenv("TEMP") << "/doxyparse-" << pid;
+  else
+    tmpdir << "doxyparse-" << pid;
+
   Config_getString(OUTPUT_DIRECTORY)= tmpdir.str().c_str();
   // enable HTML (fake) output to omit warning about missing output format
   Config_getBool(GENERATE_HTML)=TRUE;
@@ -503,16 +522,10 @@ int main(int argc,char **argv) {
   parseInput();
 
   // iterate over the input files
-  FileNameListIterator fnli(*Doxygen::inputNameList);
-  FileName *fn;
-  // for each file with a certain name
-  for (fnli.toFirst();(fn=fnli.current());++fnli) {
-    FileNameIterator fni(*fn);
-    FileDef *fd;
-    // for each file definition
-    for (;(fd=fni.current());++fni) {
+  for (const auto &fn : *Doxygen::inputNameLinkedMap) {
+    for (const auto &fd : *fn) {
       // get the references (linked and unlinked) found in this file
-      findXRefSymbols(fd);
+      findXRefSymbols(fd.get());
     }
   }
 

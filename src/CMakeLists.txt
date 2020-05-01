@@ -107,7 +107,6 @@ set(LEX_FILES scanner
     fortranscanner
     fortrancode
     vhdlcode
-    tclscanner
     pre
     declinfo
     defargs
@@ -148,13 +147,6 @@ add_library(doxycfg STATIC
 )
 
 add_library(_doxygen STATIC
-    # custom generated files
-    ${GENERATED_SRC}/lang_cfg.h
-    ${GENERATED_SRC}/settings.h
-    ${GENERATED_SRC}/layout_default.xml.h
-    ${GENERATED_SRC}/ce_parse.h
-    ${GENERATED_SRC}/configvalues.h
-    ${GENERATED_SRC}/resources.cpp
     # generated for/by flex/bison
     #${LEX_FILES_H} #unfortunately doesn't work in older versions of CMake (like 3.6.2)
     #${LEX_FILES_CPP} #unfortunately doesn't work in older versions of CMake (like 3.6.2)
@@ -173,7 +165,6 @@ add_library(_doxygen STATIC
     ${GENERATED_SRC}/pyscanner.l.h
     ${GENERATED_SRC}/scanner.l.h
     ${GENERATED_SRC}/sqlcode.l.h
-    ${GENERATED_SRC}/tclscanner.l.h
     ${GENERATED_SRC}/vhdlcode.l.h
     ${GENERATED_SRC}/xmlcode.l.h
     ${GENERATED_SRC}/code.cpp
@@ -191,11 +182,17 @@ add_library(_doxygen STATIC
     ${GENERATED_SRC}/pyscanner.cpp
     ${GENERATED_SRC}/scanner.cpp
     ${GENERATED_SRC}/sqlcode.cpp
-    ${GENERATED_SRC}/tclscanner.cpp
     ${GENERATED_SRC}/vhdlcode.cpp
     ${GENERATED_SRC}/xmlcode.cpp
     #
     ${GENERATED_SRC}/ce_parse.cpp
+    # custom generated files
+    ${GENERATED_SRC}/lang_cfg.h
+    ${GENERATED_SRC}/settings.h
+    ${GENERATED_SRC}/layout_default.xml.h
+    ${GENERATED_SRC}/ce_parse.h
+    ${GENERATED_SRC}/configvalues.h
+    ${GENERATED_SRC}/resources.cpp
     #
     arguments.cpp
     cite.cpp
@@ -235,7 +232,6 @@ add_library(_doxygen STATIC
     emoji.cpp
     entry.cpp
     filedef.cpp
-    filename.cpp
     fileparser.cpp
     formula.cpp
     ftextstream.cpp
@@ -262,7 +258,6 @@ add_library(_doxygen STATIC
     message.cpp
     msc.cpp
     namespacedef.cpp
-    objcache.cpp
     outputgen.cpp
     outputlist.cpp
     pagedef.cpp
@@ -294,6 +289,7 @@ add_library(_doxygen STATIC
 ##endforeach()
 
 add_executable(doxygen main.cpp)
+
 
 if (use_libclang)
     find_package(LLVM REQUIRED CONFIG)
@@ -329,6 +325,12 @@ target_link_libraries(doxygen
     ${CMAKE_THREAD_LIBS_INIT}
     ${EXTRA_LIBS}
     ${CLANG_LIBS}
+    ${DOXYGEN_EXTRA_LINK_OPTIONS}
 )
 
+set_project_warnings(doxycfg)
+set_project_warnings(_doxygen)
+set_project_warnings(doxygen)
+
 install(TARGETS doxygen DESTINATION bin)
+

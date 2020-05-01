@@ -503,6 +503,10 @@ void LatexDocVisitor::visit(DocInclude *inc)
     case DocInclude::DontInclude:
     case DocInclude::DontIncWithLines:
     case DocInclude::HtmlInclude:
+    case DocInclude::RtfInclude:
+    case DocInclude::ManInclude:
+    case DocInclude::XmlInclude:
+    case DocInclude::DocbookInclude:
       break;
     case DocInclude::LatexInclude:
       m_t << inc->text();
@@ -653,7 +657,8 @@ void LatexDocVisitor::visit(DocCite *cite)
   {
     //startLink(cite->ref(),cite->file(),cite->anchor());
     QCString anchor = cite->anchor();
-    anchor = anchor.mid(CiteConsts::anchorPrefix.length()); // strip prefix
+    QCString anchorPrefix = CitationManager::instance().anchorPrefix();
+    anchor = anchor.mid(anchorPrefix.length()); // strip prefix
     m_t << "\\cite{" << anchor << "}";
   }
   else

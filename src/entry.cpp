@@ -95,6 +95,7 @@ Entry::Entry(const Entry &e)
   exception   = e.exception;
   typeConstr  = e.typeConstr;
   bodyLine    = e.bodyLine;
+  bodyColumn  = e.bodyColumn;
   endBodyLine = e.endBodyLine;
   mGrpId      = e.mGrpId;
   anchors     = e.anchors;
@@ -169,21 +170,6 @@ void Entry::copyToSubEntry(const std::shared_ptr<Entry> &current)
   m_sublist.push_back(copy);
 }
 
-void Entry::moveFromSubEntry(const Entry *child,std::shared_ptr<Entry> &moveTo)
-{
-  auto it = std::find_if(m_sublist.begin(),m_sublist.end(),
-      [child](const std::shared_ptr<Entry>&elem) { return elem.get()==child; });
-  if (it!=m_sublist.end())
-  {
-    moveTo = *it;
-    m_sublist.erase(it);
-  }
-  else
-  {
-    moveTo.reset();
-  }
-}
-
 void Entry::removeSubEntry(const Entry *e)
 {
   auto it = std::find_if(m_sublist.begin(),m_sublist.end(),
@@ -228,6 +214,7 @@ void Entry::reset()
   startLine = 1;
   startColumn = 1;
   bodyLine = -1;
+  bodyColumn = 1;
   endBodyLine = -1;
   mGrpId = -1;
   callGraph   = entryCallGraph;
@@ -269,14 +256,5 @@ void Entry::setFileDef(FileDef *fd)
       childNode->setFileDef(fd);
   }
 }
-
-void Entry::addSpecialListItem(const char *listName,int itemId)
-{
-  ListItemInfo ili;
-  ili.type = listName;
-  ili.itemId = itemId;
-  sli.push_back(ili);
-}
-
 
 //------------------------------------------------------------------
