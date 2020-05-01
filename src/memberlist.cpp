@@ -75,8 +75,15 @@ int MemberList::compareValues(const MemberDef *c1, const MemberDef *c2) const
       return 1;
   }
   int cmp = qstricmp(c1->name(),c2->name());
-  if (cmp==0) cmp = qstricmp(c1->argsString(),c2->argsString());
-  return cmp!=0 ? cmp : c1->getDefLine()-c2->getDefLine();
+  if (cmp==0 && c1->argsString() && c2->argsString())
+  {
+    cmp = qstricmp(c1->argsString(),c2->argsString());
+  }
+  if (cmp==0)
+  {
+    cmp = c1->getDefLine()-c2->getDefLine();
+  }
+  return cmp;
 }
 
 int MemberList::countInheritableMembers(const ClassDef *inheritedFrom) const
@@ -412,7 +419,6 @@ void MemberList::writePlainDeclarations(OutputList &ol,
                       ) const
 {
   //printf("----- writePlainDeclaration() ----\n");
-  static bool hideUndocMembers = Config_getBool(HIDE_UNDOC_MEMBERS);
   if (numDecMembers()==-1)
   {
     err("MemberList::numDecMembers()==-1, so the members of this list have not been counted. Please report as a bug.\n");
@@ -551,8 +557,7 @@ void MemberList::writePlainDeclarations(OutputList &ol,
   // no variables of the anonymous compound type exist.
   if (cd)
   {
-    MemberListIterator mli(*this);
-    for  ( ; (md=mli.current()) ; ++mli )
+    for  ( mli.toFirst(); (md=mli.current()) ; ++mli )
     {
       if (md->fromAnonymousScope() && !md->anonymousDeclShown())
       {

@@ -44,6 +44,7 @@
 #include "dirdef.h"
 #include "pagedef.h"
 #include "bufstr.h"
+#include "reflist.h"
 
 //-----------------------------------------------------------------------------------------
 
@@ -55,11 +56,11 @@ class DefinitionImpl::IMPL
     void init(const char *df, const char *n);
     void setDefFileName(const QCString &df);
 
-    SectionDict *sectionDict = 0;  // dictionary of all sections, not accessible
+    SectionRefs sectionRefs;
 
     MemberSDict *sourceRefByDict = 0;
     MemberSDict *sourceRefsDict = 0;
-    std::vector<ListItemInfo> xrefListItems;
+    std::vector<RefItem*> xrefListItems;
     GroupList *partOfGroups = 0;
 
     DocInfo   *details = 0;    // not exported
@@ -99,7 +100,6 @@ class DefinitionImpl::IMPL
 
 DefinitionImpl::IMPL::~IMPL()
 {
-  delete sectionDict;
   delete sourceRefByDict;
   delete sourceRefsDict;
   delete partOfGroups;
@@ -122,8 +122,8 @@ void DefinitionImpl::IMPL::setDefFileName(const QCString &df)
 void DefinitionImpl::IMPL::init(const char *df, const char *n)
 {
   setDefFileName(df);
-  QCString name = n;
-  if (name!="<globalScope>") 
+  QCString lname = n;
+  if (lname!="<globalScope>")
   {
     //extractNamespaceName(m_name,m_localName,ns);
     localName=stripScope(n);
@@ -140,7 +140,6 @@ void DefinitionImpl::IMPL::init(const char *df, const char *n)
   inbodyDocs      = 0;
   sourceRefByDict = 0;
   sourceRefsDict  = 0;
-  sectionDict     = 0, 
   outerScope      = Doxygen::globalScope;
   partOfGroups    = 0;
   hidden          = FALSE;
@@ -176,15 +175,16 @@ static bool matchExcludedSymbols(const char *name)
     if (pattern.find('*')!=-1) // wildcard mode
     {
       QRegExp re(substitute(pattern,"*",".*"),TRUE);
-      int i,pl;
-      i = re.match(symName,0,&pl);
+      int pl;
+      int i = re.match(symName,0,&pl);
       //printf("  %d = re.match(%s) pattern=%s\n",i,symName.data(),pattern.data());
       if (i!=-1) // wildcard match
       {
-        int sl=symName.length();
+        uint ui=(uint)i;
+        uint sl=symName.length();
         // check if it is a whole word match
-        if ((i==0     || pattern.at(0)=='*'    || (!isId(symName.at(i-1))  && !forceStart)) &&
-            (i+pl==sl || pattern.at(i+pl)=='*' || (!isId(symName.at(i+pl)) && !forceEnd))
+        if ((ui==0     || pattern.at(0)=='*'     || (!isId(symName.at(ui-1))  && !forceStart)) &&
+            (ui+pl==sl || pattern.at(ui+pl)=='*' || (!isId(symName.at(ui+pl)) && !forceEnd))
            )
         {
           //printf("--> name=%s pattern=%s match at %d\n",symName.data(),pattern.data(),i);
@@ -197,11 +197,12 @@ static bool matchExcludedSymbols(const char *name)
       int i = symName.find(pattern);
       if (i!=-1) // we have a match!
       {
-        int pl=pattern.length();
-        int sl=symName.length();
+        uint ui=(uint)i;
+        uint pl=pattern.length();
+        uint sl=symName.length();
         // check if it is a whole word match
-        if ((i==0     || (!isId(symName.at(i-1))  && !forceStart)) &&
-            (i+pl==sl || (!isId(symName.at(i+pl)) && !forceEnd))
+        if ((ui==0     || (!isId(symName.at(ui-1))  && !forceStart)) &&
+            (ui+pl==sl || (!isId(symName.at(ui+pl)) && !forceEnd))
            )
         {
           //printf("--> name=%s pattern=%s match at %d\n",symName.data(),pattern.data(),i);
@@ -315,7 +316,6 @@ DefinitionImpl::DefinitionImpl(const DefinitionImpl &d)
 {
   m_impl = new DefinitionImpl::IMPL;
   *m_impl = *d.m_impl;
-  m_impl->sectionDict = 0;
   m_impl->sourceRefByDict = 0;
   m_impl->sourceRefsDict = 0;
   m_impl->partOfGroups = 0;
@@ -323,16 +323,6 @@ DefinitionImpl::DefinitionImpl(const DefinitionImpl &d)
   m_impl->details = 0;
   m_impl->body = 0;
   m_impl->inbodyDocs = 0;
-  if (d.m_impl->sectionDict)
-  {
-    m_impl->sectionDict = new SectionDict(17);
-    SDict<SectionInfo>::Iterator it(*d.m_impl->sectionDict);
-    SectionInfo *si;
-    for (it.toFirst();(si=it.current());++it)
-    {
-      m_impl->sectionDict->append(si->label,si);
-    }
-  }
   if (d.m_impl->sourceRefByDict)
   {
     m_impl->sourceRefByDict = new MemberSDict;
@@ -426,22 +416,18 @@ void DefinitionImpl::addSectionsToDefinition(const std::vector<const SectionInfo
   for (const SectionInfo *si : anchorList)
   {
     //printf("Add section '%s' to definition '%s'\n",
-    //    si->label.data(),name().data());
-    SectionInfo *gsi=Doxygen::sectionDict->find(si->label);
+    //    si->label().data(),name().data());
+    SectionManager &sm = SectionManager::instance();
+    SectionInfo *gsi=sm.find(si->label());
     //printf("===== label=%s gsi=%p\n",si->label.data(),gsi);
     if (gsi==0)
     {
-      gsi = new SectionInfo(*si);
-      Doxygen::sectionDict->append(si->label,gsi);
+      gsi = sm.add(*si);
     }
-    if (m_impl->sectionDict==0)
+    if (m_impl->sectionRefs.find(gsi->label())==0)
     {
-      m_impl->sectionDict = new SectionDict(17);
-    }
-    if (m_impl->sectionDict->find(gsi->label)==0)
-    {
-      m_impl->sectionDict->append(gsi->label,gsi);
-      gsi->definition = this;
+      m_impl->sectionRefs.add(gsi);
+      gsi->setDefinition(this);
     }
   }
 }
@@ -449,16 +435,11 @@ void DefinitionImpl::addSectionsToDefinition(const std::vector<const SectionInfo
 bool DefinitionImpl::hasSections() const
 {
   //printf("DefinitionImpl::hasSections(%s) #sections=%d\n",name().data(),
-  //    m_impl->sectionDict ? m_impl->sectionDict->count() : 0);
-  if (m_impl->sectionDict==0) return FALSE;
-  SDict<SectionInfo>::Iterator li(*m_impl->sectionDict);
-  SectionInfo *si;
-  for (li.toFirst();(si=li.current());++li)
+  //    m_impl->sectionRefs.size());
+  if (m_impl->sectionRefs.empty()) return FALSE;
+  for (const SectionInfo *si : m_impl->sectionRefs)
   {
-    if (si->type==SectionInfo::Section || 
-        si->type==SectionInfo::Subsection || 
-        si->type==SectionInfo::Subsubsection ||
-        si->type==SectionInfo::Paragraph)
+    if (isSection(si->type()))
     {
       return TRUE;
     }
@@ -468,20 +449,17 @@ bool DefinitionImpl::hasSections() const
 
 void DefinitionImpl::addSectionsToIndex()
 {
-  if (m_impl->sectionDict==0) return;
+  if (m_impl->sectionRefs.empty()) return;
   //printf("DefinitionImpl::addSectionsToIndex()\n");
-  SDict<SectionInfo>::Iterator li(*m_impl->sectionDict);
-  SectionInfo *si;
   int level=1;
-  for (li.toFirst();(si=li.current());++li)
+  for (auto it = m_impl->sectionRefs.begin(); it!=m_impl->sectionRefs.end(); ++it)
   {
-    if (si->type==SectionInfo::Section       || 
-        si->type==SectionInfo::Subsection    || 
-        si->type==SectionInfo::Subsubsection ||
-        si->type==SectionInfo::Paragraph)
+    const SectionInfo *si = *it;
+    SectionType type = si->type();
+    if (isSection(type))
     {
       //printf("  level=%d title=%s\n",level,si->title.data());
-      int nextLevel = (int)si->type;
+      int nextLevel = (int)type;
       int i;
       if (nextLevel>level)
       {
@@ -497,16 +475,16 @@ void DefinitionImpl::addSectionsToIndex()
           Doxygen::indexList->decContentsDepth();
         }
       }
-      QCString title = si->title;
-      if (title.isEmpty()) title = si->label;
+      QCString title = si->title();
+      if (title.isEmpty()) title = si->label();
       // determine if there is a next level inside this item
-      ++li;
-      bool isDir = ((li.current()) ? (int)(li.current()->type > nextLevel):FALSE);
-      --li;
+      auto it_next = std::next(it);
+      bool isDir = (it_next!=m_impl->sectionRefs.end()) ?
+                       ((int)((*it_next)->type()) > nextLevel) : FALSE;
       Doxygen::indexList->addContentsItem(isDir,title,
                                          getReference(),
                                          getOutputFileBase(),
-                                         si->label,
+                                         si->label(),
                                          FALSE,
                                          TRUE);
       level = nextLevel;
@@ -521,23 +499,21 @@ void DefinitionImpl::addSectionsToIndex()
 
 void DefinitionImpl::writeDocAnchorsToTagFile(FTextStream &tagFile) const
 {
-  if (m_impl->sectionDict)
+  if (!m_impl->sectionRefs.empty())
   {
-    //printf("%s: writeDocAnchorsToTagFile(%d)\n",name().data(),m_impl->sectionDict->count());
-    SDict<SectionInfo>::Iterator sdi(*m_impl->sectionDict);
-    SectionInfo *si;
-    for (;(si=sdi.current());++sdi)
+    //printf("%s: writeDocAnchorsToTagFile(%d)\n",name().data(),m_impl->sectionRef.size());
+    for (const SectionInfo *si : m_impl->sectionRefs)
     {
-      if (!si->generated && si->ref.isEmpty() && !si->label.startsWith("autotoc_md"))
+      if (!si->generated() && si->ref().isEmpty() && !si->label().startsWith("autotoc_md"))
       {
         //printf("write an entry!\n");
         if (definitionType()==TypeMember) tagFile << "  ";
-        tagFile << "    <docanchor file=\"" << addHtmlExtensionIfMissing(si->fileName) << "\"";
-        if (!si->title.isEmpty())
+        tagFile << "    <docanchor file=\"" << addHtmlExtensionIfMissing(si->fileName()) << "\"";
+        if (!si->title().isEmpty())
         {
-          tagFile << " title=\"" << convertToXML(si->title) << "\"";
+          tagFile << " title=\"" << convertToXML(si->title()) << "\"";
         }
-        tagFile << ">" << si->label << "</docanchor>" << endl;
+        tagFile << ">" << si->label() << "</docanchor>" << endl;
       }
     }
   }
@@ -623,10 +599,10 @@ void DefinitionImpl::setDocumentation(const char *d,const char *docFile,int docL
 // if that is a multibyte one.
 static bool lastCharIsMultibyte(const QCString &s)
 {
-  int l = s.length();
+  uint l = s.length();
   int p = 0;
   int pp = -1;
-  while ((p=nextUtf8CharPosition(s,l,p))<l) pp=p;
+  while ((p=nextUtf8CharPosition(s,l,(uint)p))<(int)l) pp=p;
   if (pp==-1 || ((uchar)s[pp])<0x80) return FALSE;
   return TRUE;
 }
@@ -640,7 +616,7 @@ void DefinitionImpl::_setBriefDescription(const char *b,const char *briefFile,in
   QCString brief = b;
   brief = brief.stripWhiteSpace();
   if (brief.isEmpty()) return;
-  int bl = brief.length();
+  uint bl = brief.length();
   if (bl>0 && needsDot) // add punctuation if needed
   {
     int c = brief.at(bl-1);
@@ -721,7 +697,7 @@ void DefinitionImpl::setInbodyDocumentation(const char *d,const char *inbodyFile
 struct FilterCacheItem
 {
   portable_off_t filePos;
-  uint fileSize;
+  size_t fileSize;
 };
 
 /*! Cache for storing the result of filtering a file */
@@ -748,7 +724,7 @@ class FilterCache
         if (f)
         {
           bool success=TRUE;
-          str.resize(item->fileSize+1);
+          str.resize(static_cast<uint>(item->fileSize+1));
           if (Portable::fseek(f,item->filePos,SEEK_SET)==-1)
           {
             err("Failed to seek to position %d in filter database file %s\n",(int)item->filePos,qPrint(Doxygen::filterDBFileName));
@@ -756,11 +732,11 @@ class FilterCache
           }
           if (success)
           {
-            int numBytes = fread(str.data(),1,item->fileSize,f);
+            size_t numBytes = fread(str.data(),1,item->fileSize,f);
             if (numBytes!=item->fileSize)
             {
               err("Failed to read %d bytes from position %d in filter database file %s: got %d bytes\n",
-                 (int)item->fileSize,(int)item->filePos,qPrint(Doxygen::filterDBFileName),numBytes);
+                 (int)item->fileSize,(int)item->filePos,qPrint(Doxygen::filterDBFileName),(int)numBytes);
               success=FALSE;
             }
           }
@@ -782,7 +758,7 @@ class FilterCache
         Debug::print(Debug::ExtCmd,0,"Executing popen(`%s`)\n",qPrint(cmd));
         f = Portable::popen(cmd,"r");
         FILE *bf = Portable::fopen(Doxygen::filterDBFileName,"a+b");
-        FilterCacheItem *item = new FilterCacheItem;
+        item = new FilterCacheItem;
         item->filePos = m_endPos;
         if (bf==0)
         {
@@ -794,16 +770,16 @@ class FilterCache
           return FALSE;
         }
         // append the filtered output to the database file
-        int size=0;
+        size_t size=0;
         while (!feof(f))
         {
-          int bytesRead = fread(buf,1,blockSize,f);
-          int bytesWritten = fwrite(buf,1,bytesRead,bf);
+          size_t bytesRead = fread(buf,1,blockSize,f);
+          size_t bytesWritten = fwrite(buf,1,bytesRead,bf);
           if (bytesRead!=bytesWritten)
           {
             // handle error
             err("Failed to write to filter database %s. Wrote %d out of %d bytes\n",
-                qPrint(Doxygen::filterDBFileName),bytesWritten,bytesRead);
+                qPrint(Doxygen::filterDBFileName),(int)bytesWritten,(int)bytesRead);
             str.addChar('\0');
             delete item;
             Portable::pclose(f);
@@ -811,7 +787,7 @@ class FilterCache
             return FALSE;
           }
           size+=bytesWritten;
-          str.addArray(buf,bytesWritten);
+          str.addArray(buf,static_cast<uint>(bytesWritten));
         }
         str.addChar('\0');
         item->fileSize = size;
@@ -831,8 +807,8 @@ class FilterCache
         f = Portable::fopen(fileName,"r");
         while (!feof(f))
         {
-          int bytesRead = fread(buf,1,blockSize,f);
-          str.addArray(buf,bytesRead);
+          size_t bytesRead = fread(buf,1,blockSize,f);
+          str.addArray(buf,static_cast<uint>(bytesRead));
         }
         str.addChar('\0');
         fclose(f);
@@ -874,14 +850,13 @@ bool readCodeFragment(const char *fileName,
   g_filterCache.getFileContents(fileName,str);
 
   bool found = lang==SrcLangExt_VHDL   ||
-               lang==SrcLangExt_Tcl    ||
                lang==SrcLangExt_Python ||
                lang==SrcLangExt_Fortran;
-               // for VHDL, TCL, Python, and Fortran no bracket search is possible
+               // for VHDL, Python, and Fortran no bracket search is possible
   char *p=str.data();
   if (p)
   {
-    int c=0;
+    char c=0;
     int col=0;
     int lineNr=1;
     // skip until the startLine has reached
@@ -984,7 +959,7 @@ bool readCodeFragment(const char *fileName,
         int braceIndex   = result.findRev('}');
         if (braceIndex > newLineIndex)
         {
-          result.truncate(braceIndex+1);
+          result.truncate((uint)braceIndex+1);
         }
         endLine=lineNr-1;
       }
@@ -1023,11 +998,11 @@ QCString DefinitionImpl::getSourceAnchor() const
   {
     if (Htags::useHtags)
     {
-      qsnprintf(anchorStr,maxAnchorStrLen,"L%d",m_impl->body->startLine);
+      qsnprintf(anchorStr,maxAnchorStrLen,"L%d",m_impl->body->defLine);
     }
     else
     {
-      qsnprintf(anchorStr,maxAnchorStrLen,"l%05d",m_impl->body->startLine);
+      qsnprintf(anchorStr,maxAnchorStrLen,"l%05d",m_impl->body->defLine);
     }
   }
   return anchorStr;
@@ -1050,7 +1025,7 @@ void DefinitionImpl::writeSourceDef(OutputList &ol,const char *) const
     if (lineMarkerPos!=-1 && fileMarkerPos!=-1) // should always pass this.
     {
       QCString lineStr;
-      lineStr.sprintf("%d",m_impl->body->startLine);
+      lineStr.sprintf("%d",m_impl->body->defLine);
       QCString anchorStr = getSourceAnchor();
       ol.startParagraph("definition");
       if (lineMarkerPos<fileMarkerPos) // line marker before file marker
@@ -1128,10 +1103,9 @@ void DefinitionImpl::writeSourceDef(OutputList &ol,const char *) const
         // write normal text (Man, Latex optionally, RTF optionally)
         ol.docify(m_impl->body->fileDef->name());
         ol.popGeneratorState();
-        
+
         // write text right from file marker
-        ol.parseText(refText.right(
-              refText.length()-fileMarkerPos-2)); 
+        ol.parseText(refText.right(refText.length()-(uint)fileMarkerPos-2));
       }
       else // file marker before line marker
       {
@@ -1211,8 +1185,7 @@ void DefinitionImpl::writeSourceDef(OutputList &ol,const char *) const
         ol.popGeneratorState();
 
         // write text right from linePos marker
-        ol.parseText(refText.right(
-              refText.length()-lineMarkerPos-2)); 
+        ol.parseText(refText.right(refText.length()-(uint)lineMarkerPos-2));
       }
       ol.endParagraph();
     }
@@ -1224,12 +1197,13 @@ void DefinitionImpl::writeSourceDef(OutputList &ol,const char *) const
   ol.popGeneratorState();
 }
 
-void DefinitionImpl::setBodySegment(int bls,int ble) 
+void DefinitionImpl::setBodySegment(int defLine, int bls,int ble)
 {
   //printf("setBodySegment(%d,%d) for %s\n",bls,ble,name().data());
   if (m_impl->body==0) m_impl->body = new BodyInfo;
-  m_impl->body->startLine=bls; 
-  m_impl->body->endLine=ble; 
+  m_impl->body->defLine   = defLine;
+  m_impl->body->startLine = bls;
+  m_impl->body->endLine   = ble;
 }
 
 void DefinitionImpl::setBodyDef(FileDef *fd)         
@@ -1308,15 +1282,17 @@ void DefinitionImpl::_writeSourceRefList(OutputList &ol,const char *scopeName,
     ol.parseText(text);
     ol.docify(" ");
 
-    QCString ldefLine=theTranslator->trWriteList(members->count());
+    QCString ldefLine=theTranslator->trWriteList((int)members->count());
 
     QRegExp marker("@[0-9]+");
-    int index=0,newIndex,matchLen;
+    uint index=0;
+    int matchLen;
+    int newIndex;
     // now replace all markers in inheritLine with links to the classes
     while ((newIndex=marker.match(ldefLine,index,&matchLen))!=-1)
     {
       bool ok;
-      ol.parseText(ldefLine.mid(index,newIndex-index));
+      ol.parseText(ldefLine.mid(index,(uint)newIndex-index));
       uint entryIndex = ldefLine.mid(newIndex+1,matchLen-1).toUInt(&ok);
       MemberDef *md=members->at(entryIndex);
       if (ok && md)
@@ -1434,7 +1410,7 @@ void DefinitionImpl::_writeSourceRefList(OutputList &ol,const char *scopeName,
           ol.docify(name);
         }
       }
-      index=newIndex+matchLen;
+      index=(uint)newIndex+matchLen;
     } 
     ol.parseText(ldefLine.right(ldefLine.length()-index));
     ol.writeString(".");
@@ -1604,7 +1580,7 @@ void DefinitionImpl::makePartOfGroup(GroupDef *gd)
   m_impl->partOfGroups->append(gd);
 }
 
-void DefinitionImpl::setRefItems(const std::vector<ListItemInfo> &sli)
+void DefinitionImpl::setRefItems(const std::vector<RefItem*> &sli)
 {
   m_impl->xrefListItems.insert(m_impl->xrefListItems.end(), sli.cbegin(), sli.cend());
 }
@@ -1620,31 +1596,34 @@ void DefinitionImpl::mergeRefItems(Definition *d)
 
   // sort results on itemId
   std::sort(m_impl->xrefListItems.begin(),m_impl->xrefListItems.end(),
-            [](const ListItemInfo &left,const ListItemInfo &right)
-            { return left.itemId<right.itemId ||
-                     (left.itemId==right.itemId && qstrcmp(left.type,right.type)<0);
+            [](RefItem *left,RefItem *right)
+            { return  left->id() <right->id() ||
+                     (left->id()==right->id() &&
+                      qstrcmp(left->list()->listName(),right->list()->listName())<0);
             });
 
   // filter out duplicates
   auto last = std::unique(m_impl->xrefListItems.begin(),m_impl->xrefListItems.end(),
-            [](const ListItemInfo &left,const ListItemInfo &right)
-            { return left.itemId==right.itemId && left.type==right.type; });
+            [](const RefItem *left,const RefItem *right)
+            { return left->id()==right->id() &&
+                     left->list()->listName()==right->list()->listName();
+            });
   m_impl->xrefListItems.erase(last, m_impl->xrefListItems.end());
 }
 
 int DefinitionImpl::_getXRefListId(const char *listName) const
 {
-  for (const ListItemInfo &lii : m_impl->xrefListItems)
+  for (const RefItem *item : m_impl->xrefListItems)
   {
-    if (lii.type==listName)
+    if (item->list()->listName()==listName)
     {
-      return lii.itemId;
+      return item->id();
     }
   }
   return -1;
 }
 
-const std::vector<ListItemInfo> &DefinitionImpl::xrefListItems() const
+const std::vector<RefItem*> &DefinitionImpl::xrefListItems() const
 {
   return m_impl->xrefListItems;
 }
@@ -1756,8 +1735,7 @@ void DefinitionImpl::writeNavigationPath(OutputList &ol) const
 // TODO: move to htmlgen
 void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
 {
-  SectionDict *sectionDict = m_impl->sectionDict;
-  if (sectionDict==0) return;
+  if (m_impl->sectionRefs.empty()) return;
   if (localToc.isHtmlEnabled())
   {
     int maxLevel = localToc.htmlLevel();
@@ -1768,21 +1746,17 @@ void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
     ol.writeString(theTranslator->trRTFTableOfContents());
     ol.writeString("</h3>\n");
     ol.writeString("<ul>");
-    SDict<SectionInfo>::Iterator li(*sectionDict);
-    SectionInfo *si;
     int level=1,l;
     char cs[2];
     cs[1]='\0';
-    bool inLi[5]={ FALSE, FALSE, FALSE, FALSE, FALSE };
-    for (li.toFirst();(si=li.current());++li)
+    std::vector<bool> inLi(maxLevel+1,false);
+    for (const SectionInfo *si : m_impl->sectionRefs)
     {
-      if (si->type==SectionInfo::Section       || 
-          si->type==SectionInfo::Subsection    || 
-          si->type==SectionInfo::Subsubsection ||
-          si->type==SectionInfo::Paragraph)
+      SectionType type = si->type();
+      if (isSection(type))
       {
         //printf("  level=%d title=%s\n",level,si->title.data());
-        int nextLevel = (int)si->type;
+        int nextLevel = (int)type;
         if (nextLevel>level)
         {
           for (l=level;l<nextLevel;l++)
@@ -1795,28 +1769,39 @@ void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
           for (l=level;l>nextLevel;l--)
           {
             if (l <= maxLevel && inLi[l]) ol.writeString("</li>\n");
-            inLi[l]=FALSE;
+            inLi[l]=false;
             if (l <= maxLevel) ol.writeString("</ul>\n");
           }
         }
-        cs[0]='0'+nextLevel;
-        if (nextLevel <= maxLevel && inLi[nextLevel]) ol.writeString("</li>\n");
-        QCString titleDoc = convertToHtml(si->title);
-        if (nextLevel <= maxLevel) ol.writeString("<li class=\"level"+QCString(cs)+"\"><a href=\"#"+si->label+"\">"+(si->title.isEmpty()?si->label:titleDoc)+"</a>");
-        inLi[nextLevel]=TRUE;
+        cs[0]=(char)('0'+nextLevel);
+        if (nextLevel <= maxLevel && inLi[nextLevel])
+        {
+          ol.writeString("</li>\n");
+        }
+        QCString titleDoc = convertToHtml(si->title());
+        if (nextLevel <= maxLevel)
+        {
+          ol.writeString("<li class=\"level"+QCString(cs)+"\">"
+                         "<a href=\"#"+si->label()+"\">"+
+                         (si->title().isEmpty()?si->label():titleDoc)+"</a>");
+        }
+        inLi[nextLevel]=true;
         level = nextLevel;
       }
     }
     if (level > maxLevel) level = maxLevel;
     while (level>1 && level <= maxLevel)
     {
-      if (inLi[level]) ol.writeString("</li>\n");
+      if (inLi[level])
+      {
+        ol.writeString("</li>\n");
+      }
       inLi[level]=FALSE;
       ol.writeString("</ul>\n");
       level--;
     }
     if (level <= maxLevel && inLi[level]) ol.writeString("</li>\n");
-    inLi[level]=FALSE;
+    inLi[level]=false;
     ol.writeString("</ul>\n");
     ol.writeString("</div>\n");
     ol.popGeneratorState();
@@ -1828,21 +1813,16 @@ void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
     ol.disableAllBut(OutputGenerator::Docbook);
     ol.writeString("    <toc>\n");
     ol.writeString("    <title>" + theTranslator->trRTFTableOfContents() + "</title>\n");
-    SectionDict *sectionDict = getSectionDict();
-    SDict<SectionInfo>::Iterator li(*sectionDict);
-    SectionInfo *si;
     int level=1,l;
-    bool inLi[5]={ FALSE, FALSE, FALSE, FALSE, FALSE };
     int maxLevel = localToc.docbookLevel();
-    for (li.toFirst();(si=li.current());++li)
+    std::vector<bool> inLi(maxLevel+1,false);
+    for (const SectionInfo *si : m_impl->sectionRefs)
     {
-      if (si->type==SectionInfo::Section       ||
-          si->type==SectionInfo::Subsection    ||
-          si->type==SectionInfo::Subsubsection ||
-          si->type==SectionInfo::Paragraph)
+      SectionType type = si->type();
+      if (isSection(type))
       {
         //printf("  level=%d title=%s\n",level,si->title.data());
-        int nextLevel = (int)si->type;
+        int nextLevel = (int)type;
         if (nextLevel>level)
         {
           for (l=level;l<nextLevel;l++)
@@ -1860,8 +1840,10 @@ void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
         }
         if (nextLevel <= maxLevel)
         {
-          QCString titleDoc = convertToDocBook(si->title);
-          ol.writeString("      <tocentry>" + (si->title.isEmpty()?si->label:titleDoc) + "</tocentry>\n");
+          QCString titleDoc = convertToDocBook(si->title());
+          ol.writeString("      <tocentry>" +
+              (si->title().isEmpty()?si->label():titleDoc) +
+              "</tocentry>\n");
         }
         inLi[nextLevel]=TRUE;
         level = nextLevel;
@@ -1894,9 +1876,9 @@ void DefinitionImpl::writeToc(OutputList &ol, const LocalToc &localToc) const
 
 //----------------------------------------------------------------------------------------
 
-SectionDict * DefinitionImpl::getSectionDict() const
+const SectionRefs &DefinitionImpl::getSectionRefs() const
 {
-  return m_impl->sectionDict;
+  return m_impl->sectionRefs;
 }
 
 QCString DefinitionImpl::symbolName() const 
@@ -1952,17 +1934,17 @@ QCString abbreviate(const char *s,const char *name)
   const char *p = briefDescAbbrev.first();
   while (p)
   {
-    QCString s = p;
-    s.replace(QRegExp("\\$name"), scopelessName);  // replace $name with entity name
-    s += " ";
-    stripWord(result,s);
+    QCString str = p;
+    str.replace(QRegExp("\\$name"), scopelessName);  // replace $name with entity name
+    str += " ";
+    stripWord(result,str);
     p = briefDescAbbrev.next();
   }
 
   // capitalize first word
   if (!result.isEmpty())
   {
-    int c=result[0];
+    char c=result[0];
     if (c>='a' && c<='z') c+='A'-'a';
     result[0]=c;
   }
@@ -2075,6 +2057,11 @@ bool DefinitionImpl::isReference() const
   return !m_impl->ref.isEmpty(); 
 }
 
+int DefinitionImpl::getStartDefLine() const
+{
+  return m_impl->body ? m_impl->body->defLine : -1;
+}
+
 int DefinitionImpl::getStartBodyLine() const         
 { 
   return m_impl->body ? m_impl->body->startLine : -1; 
@@ -2181,7 +2168,7 @@ QCString DefinitionImpl::externalReference(const QCString &relPath) const
     if (dest)
     {
       QCString result = *dest;
-      int l = result.length();
+      uint l = result.length();
       if (!relPath.isEmpty() && l>0 && result.at(0)=='.')
       { // relative path -> prepend relPath.
         result.prepend(relPath);

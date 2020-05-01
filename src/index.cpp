@@ -760,7 +760,7 @@ static void writeDirHierarchy(OutputList &ol, FTVHelp* ftv,bool addToIndex)
     ol.pushGeneratorState();
     ol.disable(OutputGenerator::Html);
   }
-  static bool fullPathNames = Config_getBool(FULL_PATH_NAMES);
+  bool fullPathNames = Config_getBool(FULL_PATH_NAMES);
   startIndexHierarchy(ol,0);
   if (fullPathNames)
   {
@@ -776,19 +776,14 @@ static void writeDirHierarchy(OutputList &ol, FTVHelp* ftv,bool addToIndex)
   }
   if (ftv)
   {
-    FileNameListIterator fnli(*Doxygen::inputNameList);
-    FileName *fn;
-    for (fnli.toFirst();(fn=fnli.current());++fnli)
+    for (const auto &fn : *Doxygen::inputNameLinkedMap)
     {
-      FileNameIterator fni(*fn);
-      FileDef *fd;
-      for (;(fd=fni.current());++fni)
+      for (const auto &fd : *fn)
       {
-        static bool fullPathNames = Config_getBool(FULL_PATH_NAMES);
         if (!fullPathNames || fd->getDirDef()==0) // top level file
         {
-          bool doc,src;
-          doc = fileVisibleInIndex(fd,src);
+          bool src;
+          bool doc = fileVisibleInIndex(fd.get(),src);
           QCString reference, outputBase;
           if (doc)
           {
@@ -799,19 +794,19 @@ static void writeDirHierarchy(OutputList &ol, FTVHelp* ftv,bool addToIndex)
           {
             ftv->addContentsItem(FALSE,fd->displayName(),
                                  reference, outputBase, 0,
-                                 FALSE,FALSE,fd);
+                                 FALSE,FALSE,fd.get());
           }
           if (addToIndex)
           {
             if (doc)
             {
-              addMembersToIndex(fd,LayoutDocManager::File,fd->displayName(),QCString(),TRUE);
+              addMembersToIndex(fd.get(),LayoutDocManager::File,fd->displayName(),QCString(),TRUE);
             }
             else if (src)
             {
               Doxygen::indexList->addContentsItem(
                   FALSE, convertToHtml(fd->name(),TRUE), 0,
-                  fd->getSourceFileBase(), 0, FALSE, TRUE, fd);
+                  fd->getSourceFileBase(), 0, FALSE, TRUE, fd.get());
             }
           }
         }
@@ -1321,16 +1316,12 @@ static void countFiles(int &htmlFiles,int &files)
 {
   htmlFiles=0;
   files=0;
-  FileNameListIterator fnli(*Doxygen::inputNameList);
-  FileName *fn;
-  for (;(fn=fnli.current());++fnli)
+  for (const auto &fn : *Doxygen::inputNameLinkedMap)
   {
-    FileNameIterator fni(*fn);
-    FileDef *fd;
-    for (;(fd=fni.current());++fni)
+    for (const auto &fd: *fn)
     {
       bool doc,src;
-      doc = fileVisibleInIndex(fd,src);
+      doc = fileVisibleInIndex(fd.get(),src);
       if (doc || src)
       {
         htmlFiles++;
@@ -1470,27 +1461,23 @@ static void writeFileIndex(OutputList &ol)
   if (Config_getBool(FULL_PATH_NAMES))
   {
     // re-sort input files in (dir,file) output order instead of (file,dir) input order
-    FileNameListIterator fnli(*Doxygen::inputNameList);
-    FileName *fn;
-    for (fnli.toFirst();(fn=fnli.current());++fnli)
+    for (const auto &fn : *Doxygen::inputNameLinkedMap)
     {
-      FileNameIterator fni(*fn);
-      FileDef *fd;
-      for (;(fd=fni.current());++fni)
+      for (const auto &fd : *fn)
       {
         QCString path=fd->getPath();
         if (path.isEmpty()) path="[external]";
         FileList *fl = outputNameDict.find(path);
         if (fl)
         {
-          fl->append(fd);
+          fl->append(fd.get());
           //printf("+ inserting %s---%s\n",fd->getPath().data(),fd->name().data());
         }
         else
         {
           //printf("o inserting %s---%s\n",fd->getPath().data(),fd->name().data());
           fl = new FileList(path);
-          fl->append(fd);
+          fl->append(fd.get());
           outputNameList.append(fl);
           outputNameDict.insert(path,fl);
         }
@@ -1517,15 +1504,11 @@ static void writeFileIndex(OutputList &ol)
   }
   else
   {
-    FileNameListIterator fnli(*Doxygen::inputNameList);
-    FileName *fn;
-    for (fnli.toFirst();(fn=fnli.current());++fnli)
+    for (const auto &fn : *Doxygen::inputNameLinkedMap)
     {
-      FileNameIterator fni(*fn);
-      FileDef *fd;
-      for (;(fd=fni.current());++fni)
+      for (const auto &fd : *fn)
       {
-        writeSingleFileIndex(ol,fd);
+        writeSingleFileIndex(ol,fd.get());
       }
     }
   }
@@ -2008,20 +1991,20 @@ class PrefixIgnoreClassList : public ClassList
 class AlphaIndexTableCell
 {
   public:
-    AlphaIndexTableCell(int row,int col,uint letter,ClassDef *cd) :
+    AlphaIndexTableCell(int row,int col,uint letter,const ClassDef *cd) :
       m_letter(letter), m_class(cd), m_row(row), m_col(col)
     { //printf("AlphaIndexTableCell(%d,%d,%c,%s)\n",row,col,letter!=0 ? letter: '-',
       //       cd!=(ClassDef*)0x8 ? cd->name().data() : "<null>");
     }
 
-    ClassDef *classDef() const { return m_class; }
+    const ClassDef *classDef() const { return m_class; }
     uint letter()        const { return m_letter; }
     int row()            const { return m_row; }
     int column()         const { return m_col; }
 
   private:
     uint m_letter;
-    ClassDef *m_class;
+    const ClassDef *m_class;
     int m_row;
     int m_col;
 };
@@ -2037,8 +2020,8 @@ class AlphaIndexTableRows : public QList<AlphaIndexTableCell>
 class AlphaIndexTableRowsIterator : public QListIterator<AlphaIndexTableCell>
 {
   public:
-    AlphaIndexTableRowsIterator(const AlphaIndexTableRows &list) :
-      QListIterator<AlphaIndexTableCell>(list) {}
+    AlphaIndexTableRowsIterator(const AlphaIndexTableRows &list_) :
+      QListIterator<AlphaIndexTableCell>(list_) {}
 };
 
 /** Class representing the columns in the alphabetical class index. */
@@ -2190,7 +2173,7 @@ static void writeAlphabeticalClassList(OutputList &ol, ClassDef::CompoundType ct
     row++;
     ClassListIterator cit(*cl);
     cit.toFirst();
-    ClassDef *cd = cit.current();
+    cd = cit.current();
     ++cit;
     tableRows->append(new AlphaIndexTableCell(row,col,0,cd));
     row++;
@@ -2847,9 +2830,9 @@ static void writeMemberList(OutputList &ol,bool useSections,int page,
           QCString cl = letterToString(ml->letter());
           QCString anchor=(QCString)"index_"+convertToId(cs);
           QCString title=(QCString)"- "+cl+" -";
-          ol.startSection(anchor,title,SectionInfo::Subsection);
+          ol.startSection(anchor,title,SectionType::Subsection);
           ol.docify(title);
-          ol.endSection(anchor,SectionInfo::Subsection);
+          ol.endSection(anchor,SectionType::Subsection);
           ol.startItemList();
           firstSection=FALSE;
           firstItem=TRUE;
@@ -4059,7 +4042,7 @@ static void writeGroupTreeNode(OutputList &ol, GroupDef *gd, int level, FTVHelp*
           for (mi.toFirst();(md=mi.current());++mi)
           {
             const MemberList *enumList = md->enumFieldList();
-            bool isDir = enumList!=0 && md->isEnumerate();
+            isDir = enumList!=0 && md->isEnumerate();
             if (md->isVisible() && !md->isAnonymous())
             {
               Doxygen::indexList->addContentsItem(isDir,
@@ -4160,16 +4143,16 @@ static void writeGroupTreeNode(OutputList &ol, GroupDef *gd, int level, FTVHelp*
         PageDef *pd;
         for (;(pd=it.current());++it)
         {
-          SectionInfo *si=0;
-          if (!pd->name().isEmpty()) si=Doxygen::sectionDict->find(pd->name());
-          bool hasSubPages = pd->hasSubPages();
+          const SectionInfo *si=0;
+          if (!pd->name().isEmpty()) si=SectionManager::instance().find(pd->name());
+          hasSubPages = pd->hasSubPages();
           bool hasSections = pd->hasSections();
           Doxygen::indexList->addContentsItem(
               hasSubPages || hasSections,
               convertToHtml(pd->title(),TRUE),
               gd->getReference(),
               gd->getOutputFileBase(),
-              si ? si->label.data() : 0,
+              si ? si->label().data() : 0,
               hasSubPages || hasSections,
               TRUE); // addToNavIndex
           if (hasSections || hasSubPages)
@@ -4556,8 +4539,7 @@ static void writeIndex(OutputList &ol)
 
     ol.startTextBlock();
     ol.generateDoc(defFileName,defLine,Doxygen::mainPage,0,
-                Doxygen::mainPage->documentation(),TRUE,FALSE
-                /*,Doxygen::mainPage->sectionDict*/);
+                Doxygen::mainPage->documentation(),TRUE,FALSE);
     ol.endTextBlock();
     ol.endPageDoc();
 
@@ -4639,7 +4621,7 @@ static void writeIndex(OutputList &ol)
           ol.pushGeneratorState();
           ol.disable(OutputGenerator::Latex);
         }
-        QCString title = pd->title();
+        title = pd->title();
         if (title.isEmpty()) title=pd->name();
 
         ol.disable(OutputGenerator::Docbook);

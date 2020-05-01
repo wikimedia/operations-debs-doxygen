@@ -21,6 +21,8 @@
 #include "qarray.h"
 #endif // QT_H
 
+#include <string>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,7 +151,7 @@ public:
     /** creates a string with room for size characters
      *  @param[in] size the number of character to allocate (including the 0-terminator)
      */
-    explicit QCString( int size ) : m_rep(size)
+    explicit QCString( uint size ) : m_rep(size)
     {
     }
 
@@ -269,7 +271,7 @@ public:
     bool stripPrefix(const char *prefix);
     QCString left( uint len ) const;
     QCString right( uint len ) const;
-    QCString mid( uint index, uint len=0xffffffff) const;
+    QCString mid( uint index, uint len=(uint)-1) const;
     QCString lower() const;
     QCString upper() const;
     QCString stripWhiteSpace() const;
@@ -307,8 +309,8 @@ public:
     QCString &operator+=( const char *str )
     {
       if (!str) return *this;
-      int len1 = length();
-      int len2 = (int)strlen(str);
+      uint len1 = length();
+      uint len2 = (uint)strlen(str);
       resize(len1+len2+1);
       memcpy(rawData()+len1,str,len2);
       return *this;
@@ -317,7 +319,7 @@ public:
     /** Appends character \a c to this string and returns a reference to the result. */
     QCString &operator+=( char c )
     {
-      int len = length();
+      uint len = length();
       resize(len+2);
       rawData()[len]=c;
       return *this;
@@ -361,7 +363,7 @@ public:
     // ref counting string header
     struct LSHeader
     {
-      int           len;      // length of string without 0 terminator
+      uint          len;      // length of string without 0 terminator
       int           refCount; // -1=leaked, 0=one ref & non-cost, n>0, n+1 refs, const
     };
     // ref counting string data and methods
@@ -374,7 +376,7 @@ public:
 
       // creates a LSData item with room for size bytes (which includes the 0 terminator!)
       // if size is zero, an empty string will be created.
-      static LSData *create(int size)
+      static LSData *create(uint size)
       {
         LSData *data;
         data = (LSData*)malloc(sizeof(LSHeader)+size);
@@ -391,7 +393,7 @@ public:
 
       // resizes LSData so it can hold size bytes (which includes the 0 terminator!)
       // Since this is for long strings only, size should be > SHORT_STR_CAPACITY
-      static LSData *resize(LSData *d,int size)
+      static LSData *resize(LSData *d,uint size)
       {
         if (d->len>0 && d->refCount==0) // non-const, non-empty
         {
@@ -403,7 +405,7 @@ public:
         else // need to make a copy
         {
           LSData *newData = LSData::create(size);
-          int len = d->len;
+          uint len = d->len;
           if (len>=size) len=size-1;
           memcpy(newData->toStr(),d->toStr(),len);
           newData->toStr()[len]=0;
@@ -454,14 +456,14 @@ public:
             u = s.u; // avoid uninitialized warning from gcc
           }
         }
-        StringRep(int size)
+        StringRep(uint size)
         {
           u.s.isShort = size<=SHORT_STR_CAPACITY;
           if (size<=SHORT_STR_CAPACITY) // init short string
           {
             if (size>0)
             {
-              u.s.len = size-1;
+              u.s.len = (uchar)(size-1);
               u.s.str[size-1]='\0';
             }
             else
@@ -478,11 +480,11 @@ public:
         {
           if (str)
           {
-            int len = (int)strlen(str);
+            uint len = (uint)strlen(str);
             u.s.isShort = len<SHORT_STR_CAPACITY;
             if (len<SHORT_STR_CAPACITY)
             {
-              u.s.len = len;
+              u.s.len = (uchar)len;
               qstrncpy(u.s.str,str,SHORT_STR_CAPACITY);
             }
             else
@@ -505,7 +507,7 @@ public:
             u.s.isShort = len<=SHORT_STR_MAX_LEN;
             if (u.s.isShort)
             {
-              u.s.len = len;
+              u.s.len = (uchar)len;
               memcpy(u.s.str,str,len);
               u.s.str[len]='\0';
             }
@@ -554,11 +556,11 @@ public:
           }
           if (str)
           {
-            int len = (int)strlen(str);
+            uint len = (uint)strlen(str);
             u.s.isShort = len<SHORT_STR_CAPACITY;
             if (len<SHORT_STR_CAPACITY)
             {
-              u.s.len = len;
+              u.s.len = (uchar)len;
               qstrncpy(u.s.str,str,SHORT_STR_CAPACITY);
             }
             else
@@ -605,7 +607,7 @@ public:
             return u.l.d->len==0 ? 0 : u.l.d->toStr();
           }
         }
-        char &at(int i) const
+        char &at(uint i) const
         {
           if (u.s.isShort)
           {
@@ -622,7 +624,7 @@ public:
           {
             if (newlen>0)
             {
-              u.s.len = newlen-1;
+              u.s.len = (uchar)(newlen-1);
               u.s.str[newlen-1]='\0';
             }
             else // string becomes empty
@@ -668,21 +670,21 @@ public:
         }
         bool fill( char c, int len )
         {
-          if (len<0) len=length();
+          uint ulen = len<0 ? length() : (uint)len;
           if (!u.s.isShort) // detach from shared string
           {
-            resize(len+1);
+            resize(ulen+1);
           }
-          else if (len!=(int)length())
+          else if (ulen!=length())
           {
-            if (len>0)
+            if (ulen>0)
             {
-              resize(len+1);
+              resize(ulen+1);
             }
           }
-          if (len>0)
+          if (ulen>0)
           {
-            memset(rawData(),c,len);
+            memset(rawData(),c,ulen);
           }
           return TRUE;
         }
@@ -803,6 +805,11 @@ inline const char *qPrint(const char *s)
 inline const char *qPrint(const QCString &s)
 {
   if (!s.isEmpty()) return s.data(); else return "";
+}
+
+inline std::string toStdString(const QCString &s)
+{
+  if (!s.isEmpty()) return std::string(s.data()); else return std::string();
 }
 
 #endif // QCSTRING_H

@@ -128,7 +128,7 @@ static void format_warn(const char *file,int line,const char *text)
   if (file) // get version from file name
   {
     bool ambig;
-    FileDef *fd=findFileDef(Doxygen::inputNameDict,file,ambig);
+    FileDef *fd=findFileDef(Doxygen::inputNameLinkedMap,file,ambig);
     if (fd)
     {
       versionSubst = fd->getVersion();
@@ -174,7 +174,7 @@ static void do_warn(bool enabled, const char *file, int line, const char *prefix
   int l=0;
   if (prefix)
   {
-    l=strlen(prefix);
+    l=(int)strlen(prefix);
   }
   // determine needed buffersize based on:
   // format + arguments
@@ -259,7 +259,7 @@ void term(const char *fmt, ...)
   va_end(args);
   if (warnFile != stderr)
   {
-    for (int i = 0; i < strlen(error_str); i++) fprintf(warnFile, " ");
+    for (int i = 0; i < (int)strlen(error_str); i++) fprintf(warnFile, " ");
     fprintf(warnFile, "%s\n", "Exiting...");
   }
   exit(1);

@@ -43,6 +43,32 @@
 
 static int folderId=1;
 
+const char *JAVASCRIPT_LICENSE_TEXT = R"LIC(/*
+ @licstart  The following is the entire license notice for the JavaScript code in this file.
+
+ The MIT License (MIT)
+
+ Copyright (C) 1997-2020 by Dimitri van Heesch
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ and associated documentation files (the "Software"), to deal in the Software without restriction,
+ including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all copies or
+ substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+ @licend  The above is the entire license notice for the JavaScript code in this file
+*/
+)LIC";
+
 struct FTVNode
 {
   FTVNode(bool dir,const char *r,const char *f,const char *a,
@@ -233,7 +259,7 @@ static QCString node2URL(const FTVNode *n,bool overruleFile=FALSE,bool srcLink=F
         url = fd->getOutputFileBase();
       }
     }
-    url+=Doxygen::htmlFileExtension;
+    url = addHtmlExtensionIfMissing(url);
     if (!n->anchor.isEmpty()) url+="#"+n->anchor;
   }
   return url;
@@ -450,6 +476,10 @@ void FTVHelp::generateTree(FTextStream &t, const QList<FTVNode> &nl,int level,in
       {
         char icon=compoundIcon(dynamic_cast<const ClassDef*>(n->def));
         t << "<span class=\"icona\"><span class=\"icon\">" << icon << "</span></span>";
+      }
+      else if (n->def && n->def->definitionType()==Definition::TypeDir)
+      {
+        t << "<span class=\"iconfclosed\"></span>";
       }
       else
       {
@@ -689,7 +719,7 @@ static void generateJSNavTree(const QList<FTVNode> &nodeList)
       tsidx << "{" << endl;
       QListIterator<NavIndexEntry> li(navIndex);
       NavIndexEntry *e;
-      bool first=TRUE;
+      first=TRUE;
       for (li.toFirst();(e=li.current());) // for each entry
       {
         if (elemCount==0)
@@ -781,8 +811,7 @@ void FTVHelp::generateTreeViewInline(FTextStream &t)
     t << "<div class=\"levels\">[";
     t << theTranslator->trDetailLevel();
     t << " ";
-    int i;
-    for (i=1;i<=depth;i++)
+    for (int i=1;i<=depth;i++)
     {
       t << "<span onclick=\"javascript:toggleLevel(" << i << ");\">" << i << "</span>";
     }
@@ -794,9 +823,7 @@ void FTVHelp::generateTreeViewInline(FTextStream &t)
       for (int i=1;i<=depth;i++)
       {
         int num=0;
-        QListIterator<FTVNode> li(m_indentNodes[0]);
-        FTVNode *n;
-        for (;(n=li.current());++li)
+        for (li.toFirst();(n=li.current());++li)
         {
           num+=n->numNodesAtLevel(0,i);
         }
