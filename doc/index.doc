@@ -71,6 +71,7 @@ The first part forms a user manual:
 <li>Section \ref markdown show the Markdown formatting supported by doxygen.
 <li>Section \ref lists shows how to create lists.
 <li>Section \ref grouping shows how to group things together. 
+<li>Section \ref tables shows how to insert tables in the documentation.
 <li>Section \ref formulas shows how to insert formulas in the documentation.
 <li>Section \ref diagrams describes the diagrams and graphs that doxygen can generate.
 <li>Section \ref preprocessing explains how doxygen deals with macro definitions.
@@ -120,7 +121,7 @@ The third part provides information for developers:
 \addindex license
 \addindex GPL
 
-Copyright &copy; 1997-2016 by 
+Copyright &copy; 1997-2019 by 
 <a href="mailto:doxygen@gmail.com">Dimitri van Heesch</a>.<p>
 
 Permission to use, copy, modify, and distribute this software and its

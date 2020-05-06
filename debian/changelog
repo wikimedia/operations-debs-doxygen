@@ -1,3 +1,12 @@
+doxygen (1.8.17-1~deb10+wmf1) buster-wikimedia; urgency=medium
+
+  * Rebuild debian/1.8.17-1 for buster T242155
+  * Rename branch in gbp.conf buster-backports > buster-wikimedia
+  * Drop hardcoding of LLVM 7. It is now detected from debian/control
+  * Relax qtbase5-dev version restriction
+
+ -- Antoine Musso <hashar@free.fr>  Thu, 16 Apr 2020 22:15:26 +0200
+
 doxygen (1.8.16-1~exp4~deb10+wmf1) buster-wikimedia; urgency=medium
 
   * Rebuild for buster based on f562715. Fix: T239482
@@ -7,17 +16,64 @@ doxygen (1.8.16-1~exp4~deb10+wmf1) buster-wikimedia; urgency=medium
 
  -- Antoine Musso <hashar@free.fr>  Fri, 29 Nov 2019 22:39:12 +0100
 
-doxygen (1.8.16-1~exp4) UNRELEASED; urgency=medium
+doxygen (1.8.17-1) unstable; urgency=medium
 
+  * Upload to unstable.
+  * Make examples reproducible by stripping metadata from pdf files.
+  * Dropping unused Build-Depends on yui-compressor also allows to bootstrap
+    doxygen without needing Java. Closes: #879695.
+  * Make the GNU_BUILD_ID reproducible
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 30 Apr 2020 19:36:59 +0200
+
+doxygen (1.8.17-1~exp2) experimental; urgency=medium
+
+  * Fix sass compilation error. Closes: #954677.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 07 Apr 2020 12:02:12 +0200
+
+doxygen (1.8.17-1~exp1) experimental; urgency=medium
+
+  [ Samuel Thibault ]
+  * Drop unused build dependency. Closes: #947897.
+
+  [ Paolo Greppi ]
+  * doxygen 1.8.17 release.
+  * Bump standards version to 4.5.0: No changes needed.
+  * Make doxygen_manual.pdf build reproducibly with cmake.
+  * Make the changelog reproducible.
+  * Make the manpages reproducible when the timezone changes.
+  * Import upstream patch to use eps2eps rather than ps2epsi.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sat, 01 Feb 2020 18:32:03 +0100
+
+doxygen (1.8.16-2) unstable; urgency=medium
+
+  * Build-depend on qtbase5-dev version that fixes 947117.
+  * Import upstream patch for ghostscript 9.50 invocation. Closes: #947121.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 22 Dec 2019 10:17:19 +0100
+
+doxygen (1.8.16-1) unstable; urgency=medium
+
+  [ Steve Langasek ]
+  * Make autopkgtests cross-test-friendly.
+  * Build using LLVM 9.0.
   * Build-depend on texlive-plain-generic instead of obsolete texlive-
     generic-recommended.
+
+  [ Paolo Greppi ]
   * Make the output of $year reproducible. Closes: #942671.
   * Fix a regression whereby if the Doxyfile has a blank FILE_PATTERNS then
     no files are processed.
-  * Build using LLVM 9.0
   * Disable patch to conditionally skip copying jquery. Closes: #943890.
+  * Fix lintian W: doxygen source: tab-in-license-text debian/copyright.
+  * Upload to unstable.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 31 Oct 2019 16:23:16 +0100
+  [ Norbert Lange ]
+  * Improve d/rules to pick llvm version from d/control. Closes: #945427.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 10 Dec 2019 23:48:20 +0100
 
 doxygen (1.8.16-1~exp3) experimental; urgency=medium
 

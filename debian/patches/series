@@ -9,7 +9,9 @@ no-timestamps.diff
 #issue759241.diff
 avoid-compass.diff
 llvm_libs.diff
-reproducible_year.diff
 faketime_pdflatex.diff
 libatomic.diff
-blank-file-patterns.diff
+reproducible_changelog.diff
+reproducible_manpages.diff
+eps2eps.diff
+sass_fix.diff

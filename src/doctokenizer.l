@@ -57,8 +57,7 @@ static bool g_insidePre;
 static int g_sharpCount=0;
 
 // context for section finding phase
-static Definition  *g_definition;
-static MemberGroup *g_memberGroup;
+static const Definition  *g_definition;
 static QCString     g_secLabel;
 static QCString     g_secTitle;
 static SectionInfo::SectionType g_secType;
@@ -77,6 +76,7 @@ struct DocLexerContext
 
 static QStack<DocLexerContext> g_lexerStack;
 
+static const char *stateToString(int state);
 //--------------------------------------------------------------------------
 
 void doctokenizerYYpushContext()
@@ -159,11 +159,7 @@ static void processSection()
 {
   //printf("%s: found section/anchor with name '%s'\n",g_fileName.data(),g_secLabel.data());
   QCString file;
-  if (g_memberGroup)
-  {
-    file = g_memberGroup->parent()->getOutputFileBase();
-  }
-  else if (g_definition)
+  if (g_definition)
   {
     file = g_definition->getOutputFileBase();
   }
@@ -207,6 +203,7 @@ static void handleHtmlTag()
   // Parse the attributes. Each attribute is a name, value pair
   // The result is stored in g_token->attribs.
   int startName,endName,startAttrib,endAttrib;
+  int startAttribList = i;
   while (i<(int)yyleng)
   {
     char c=tagText.at(i);
@@ -222,7 +219,7 @@ static void handleHtmlTag()
     }
     startName=i;
     // search for end of name
-    while (i<(int)yyleng && !isspace((uchar)c) && c!='=') { c=tagText.at(++i); }
+    while (i<(int)yyleng && !isspace((uchar)c) && c!='=' && c!= '>') { c=tagText.at(++i); }
     endName=i;
     HtmlAttrib opt;
     opt.name  = tagText.mid(startName,endName-startName).lower(); 
@@ -241,7 +238,7 @@ static void handleHtmlTag()
 	// search for matching quote 
         while (i<(int)yyleng && c!='\'') { c=tagText.at(++i); } 
 	endAttrib=i;
-        if (i<(int)yyleng) c=tagText.at(++i);
+        if (i<(int)yyleng) { c=tagText.at(++i);}
       }
       else if (tagText.at(i)=='"') // option "..."
       {
@@ -250,7 +247,7 @@ static void handleHtmlTag()
 	// search for matching quote 
         while (i<(int)yyleng && c!='"') { c=tagText.at(++i); } 
 	endAttrib=i;
-        if (i<(int)yyleng) c=tagText.at(++i);
+        if (i<(int)yyleng) { c=tagText.at(++i);}
       }
       else // value without any quotes
       {
@@ -258,7 +255,7 @@ static void handleHtmlTag()
 	// search for separator or end symbol
         while (i<(int)yyleng && !isspace((uchar)c) && c!='>') { c=tagText.at(++i); } 
 	endAttrib=i;
-	if (i<(int)yyleng) c=tagText.at(++i);
+        if (i<(int)yyleng) { c=tagText.at(++i);}
       }
       opt.value  = tagText.mid(startAttrib,endAttrib-startAttrib); 
       if (opt.name == "align") opt.value = opt.value.lower();
@@ -275,6 +272,7 @@ static void handleHtmlTag()
     //    opt.name.data(),opt.value.data());
     g_token->attribs.append(&opt);
   }
+  g_token->attribsStr = tagText.mid(startAttribList,i-startAttribList);
 }
   
 static QCString stripEmptyLines(const QCString &s)
@@ -333,8 +331,8 @@ static int yyread(char *buf,int max_size)
 
 //--------------------------------------------------------------------------
 //#define REAL_YY_DECL int doctokenizerYYlex (void)
-//#define YY_DECL static int local_doctokinizer(void)
-//#define LOCAL_YY_DECL local_doctokinizer()
+//#define YY_DECL static int local_doctokenizer(void)
+//#define LOCAL_YY_DECL local_doctokenizer()
 
 %}
 
@@ -348,25 +346,28 @@ PHPTYPE   [\\:a-z_A-Z0-9\x80-\xFF\-]+
 CITESCHAR [a-z_A-Z0-9\x80-\xFF\-\?]
 CITEECHAR [a-z_A-Z0-9\x80-\xFF\-\+:\/\?]
 CITEID    {CITESCHAR}{CITEECHAR}*("."{CITESCHAR}{CITEECHAR}*)*|"\""{CITESCHAR}{CITEECHAR}*("."{CITESCHAR}{CITEECHAR}*)*"\""
-MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z_A-Z0-9\-]+
+MAILADDR  ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z_A-Z0-9\-]+
+MAILWS    [\t a-z_A-Z0-9+-]
+MAILADDR2 {MAILWS}+{BLANK}+("at"|"AT"|"_at_"|"_AT_"){BLANK}+{MAILWS}+("dot"|"DOT"|"_dot_"|"_DOT_"){BLANK}+{MAILWS}+
 OPTSTARS  ("//"{BLANK}*)?"*"*{BLANK}*
 LISTITEM  {BLANK}*[-]("#")?{WS}
 MLISTITEM {BLANK}*[+*]{WS}
 OLISTITEM {BLANK}*[1-9][0-9]*"."{BLANK}
 ENDLIST   {BLANK}*"."{BLANK}*\n
-ATTRNAME  [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-]*
+ATTRNAME  [a-z_A-Z\x80-\xFF][:a-z_A-Z0-9\x80-\xFF\-]*
 ATTRIB    {ATTRNAME}{WS}*("="{WS}*(("\""[^\"]*"\"")|("'"[^\']*"'")|[^ \t\r\n'"><]+))?
 URLCHAR   [a-z_A-Z0-9\!\~\,\:\;\'\$\?\@\&\%\#\.\-\+\/\=]
 URLMASK   ({URLCHAR}+([({]{URLCHAR}*[)}])?)+
-FILESCHAR [a-z_A-Z0-9\\:\\\/\-\+@&#]
-FILEECHAR [a-z_A-Z0-9\-\+@&#]
+URLPROTOCOL ("http:"|"https:"|"ftp:"|"file:"|"news:"|"irc")
+FILESCHAR [a-z_A-Z0-9\\:\\\/\-\+&#]
+FILEECHAR [a-z_A-Z0-9\-\+&#]
 HFILEMASK ("."{FILESCHAR}*{FILEECHAR}+)+
 FILEMASK  ({FILESCHAR}*{FILEECHAR}+("."{FILESCHAR}*{FILEECHAR}+)*)|{HFILEMASK}
 LINKMASK  [^ \t\n\r\\@<&${}]+("("[^\n)]*")")?({BLANK}*("const"|"volatile"){BLANK}+)? 
 VERBATIM  "verbatim"{BLANK}*
 SPCMD1    {CMD}([a-z_A-Z][a-z_A-Z0-9]*|{VERBATIM}|"--"|"---")
 SPCMD2    {CMD}[\\@<>&$#%~".+=|-]
-SPCMD3    {CMD}form#[0-9]+
+SPCMD3    {CMD}_form#[0-9]+
 SPCMD4    {CMD}"::"
 SPCMD5    {CMD}":"
 INOUT	  "inout"|"in"|"out"|("in"{BLANK}*","{BLANK}*"out")|("out"{BLANK}*","{BLANK}*"in")
@@ -405,8 +406,8 @@ WORD1NQ   {ESCWORD}|{CHARWORDQ}+|"{"|"}"
 WORD2NQ   "."|","|"("|")"|"["|"]"|"::"|":"|";"|"\?"|"="|"'"
 CAPTION   [cC][aA][pP][tT][iI][oO][nN]
 HTMLTAG   "<"(("/")?){ID}({WS}+{ATTRIB})*{WS}*(("/")?)">" 
-HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"pre"|"sub"|"sup"|"tr"|"td"|"th"|"ol"|"ul"|"li"|"tt"|"kbd"|"em"|"hr"|"dl"|"dt"|"dd"|"br"|"i"|"a"|"b"|"p"|"strike"|"u"|"del"|"ins"
-HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"|"STRIKE"|"U"|"DEL"|"INS"
+HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"pre"|"sub"|"sup"|"tr"|"td"|"th"|"ol"|"ul"|"li"|"tt"|"kbd"|"em"|"hr"|"dl"|"dt"|"dd"|"br"|"i"|"a"|"b"|"p"|"strike"|"u"|"del"|"ins"|"s"
+HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"|"STRIKE"|"U"|"DEL"|"INS"|"S"
 HTMLKEYW  {HTMLKEYL}|{HTMLKEYU}
 REFWORD2_PRE   ("#"|"::")?((({ID}{TEMPLPART}?)|{ANONNS})("."|"#"|"::"|"-"|"/"))*({ID}{TEMPLPART}?(":")?)
 REFWORD2       {REFWORD2_PRE}{FUNCARG2}?
@@ -581,9 +582,9 @@ REFWORD_NOCV   {FILEMASK}|{LABELID}|{REFWORD2_NOCV}|{REFWORD3}|{REFWORD4_NOCV}
                              yylineno++; 
   		          }
 <St_Para>{SPCMD3}      {
-  			 g_token->name = "form";
+  			 g_token->name = "_form";
 			 bool ok;
-			 g_token->id = QCString(yytext).right((int)yyleng-6).toInt(&ok);
+			 g_token->id = QCString(yytext).right((int)yyleng-7).toInt(&ok);
 			 ASSERT(ok);
 			 return TK_COMMAND_SEL();
   		       }
@@ -629,34 +630,38 @@ REFWORD_NOCV   {FILEMASK}|{LABELID}|{REFWORD2_NOCV}|{REFWORD3}|{REFWORD4_NOCV}
 			 }
 			 return TK_COMMAND_SEL();
   		       }
-<St_Para>("http:"|"https:"|"ftp:"|"file:"|"news:"){URLMASK}/\. { // URL.
+<St_Para>{URLPROTOCOL}{URLMASK}/\. { // URL.
                          g_token->name=yytext;
 			 g_token->isEMailAddr=FALSE;
 			 return TK_URL;
                        }
-<St_Para>("http:"|"https:"|"ftp:"|"file:"|"news:"){URLMASK} { // URL
+<St_Para>{URLPROTOCOL}{URLMASK} { // URL
                          g_token->name=yytext;
 			 g_token->isEMailAddr=FALSE;
 			 return TK_URL;
                        }
-<St_Para>"<"("http:"|"https:"|"ftp:"|"file:"|"news:"){URLMASK}">" { // URL
+<St_Para>"<"{URLPROTOCOL}{URLMASK}">" { // URL
                          g_token->name=yytext;
                          g_token->name = g_token->name.mid(1,g_token->name.length()-2);
 			 g_token->isEMailAddr=FALSE;
 			 return TK_URL;
                        }
-<St_Para>{MAILADR}     { // Mail address
+<St_Para>{MAILADDR}    { // Mail address
                          g_token->name=yytext;
                          g_token->name.stripPrefix("mailto:");
 			 g_token->isEMailAddr=TRUE;
 			 return TK_URL;
                        }
-<St_Para>"<"{MAILADR}">" { // Mail address
+<St_Para>"<"{MAILADDR}">" { // Mail address
                          g_token->name=yytext;
                          g_token->name = g_token->name.mid(1,g_token->name.length()-2);
                          g_token->name.stripPrefix("mailto:");
 			 g_token->isEMailAddr=TRUE;
 			 return TK_URL;
+                       }
+<St_Para>"<"{MAILADDR2}">" { // anti spam mail address
+                         g_token->name=yytext;
+			 return TK_WORD;
                        }
 <St_Para>"$"{ID}":"[^:\n$][^\n$]*"$" { /* RCS tag */
                          QCString tagName(yytext+1);
@@ -677,7 +682,7 @@ REFWORD_NOCV   {FILEMASK}|{LABELID}|{REFWORD2_NOCV}|{REFWORD3}|{REFWORD4_NOCV}
 <St_Para,St_HtmlOnly,St_ManOnly,St_LatexOnly,St_RtfOnly,St_XmlOnly,St_DbOnly>"$("{ID}"("{ID}"))"   { /* environment variable */
                          QCString name = &yytext[2];
 			 name = name.left(name.length()-1);
-			 QCString value = portable_getenv(name);
+			 QCString value = Portable::getenv(name);
 			 for (int i=value.length()-1;i>=0;i--) unput(value.at(i));
                        }
 <St_Para>{HTMLTAG}     { /* html tag */ 
@@ -1369,8 +1374,8 @@ REFWORD_NOCV   {FILEMASK}|{LABELID}|{REFWORD2_NOCV}|{REFWORD3}|{REFWORD4_NOCV}
 
 //--------------------------------------------------------------------------
 
-void doctokenizerYYFindSections(const char *input,Definition *d,
-                                MemberGroup *mg,const char *fileName)
+void doctokenizerYYFindSections(const char *input,const Definition *d,
+                                const char *fileName)
 {
   if (input==0) return;
   printlex(yy_flex_debug, TRUE, __FILE__, fileName);
@@ -1378,7 +1383,6 @@ void doctokenizerYYFindSections(const char *input,Definition *d,
   //printf("parsing --->'%s'<---\n",input);
   g_inputPos    = 0;
   g_definition  = d;
-  g_memberGroup = mg;
   g_fileName    = fileName;
   BEGIN(St_Sections);
   doctokenizerYYlineno = 1;
@@ -1615,9 +1619,5 @@ void doctokenizerYYendAutoList()
 //  printlex(yy_flex_debug, FALSE, __FILE__, g_fileName);
 //  return retval;
 //}
-#if !defined(YY_FLEX_SUBMINOR_VERSION) 
-extern "C" { // some bogus code to keep the compiler happy
-    void doctokenizerYYdummy() { yy_flex_realloc(0,0); }
-}
-#endif
 
+#include "doctokenizer.l.h"

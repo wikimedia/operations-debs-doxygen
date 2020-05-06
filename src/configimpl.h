@@ -37,14 +37,14 @@ class ConfigOption
     /*! The type of option */
     enum OptionType 
     { 
-      O_Info,      //<! A section header
-      O_List,      //<! A list of items
-      O_Enum,      //<! A fixed set of items
-      O_String,    //<! A single item
-      O_Int,       //<! An integer value
-      O_Bool,      //<! A boolean value
-      O_Obsolete,  //<! An obsolete option
-      O_Disabled   //<! Disabled compile time option
+      O_Info,      //!< A section header
+      O_List,      //!< A list of items
+      O_Enum,      //!< A fixed set of items
+      O_String,    //!< A single item
+      O_Int,       //!< An integer value
+      O_Bool,      //!< A boolean value
+      O_Obsolete,  //!< An obsolete option
+      O_Disabled   //!< Disabled compile time option
     };
     enum 
     { 
@@ -126,6 +126,7 @@ class ConfigList : public ConfigOption
     void setWidgetType(WidgetType w) { m_widgetType = w; }
     WidgetType widgetType() const { return m_widgetType; }
     QStrList *valueRef() { return &m_value; }
+    QStrList getDefault() { return m_defaultValue; }
     void writeTemplate(FTextStream &t,bool sl,bool);
     void compareDoxyfile(FTextStream &t);
     void substEnvVars();
