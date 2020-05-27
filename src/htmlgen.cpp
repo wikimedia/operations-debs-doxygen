@@ -114,20 +114,28 @@ static void writeServerSearchBox(FTextStream &t,const char *relPath,bool highlig
 }
 
 //------------------------------------------------------------------------
-/// Convert a set of LaTeX `\(re)newcommand` to a form readable by MathJax
+/// Convert a set of LaTeX  commands `\(re)newcommand`  to a form readable by MathJax
 /// LaTeX syntax:
+/// ```
 ///       \newcommand{\cmd}{replacement}
 ///         or
 ///       \renewcommand{\cmd}{replacement}
+/// ```
 /// MathJax syntax:
+/// ```
 ///        cmd: "{replacement}"
+/// ```
 ///
 /// LaTeX syntax:
+/// ```
 ///       \newcommand{\cmd}[nr]{replacement}
 ///         or
 ///       \renewcommand{\cmd}[nr]{replacement}
+/// ```
 /// MathJax syntax:
+/// ```
 ///        cmd: ["{replacement}",nr]
+/// ```
 static QCString getConvertLatexMacro()
 {
   QCString macrofile = Config_getString(FORMULA_MACROFILE);
@@ -158,8 +166,14 @@ static QCString getConvertLatexMacro()
       return "";
     }
     i++;
-    if (!qstrncmp(data + i, "newcommand", strlen("newcommand"))) i += strlen("newcommand");
-    else if (!qstrncmp(data + i, "renewcommand", strlen("renewcommand"))) i += strlen("renewcommand");
+    if (!qstrncmp(data + i, "newcommand", (uint)strlen("newcommand")))
+    {
+      i += (int)strlen("newcommand");
+    }
+    else if (!qstrncmp(data + i, "renewcommand", (uint)strlen("renewcommand")))
+    {
+      i += (int)strlen("renewcommand");
+    }
     else
     {
       warn(macrofile,line, "file contains non valid code, expected 'newcommand' or 'renewcommand'");
@@ -394,7 +408,7 @@ static QCString removeEmptyLines(const QCString &s)
   return out.data();
 }
 
-static QCString substituteHtmlKeywords(const QCString &s,
+static QCString substituteHtmlKeywords(const QCString &str,
                                        const QCString &title,
                                        const QCString &relPath,
                                        const QCString &navPath=QCString())
@@ -562,7 +576,7 @@ static QCString substituteHtmlKeywords(const QCString &s,
   }
 
   // first substitute generic keywords
-  QCString result = substituteKeywords(s,title,
+  QCString result = substituteKeywords(str,title,
     convertToHtml(Config_getString(PROJECT_NAME)),
     convertToHtml(Config_getString(PROJECT_NUMBER)),
         convertToHtml(Config_getString(PROJECT_BRIEF)));
@@ -654,6 +668,10 @@ void HtmlCodeGenerator::codify(const char *str)
                      { m_t << "&lt;"; p++; }
                    else if (*p=='>')
                      { m_t << "&gt;"; p++; }
+		   else if (*p=='(')
+                     { m_t << "\\&zwj;("; m_col++;p++; }
+                   else if (*p==')')
+                     { m_t << "\\&zwj;)"; m_col++;p++; }
                    else
                      m_t << "\\";
                    m_col++;
@@ -688,6 +706,10 @@ void HtmlCodeGenerator::docify(const char *str)
                      { m_t << "&lt;"; p++; }
                    else if (*p=='>')
                      { m_t << "&gt;"; p++; }
+		   else if (*p=='(')
+                     { m_t << "\\&zwj;("; p++; }
+                   else if (*p==')')
+                     { m_t << "\\&zwj;)"; p++; }
                    else
                      m_t << "\\";
                    break;
@@ -1056,7 +1078,7 @@ void HtmlGenerator::writeSearchData(const char *dir)
     {
       searchCss = mgr.getAsString("search.css");
     }
-    searchCss = substitute(replaceColorMarkers(searchCss),"$doxygenversion",getVersion());
+    searchCss = substitute(replaceColorMarkers(searchCss),"$doxygenversion",getDoxygenVersion());
     t << searchCss;
     Doxygen::indexList->addStyleSheetFile("search/search.css");
   }
@@ -1065,20 +1087,20 @@ void HtmlGenerator::writeSearchData(const char *dir)
 void HtmlGenerator::writeStyleSheetFile(QFile &file)
 {
   FTextStream t(&file);
-  t << replaceColorMarkers(substitute(ResourceMgr::instance().getAsString("doxygen.css"),"$doxygenversion",getVersion()));
+  t << replaceColorMarkers(substitute(ResourceMgr::instance().getAsString("doxygen.css"),"$doxygenversion",getDoxygenVersion()));
 }
 
 void HtmlGenerator::writeHeaderFile(QFile &file, const char * /*cssname*/)
 {
   FTextStream t(&file);
-  t << "<!-- HTML header for doxygen " << getVersion() << "-->" << endl;
+  t << "<!-- HTML header for doxygen " << getDoxygenVersion() << "-->" << endl;
   t << ResourceMgr::instance().getAsString("header.html");
 }
 
 void HtmlGenerator::writeFooterFile(QFile &file)
 {
   FTextStream t(&file);
-  t << "<!-- HTML footer for doxygen " << getVersion() << "-->" <<  endl;
+  t << "<!-- HTML footer for doxygen " << getDoxygenVersion() << "-->" <<  endl;
   t << ResourceMgr::instance().getAsString("footer.html");
 }
 
@@ -1099,7 +1121,7 @@ void HtmlGenerator::startFile(const char *name,const char *,
   t << substituteHtmlKeywords(g_header,convertToHtml(filterTitle(title)),m_relPath);
 
   t << "<!-- " << theTranslator->trGeneratedBy() << " Doxygen "
-    << getVersion() << " -->" << endl;
+    << getDoxygenVersion() << " -->" << endl;
   //static bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
   static bool searchEngine = Config_getBool(SEARCHENGINE);
   if (searchEngine /*&& !generateTreeView*/)
@@ -1163,7 +1185,7 @@ QCString HtmlGenerator::writeLogoAsString(const char *path)
             "<img class=\"footer\" src=\"";
   result += path;
   result += "doxygen.png\" alt=\"doxygen\"/></a> ";
-  result += getVersion();
+  result += getDoxygenVersion();
   result += " ";
   return result;
 }
@@ -1216,7 +1238,7 @@ void HtmlGenerator::writeStyleInfo(int part)
       //t << "H1 { text-align: center; border-width: thin none thin none;" << endl;
       //t << "     border-style : double; border-color : blue; padding-left : 1em; padding-right : 1em }" << endl;
 
-      t << replaceColorMarkers(substitute(ResourceMgr::instance().getAsString("doxygen.css"),"$doxygenversion",getVersion()));
+      t << replaceColorMarkers(substitute(ResourceMgr::instance().getAsString("doxygen.css"),"$doxygenversion",getDoxygenVersion()));
       endPlainFile();
       Doxygen::indexList->addStyleSheetFile("doxygen.css");
     }
@@ -1435,29 +1457,29 @@ void HtmlGenerator::endGroupHeader(int extraIndentLevel)
   }
 }
 
-void HtmlGenerator::startSection(const char *lab,const char *,SectionInfo::SectionType type)
+void HtmlGenerator::startSection(const char *lab,const char *,SectionType type)
 {
   switch(type)
   {
-    case SectionInfo::Page:          t << "\n\n<h1>"; break;
-    case SectionInfo::Section:       t << "\n\n<h2>"; break;
-    case SectionInfo::Subsection:    t << "\n\n<h3>"; break;
-    case SectionInfo::Subsubsection: t << "\n\n<h4>"; break;
-    case SectionInfo::Paragraph:     t << "\n\n<h5>"; break;
+    case SectionType::Page:          t << "\n\n<h1>"; break;
+    case SectionType::Section:       t << "\n\n<h2>"; break;
+    case SectionType::Subsection:    t << "\n\n<h3>"; break;
+    case SectionType::Subsubsection: t << "\n\n<h4>"; break;
+    case SectionType::Paragraph:     t << "\n\n<h5>"; break;
     default: ASSERT(0); break;
   }
   t << "<a id=\"" << lab << "\"></a>";
 }
 
-void HtmlGenerator::endSection(const char *,SectionInfo::SectionType type)
+void HtmlGenerator::endSection(const char *,SectionType type)
 {
   switch(type)
   {
-    case SectionInfo::Page:          t << "</h1>"; break;
-    case SectionInfo::Section:       t << "</h2>"; break;
-    case SectionInfo::Subsection:    t << "</h3>"; break;
-    case SectionInfo::Subsubsection: t << "</h4>"; break;
-    case SectionInfo::Paragraph:     t << "</h5>"; break;
+    case SectionType::Page:          t << "</h1>"; break;
+    case SectionType::Section:       t << "</h2>"; break;
+    case SectionType::Subsection:    t << "</h3>"; break;
+    case SectionType::Subsubsection: t << "</h4>"; break;
+    case SectionType::Paragraph:     t << "</h5>"; break;
     default: ASSERT(0); break;
   }
 }
@@ -1488,6 +1510,10 @@ void HtmlGenerator::docify(const char *str,bool inHtmlComment)
                      { t << "&lt;"; p++; }
                    else if (*p=='>')
                      { t << "&gt;"; p++; }
+		   else if (*p=='(')
+                     { t << "\\&zwj;("; p++; }
+                   else if (*p==')')
+                     { t << "\\&zwj;)"; p++; }
                    else
                      t << "\\";
                    break;
@@ -2634,7 +2660,7 @@ void HtmlGenerator::writeSearchPage()
     t << substituteHtmlKeywords(g_header,"Search","");
 
     t << "<!-- " << theTranslator->trGeneratedBy() << " Doxygen "
-      << getVersion() << " -->" << endl;
+      << getDoxygenVersion() << " -->" << endl;
     t << "<script type=\"text/javascript\">\n";
 		t << "/* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */\n";
 		t << "var searchBox = new SearchBox(\"searchBox\", \""
@@ -2679,7 +2705,6 @@ void HtmlGenerator::writeSearchPage()
 void HtmlGenerator::writeExternalSearchPage()
 {
   static bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
-  static bool disableIndex = Config_getBool(DISABLE_INDEX);
   QCString fileName = Config_getString(HTML_OUTPUT)+"/search"+Doxygen::htmlFileExtension;
   QFile f(fileName);
   if (f.open(IO_WriteOnly))
@@ -2688,7 +2713,7 @@ void HtmlGenerator::writeExternalSearchPage()
     t << substituteHtmlKeywords(g_header,"Search","");
 
     t << "<!-- " << theTranslator->trGeneratedBy() << " Doxygen "
-      << getVersion() << " -->" << endl;
+      << getDoxygenVersion() << " -->" << endl;
     t << "<script type=\"text/javascript\">\n";
 		t << "/* @license magnet:?xt=urn:btih:cf05388f2679ee054f2beb29a391d25f4e673ac3&amp;dn=gpl-2.0.txt GPL-v2 */\n";
 		t << "var searchBox = new SearchBox(\"searchBox\", \""

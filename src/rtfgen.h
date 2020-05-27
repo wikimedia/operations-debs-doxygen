@@ -32,6 +32,8 @@ class RTFGenerator : public OutputGenerator
     static void writeStyleSheetFile(QFile &f);
     static void writeExtensionsFile(QFile &file);
 
+    void setRelativePath(const QCString &path);
+    void setSourceFileName(const QCString &sourceFileName);
     void enable() 
     { if (m_genStack->top()) m_active=*m_genStack->top(); else m_active=TRUE; }
     void disable() { m_active=FALSE; }
@@ -171,8 +173,8 @@ class RTFGenerator : public OutputGenerator
     //void writeDescItem();
     void startDescForItem();
     void endDescForItem();
-    void startSection(const char *,const char *,SectionInfo::SectionType);
-    void endSection(const char *,SectionInfo::SectionType);
+    void startSection(const char *,const char *,SectionType);
+    void endSection(const char *,SectionType);
     void addIndexItem(const char *,const char *);
     void startIndent();
     void endIndent();
@@ -279,6 +281,7 @@ class RTFGenerator : public OutputGenerator
     const char *rtf_Code_DepthStyle();
     void incrementIndentLevel();
     void decrementIndentLevel();
+    QCString m_sourceFileName;
     int  m_col;
     bool m_prettyCode;
 

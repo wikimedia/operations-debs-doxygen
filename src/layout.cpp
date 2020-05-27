@@ -1424,15 +1424,15 @@ class LayoutParser : public QXmlDefaultHandler
     }
 
   private:
-    LayoutParser() : m_sHandler(163), m_eHandler(17), m_invalidEntry(FALSE), m_part(0), m_rootNav(NULL) { }
+    LayoutParser() : m_sHandler(163), m_eHandler(17) { }
    ~LayoutParser() { delete m_rootNav; }
 
     QDict<StartElementHandler> m_sHandler;
     QDict<EndElementHandler>   m_eHandler;
     QCString m_scope;
-    int m_part;
-    LayoutNavEntry *m_rootNav;
-    bool m_invalidEntry;
+    int m_part = 0;
+    LayoutNavEntry *m_rootNav = 0;
+    bool m_invalidEntry = false;
     static int m_userGroupCount;
 };
 
@@ -1562,7 +1562,7 @@ void writeDefaultLayoutFile(const char *fileName)
   }
   QTextStream t(&f);
   t.setEncoding(QTextStream::UnicodeUTF8);
-  t << substitute(layout_default,"$doxygenversion",getVersion());
+  t << substitute(layout_default,"$doxygenversion",getDoxygenVersion());
 }
 
 //----------------------------------------------------------------------------------

@@ -27,7 +27,6 @@
 #include "membergroup.h"
 #include "dirdef.h"
 #include "memberlist.h"
-#include "docgroup.h"
 
 class RefList;
 class PageSList;
@@ -35,7 +34,6 @@ class PageSDict;
 class PageDef;
 class SearchIndexIntf;
 class ParserManager;
-class ObjCache;
 class Store;
 class QFileInfo;
 class BufStr;
@@ -47,9 +45,8 @@ class FileDef;
 class ClassDef;
 class ClassSDict;
 class GenericsSDict;
-class MemberNameSDict;
-class FileNameDict;
-class FileNameList;
+class MemberNameLinkedMap;
+class FileNameLinkedMap;
 class NamespaceSDict;
 class NamespaceDef;
 class DefinitionIntf;
@@ -59,7 +56,6 @@ class IndexList;
 class FormulaList;
 class FormulaDict;
 class FormulaNameDict;
-class SectionDict;
 class Preprocessor;
 struct MemberGroupInfo;
 
@@ -101,31 +97,25 @@ class Doxygen
     static PageSDict                *pageSDict;
     static PageDef                  *mainPage;
     static bool                      insideMainPage;
-    static FileNameDict             *includeNameDict;
-    static FileNameDict             *exampleNameDict;
+    static FileNameLinkedMap        *includeNameLinkedMap;
+    static FileNameLinkedMap        *exampleNameLinkedMap;
     static QDict<void>               inputPaths;
-    static FileNameDict             *inputNameDict;
-    static FileNameList             *inputNameList;
-    static FileNameDict             *imageNameDict;
-    static FileNameDict             *dotFileNameDict;
-    static FileNameDict             *mscFileNameDict;
-    static FileNameDict             *diaFileNameDict;
+    static FileNameLinkedMap        *inputNameLinkedMap;
+    static FileNameLinkedMap        *imageNameLinkedMap;
+    static FileNameLinkedMap        *dotFileNameLinkedMap;
+    static FileNameLinkedMap        *mscFileNameLinkedMap;
+    static FileNameLinkedMap        *diaFileNameLinkedMap;
+    static MemberNameLinkedMap      *memberNameLinkedMap;
+    static MemberNameLinkedMap      *functionNameLinkedMap;
     static QStrList                  tagfileList;
-    static MemberNameSDict          *memberNameSDict;
-    static MemberNameSDict          *functionNameSDict;
-    static SectionDict              *sectionDict;
     static StringDict                namespaceAliasDict;
     static GroupSDict               *groupSDict;
     static NamespaceSDict           *namespaceSDict;
-    static FormulaList              *formulaList;
-    static FormulaDict              *formulaDict;
-    static FormulaDict              *formulaNameDict;
     static StringDict                tagDestinationDict;
     static StringDict                aliasDict;
     static QIntDict<MemberGroupInfo> memGrpInfoDict;
     static QDict<void>               expandAsDefinedDict;
     static NamespaceDef             *globalScope;
-    static QDict<RefList>           *xrefLists; // array of xref lists: todo, test, bug, deprecated ...
     static QCString                  htmlFileExtension;
     static bool                      parseSourcesNeeded;
     static QTime                     runningTime;
@@ -143,8 +133,6 @@ class Doxygen
     static QCString                  objDBFileName;
     static QCString                  entryDBFileName;
     static QCString                  filterDBFileName;
-    static CiteDict                 *citeDict;
-    static bool                      gatherDefines;
     static bool                      userComments;
     static IndexList                *indexList;
     static int                       subpageNestingLevel;
@@ -152,7 +140,6 @@ class Doxygen
     static bool                      generatingXmlOutput;
     static bool                      markdownSupport;
     static GenericsSDict            *genericsDict;
-    static DocGroup                  docGroup;
     static Preprocessor             *preprocessor;
 };
 
@@ -167,8 +154,7 @@ void readAliases();
 void readFormulaRepository(QCString dir, bool cmp = FALSE);
 void cleanUpDoxygen();
 int readFileOrDirectory(const char *s,
-                        FileNameList *fnList,
-                        FileNameDict *fnDict,
+                        FileNameLinkedMap *fnDict,
                         StringDict *exclDict,
                         QStrList *patList,
                         QStrList *exclPatList,
@@ -180,8 +166,7 @@ int readFileOrDirectory(const char *s,
                         QDict<void> *paths = 0
                        );
 int readDir(QFileInfo *fi,
-            FileNameList *fnList,
-            FileNameDict *fnDict,
+            FileNameLinkedMap *fnDict,
             StringDict  *exclDict,
             QStrList *patList,
             QStrList *exclPatList,

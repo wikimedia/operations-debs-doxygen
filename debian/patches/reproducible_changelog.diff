@@ -6,7 +6,7 @@ Index: doxygen/doc/changelog.doc
 ===================================================================
 --- doxygen.orig/doc/changelog.doc
 +++ doxygen/doc/changelog.doc
-@@ -6534,7 +6534,7 @@ make sure you add the following:
+@@ -6704,7 +6704,7 @@ make sure you add the following:
         now be improved significantly.</li>
  <li>   Made some cosmetic changes to the HTML output (thanks to Ben Harper).</li>
  <li>   STRIP_FROM_PATH now by default strips the path from which doxygen is
@@ -15,7 +15,7 @@ Index: doxygen/doc/changelog.doc
  </ul>
  <h3>New features</h3>
  <ul>
-@@ -6585,7 +6585,7 @@ make sure you add the following:
+@@ -6755,7 +6755,7 @@ make sure you add the following:
         Eoin MacDonell for the fix).</li>
  <li>   Grouped pages in the XML output did have the same id as their group.</li>
  <li>   Fixed problem handling environment variables inside a

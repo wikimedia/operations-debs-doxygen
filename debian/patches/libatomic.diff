@@ -6,7 +6,7 @@ Index: doxygen/src/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/src/CMakeLists.txt
 +++ doxygen/src/CMakeLists.txt
-@@ -313,6 +313,9 @@ if (use_libclang)
+@@ -309,6 +309,9 @@ if (use_libclang)
      llvm_map_components_to_libnames(llvm_libs core option)
      target_compile_definitions(doxygen PRIVATE ${LLVM_DEFINITIONS})
      set(CLANG_LIBS libclang clangTooling ${llvm_libs})
@@ -16,14 +16,14 @@ Index: doxygen/src/CMakeLists.txt
  endif()
  
  target_link_libraries(doxygen
-@@ -329,6 +332,7 @@ target_link_libraries(doxygen
-     ${CMAKE_THREAD_LIBS_INIT}
+@@ -326,6 +329,7 @@ target_link_libraries(doxygen
      ${EXTRA_LIBS}
      ${CLANG_LIBS}
+     ${DOXYGEN_EXTRA_LINK_OPTIONS}
 +    ${EXTRA_CLANG_LIBS}
  )
  
- install(TARGETS doxygen DESTINATION bin)
+ set_project_warnings(doxycfg)
 Index: doxygen/addon/doxyparse/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/addon/doxyparse/CMakeLists.txt

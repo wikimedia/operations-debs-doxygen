@@ -426,6 +426,7 @@
       <xsd:element name="xmlonly" type="xsd:string" />
       <xsd:element name="rtfonly" type="xsd:string" />
       <xsd:element name="latexonly" type="xsd:string" />
+      <xsd:element name="docbookonly" type="xsd:string" />
       <xsd:element name="image" type="docImageType" />
       <xsd:element name="dot" type="docImageType" />
       <xsd:element name="msc" type="docImageType" />
@@ -446,7 +447,6 @@
   <xsd:group name="docCmdGroup">
     <xsd:choice>
       <xsd:group ref="docTitleCmdGroup"/>
-      <xsd:element name="linebreak" type="docEmptyType" />
       <xsd:element name="hruler" type="docEmptyType" />
       <xsd:element name="preformatted" type="docMarkupType" />
       <xsd:element name="programlisting" type="listingType" />
@@ -459,7 +459,6 @@
       <xsd:element name="variablelist" type="docVariableListType" />
       <xsd:element name="table" type="docTableType" />
       <xsd:element name="heading" type="docHeadingType" />
-      <xsd:element name="image" type="docImageType" />
       <xsd:element name="dotfile" type="docImageType" />
       <xsd:element name="mscfile" type="docImageType" />
       <xsd:element name="diafile" type="docImageType" />
@@ -569,6 +568,11 @@
       <xsd:element name="para" type="docParaType" minOccurs="0" maxOccurs="unbounded" />
     </xsd:sequence>
     <xsd:attribute name="thead" type="DoxBool" />
+    <xsd:attribute name="colspan" type="xsd:integer" />
+    <xsd:attribute name="rowspan" type="xsd:integer" />
+    <xsd:attribute name="align" type="DoxAlign" />
+    <xsd:attribute name="class" type="xsd:string" />
+    <xsd:anyAttribute processContents="skip"/>
   </xsd:complexType>
 
   <xsd:complexType name="docCaptionType" mixed="true">
@@ -771,7 +775,6 @@
       <xsd:enumeration value="VHDL" />
       <xsd:enumeration value="XML" />
       <xsd:enumeration value="SQL" />
-      <xsd:enumeration value="Tcl" />
       <xsd:enumeration value="Markdown" />
     </xsd:restriction>
   </xsd:simpleType>
@@ -932,6 +935,14 @@
       <xsd:enumeration value="weak"/>
       <xsd:enumeration value="strong"/>
       <xsd:enumeration value="unretained"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="DoxAlign">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="left"/>
+      <xsd:enumeration value="right"/>
+      <xsd:enumeration value="center"/>
     </xsd:restriction>
   </xsd:simpleType>
 

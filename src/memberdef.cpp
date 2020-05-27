@@ -36,7 +36,6 @@
 #include "dotcallgraph.h"
 #include "searchindex.h"
 #include "parserintf.h"
-#include "objcache.h"
 
 #include "vhdldocgen.h"
 #include "arguments.h"
@@ -944,30 +943,6 @@ static bool writeDefArgumentList(OutputList &ol,const Definition *scope,const Me
     return FALSE; // member has no function like argument list
   }
 
-  // simple argument list for tcl
-  if (md->getLanguage()==SrcLangExt_Tcl)
-  {
-    if (defArgList.empty()) return FALSE;
-    ol.endMemberDocName();
-    ol.startParameterList(FALSE);
-    ol.startParameterType(TRUE,0);
-    ol.endParameterType();
-    ol.startParameterName(FALSE);
-    for (const Argument &a : defArgList)
-    {
-      if (a.defval.isEmpty())
-      {
-        ol.docify(a.name+" ");
-      }
-      else
-      {
-        ol.docify("?"+a.name+"? ");
-      }
-    }
-    ol.endParameterName(TRUE,FALSE,FALSE);
-    return TRUE;
-  }
-
   if (!md->isDefine()) ol.docify(" ");
 
   //printf("writeDefArgList(%d)\n",defArgList->count());
@@ -1438,7 +1413,7 @@ MemberDefImpl::IMPL::~IMPL()
   delete classSectionSDict;
 }
 
-void MemberDefImpl::IMPL::init(Definition *def,
+void MemberDefImpl::IMPL::init(Definition *d,
                      const char *t,const char *a,const char *e,
                      Protection p,Specifier v,bool s,Relationship r,
                      MemberType mt,const ArgumentList &tal,
@@ -1473,7 +1448,7 @@ void MemberDefImpl::IMPL::init(Definition *def,
   type=removeRedundantWhiteSpace(type);
   args=a;
   args=removeRedundantWhiteSpace(args);
-  if (type.isEmpty()) decl=def->name()+args; else decl=type+" "+def->name()+args;
+  if (type.isEmpty()) decl=d->name()+args; else decl=type+" "+d->name()+args;
 
   memberGroup=0;
   virt=v;
@@ -1503,7 +1478,7 @@ void MemberDefImpl::IMPL::init(Definition *def,
   // convert function declaration arguments (if any)
   if (!args.isEmpty())
   {
-    stringToArgumentList(def->getLanguage(),args,declArgList,&extraTypeChars);
+    stringToArgumentList(d->getLanguage(),args,declArgList,&extraTypeChars);
     //printf("setDeclArgList %s to %s const=%d\n",args.data(),
     //    argListToString(declArgList).data(),declArgList->constSpecifier);
   }
@@ -1519,7 +1494,7 @@ void MemberDefImpl::IMPL::init(Definition *def,
   hasDocumentedParams = FALSE;
   hasDocumentedReturnType = FALSE;
   docProvider = 0;
-  isDMember = def->getDefFileName().right(2).lower()==".d";
+  isDMember = d->getDefFileName().right(2).lower()==".d";
 }
 
 
@@ -2640,7 +2615,6 @@ void MemberDefImpl::writeDeclaration(OutputList &ol,
       ol.writeDoc(rootNode,getOuterScope()?getOuterScope():d,this);
       if (detailsVisible)
       {
-        static bool separateMemberPages = Config_getBool(SEPARATE_MEMBER_PAGES);
         ol.pushGeneratorState();
         ol.disableAllBut(OutputGenerator::Html);
         //ol.endEmphasis();
@@ -3337,8 +3311,6 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
 {
   // if this member is in a group find the real scope name.
   bool hasParameterList = FALSE;
-  bool inFile = container->definitionType()==Definition::TypeFile;
-  bool hasDocs = isDetailedSectionVisible(inGroup,inFile);
 
   //printf("MemberDefImpl::writeDocumentation(): name='%s' hasDocs='%d' containerType=%d inGroup=%d sectionLinkable=%d\n",
   //    name().data(),hasDocs,container->definitionType(),inGroup,isDetailedSectionLinkable());
@@ -3494,7 +3466,6 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
     if (!Config_getBool(HIDE_SCOPE_NAMES))
     {
       bool first=TRUE;
-      SrcLangExt lang = getLanguage();
       if (!m_impl->defTmpArgLists.empty() && lang==SrcLangExt_Cpp)
         // definition has explicit template parameter declarations
       {
@@ -3567,9 +3538,9 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
       {
         ldef=ldef.left(dp+1);
       }
-      int l=ldef.length();
+      int dl=ldef.length();
       //printf("start >%s<\n",ldef.data());
-      int i=l-1;
+      i=dl-1;
       while (i>=0 && (isId(ldef.at(i)) || ldef.at(i)==':')) i--;
       while (i>=0 && isspace((uchar)ldef.at(i))) i--;
       if (i>0)
@@ -4073,11 +4044,34 @@ void MemberDefImpl::warnIfUndocumented() const
   }
 }
 
+static QCString removeReturnTypeKeywords(const QCString &s)
+{
+  QCString result = s;
+  bool done;
+  do
+  {
+    done=true;
+    if (result.stripPrefix("constexpr ")  ||
+        result.stripPrefix("consteval ") ||
+        result.stripPrefix("virtual ")   ||
+        result.stripPrefix("static ")    ||
+        result.stripPrefix("volatile "))
+    {
+      done=false;
+    }
+  }
+  while (!done);
+  return result;
+}
+
 void MemberDefImpl::detectUndocumentedParams(bool hasParamCommand,bool hasReturnCommand) const
 {
   if (!Config_getBool(WARN_NO_PARAMDOC)) return;
-  QCString returnType   = typeString();
+  QCString returnType = removeReturnTypeKeywords(typeString());
   bool isPython = getLanguage()==SrcLangExt_Python;
+  bool isFortran = getLanguage()==SrcLangExt_Fortran;
+  bool isFortranSubroutine = isFortran && returnType.find("subroutine")!=-1;
+  bool isVoidReturn = returnType=="void";
 
   if (!m_impl->hasDocumentedParams && hasParamCommand)
   {
@@ -4139,8 +4133,8 @@ void MemberDefImpl::detectUndocumentedParams(bool hasParamCommand,bool hasReturn
   else if ( // see if return type is documented in a function w/o return type
             hasReturnCommand &&
             (
-              returnType=="void"   || // void return type
-              returnType.find("subroutine")!=-1 || // fortran subroutine
+              isVoidReturn         || // void return type
+              isFortranSubroutine  || // fortran subroutine
               isConstructor()      || // a constructor
               isDestructor()          // or destructor
             )
@@ -4151,10 +4145,10 @@ void MemberDefImpl::detectUndocumentedParams(bool hasParamCommand,bool hasReturn
   }
   else if ( // see if return needs to documented 
             m_impl->hasDocumentedReturnType ||
-           returnType=="void" || // void return type
-           returnType.find("subroutine")!=-1 || // fortran subroutine
-           isConstructor()    || // a constructor
-           isDestructor()        // or destructor
+           isVoidReturn        || // void return type
+           isFortranSubroutine || // fortran subroutine
+           isConstructor()     || // a constructor
+           isDestructor()         // or destructor
           )
   {
     m_impl->hasDocumentedReturnType = TRUE;
@@ -4369,7 +4363,7 @@ MemberDef *MemberDefImpl::createTemplateInstanceMember(
   imd->setArgumentList(actualArgList);
   imd->setDefinition(substituteTemplateArgumentsInString(m_impl->def,formalArgs,actualArgs));
   imd->setBodyDef(getBodyDef());
-  imd->setBodySegment(getStartBodyLine(),getEndBodyLine());
+  imd->setBodySegment(getDefLine(),getStartBodyLine(),getEndBodyLine());
   //imd->setBodyMember(this);
 
   // TODO: init other member variables (if needed).
@@ -4456,7 +4450,7 @@ void MemberDefImpl::addListReference(Definition *)
       memArgs = argsString();
     }
   }
-  const std::vector<ListItemInfo> &xrefItems = xrefListItems();
+  const std::vector<RefItem*> &xrefItems = xrefListItems();
   addRefItem(xrefItems,
         qualifiedName()+argsString(), // argsString is needed for overloaded functions (see bug 609624)
         memLabel,
@@ -4467,7 +4461,7 @@ const MemberList *MemberDefImpl::getSectionList() const
 {
   const Definition *d= resolveAlias()->getOuterScope();
   char key[20];
-  sprintf(key,"%p",d);
+  sprintf(key,"%p",(void*)d);
   return (d!=0 && m_impl->classSectionSDict) ? m_impl->classSectionSDict->find(key) : 0;
 }
 
@@ -4476,7 +4470,7 @@ void MemberDefImpl::setSectionList(MemberList *sl)
   //printf("MemberDefImpl::setSectionList(%p,%p) name=%s\n",d,sl,name().data());
   const Definition *d= resolveAlias()->getOuterScope();
   char key[20];
-  sprintf(key,"%p",d);
+  sprintf(key,"%p",(void*)d);
   if (m_impl->classSectionSDict==0)
   {
     m_impl->classSectionSDict = new SDict<MemberList>(7);
@@ -4550,7 +4544,7 @@ void MemberDefImpl::writeTagFile(FTextStream &tagFile) const
     tagFile << "      <type>" << convertToXML(typeString()) << "</type>" << endl;
   }
   tagFile << "      <name>" << convertToXML(name()) << "</name>" << endl;
-  tagFile << "      <anchorfile>" << convertToXML(getOutputFileBase()+Doxygen::htmlFileExtension) << "</anchorfile>" << endl;
+  tagFile << "      <anchorfile>" << convertToXML(getOutputFileBase()) << Doxygen::htmlFileExtension << "</anchorfile>" << endl;
   tagFile << "      <anchor>" << convertToXML(anchor()) << "</anchor>" << endl;
   QCString idStr = id();
   if (!idStr.isEmpty())
@@ -4571,7 +4565,7 @@ void MemberDefImpl::writeTagFile(FTextStream &tagFile) const
         {
           tagFile << "      <enumvalue file=\"" << convertToXML(getOutputFileBase()+Doxygen::htmlFileExtension);
           tagFile << "\" anchor=\"" << convertToXML(fmd->anchor());
-          QCString idStr = fmd->id();
+          idStr = fmd->id();
           if (!idStr.isEmpty())
           {
             tagFile << "\" clangid=\"" << convertToXML(idStr);
@@ -4604,11 +4598,6 @@ void MemberDefImpl::_computeIsConstructor()
              getLanguage()==SrcLangExt_Python) // for Python
     {
       m_isConstructorCached = 2; // TRUE
-      return;
-    }
-    else if (getLanguage()==SrcLangExt_Tcl) // for Tcl
-    {
-      m_isConstructorCached = name()=="constructor" ? 2 : 1;
       return;
     }
     else // for other languages
@@ -4650,10 +4639,6 @@ void MemberDefImpl::_computeIsDestructor()
   else if (getLanguage()==SrcLangExt_PHP) // for PHP
   {
     isDestructor = name()=="__destruct";
-  }
-  else if (getLanguage()==SrcLangExt_Tcl) // for Tcl
-  {
-    isDestructor = name()=="destructor";
   }
   else if (name()=="__del__" &&
            getLanguage()==SrcLangExt_Python) // for Python
@@ -6032,14 +6017,14 @@ void combineDeclarationAndDefinition(MemberDef *mdec,MemberDef *mdef)
       if (mdec->getStartBodyLine()!=-1 && mdef->getStartBodyLine()==-1)
       {
         //printf("body mdec->mdef %d-%d\n",mdec->getStartBodyLine(),mdef->getEndBodyLine());
-        mdef->setBodySegment(mdec->getStartBodyLine(),mdec->getEndBodyLine());
+        mdef->setBodySegment(mdec->getDefLine(),mdec->getStartBodyLine(),mdec->getEndBodyLine());
         mdef->setBodyDef(mdec->getBodyDef());
         //mdef->setBodyMember(mdec);
       }
       else if (mdef->getStartBodyLine()!=-1 && mdec->getStartBodyLine()==-1)
       {
         //printf("body mdef->mdec %d-%d\n",mdef->getStartBodyLine(),mdec->getEndBodyLine());
-        mdec->setBodySegment(mdef->getStartBodyLine(),mdef->getEndBodyLine());
+        mdec->setBodySegment(mdef->getDefLine(),mdef->getStartBodyLine(),mdef->getEndBodyLine());
         mdec->setBodyDef(mdef->getBodyDef());
         //mdec->setBodyMember(mdef);
       }
