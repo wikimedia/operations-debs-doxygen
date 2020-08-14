@@ -1446,16 +1446,6 @@ static void addTemplateArgumentList(const ArgumentList &al,PerlModOutput &output
   output.closeList();
 }
 
-#if 0
-static void addMemberTemplateLists(MemberDef *md,PerlModOutput &output)
-{
-  ClassDef *cd = md->getClassDef();
-  const char *cname = cd ? cd->name().data() : 0;
-  if (md->templateArguments()) // function template prefix
-    addTemplateArgumentList(md->templateArguments(),output,cname);
-}
-#endif
-
 static void addTemplateList(const ClassDef *cd,PerlModOutput &output)
 {
   addTemplateArgumentList(cd->templateArguments(),output,cd->name());
@@ -1473,7 +1463,8 @@ static void addPerlModDocBlock(PerlModOutput &output,
   if (stext.isEmpty())
     output.addField(name).add("{}");
   else {
-    DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,stext,FALSE,0);
+    DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,stext,FALSE,FALSE,
+                                       0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     output.openHash(name);
     PerlModDocVisitor *visitor = new PerlModDocVisitor(output);
     root->accept(visitor);
@@ -1615,8 +1606,8 @@ void PerlModGenerator::generatePerlModForMember(const MemberDef *md,const Defini
   const ArgumentList &al = md->argumentList();
   if (isFunc) //function
   {
-    m_output.addFieldBoolean("const",    al.constSpecifier)
-            .addFieldBoolean("volatile", al.volatileSpecifier);
+    m_output.addFieldBoolean("const",    al.constSpecifier())
+            .addFieldBoolean("volatile", al.volatileSpecifier());
 
     m_output.openList("parameters");
     const ArgumentList &declAl = md->declArgumentList();
@@ -1705,6 +1696,15 @@ void PerlModGenerator::generatePerlModForMember(const MemberDef *md,const Defini
     }
   }
 
+  /* DGA: fix #7495  Perlmod does not generate bitfield */
+  if (md->memberType() == MemberType_Variable && md->bitfieldString())
+  {
+	QCString bitfield = md->bitfieldString();
+	if (bitfield.at(0) == ':') bitfield = bitfield.mid(1);
+	m_output.addFieldQuotedString("bitfield", bitfield);
+  }
+  /* DGA: end of fix #7495 */
+
   const MemberDef *rmd = md->reimplements();
   if (rmd)
     m_output.openHash("reimplements")
@@ -1750,32 +1750,25 @@ void PerlModGenerator::generatePerlModSection(const Definition *d,
 void PerlModGenerator::addListOfAllMembers(const ClassDef *cd)
 {
   m_output.openList("all_members");
-  if (cd->memberNameInfoSDict())
+  for (auto &mni : cd->memberNameInfoLinkedMap())
   {
-    MemberNameInfoSDict::Iterator mnii(*cd->memberNameInfoSDict());
-    MemberNameInfo *mni;
-    for (mnii.toFirst();(mni=mnii.current());++mnii)
+    for (auto &mi : *mni)
     {
-      MemberNameInfoIterator mii(*mni);
-      MemberInfo *mi;
-      for (mii.toFirst();(mi=mii.current());++mii)
-      {
-        const MemberDef *md=mi->memberDef;
-        const ClassDef  *mcd=md->getClassDef();
-        const Definition *d=md->getGroupDef();
-        if (d==0) d = mcd;
+      const MemberDef *md=mi->memberDef();
+      const ClassDef  *mcd=md->getClassDef();
+      const Definition *d=md->getGroupDef();
+      if (d==0) d = mcd;
 
-        m_output.openHash()
-          .addFieldQuotedString("name", md->name())
-          .addFieldQuotedString("virtualness", getVirtualnessName(md->virtualness()))
-          .addFieldQuotedString("protection", getProtectionName(mi->prot));
+      m_output.openHash()
+        .addFieldQuotedString("name", md->name())
+        .addFieldQuotedString("virtualness", getVirtualnessName(md->virtualness()))
+        .addFieldQuotedString("protection", getProtectionName(mi->prot()));
 
-        if (!mi->ambiguityResolutionScope.isEmpty())
-          m_output.addFieldQuotedString("ambiguity_scope", mi->ambiguityResolutionScope);
+      if (!mi->ambiguityResolutionScope().isEmpty())
+        m_output.addFieldQuotedString("ambiguity_scope", mi->ambiguityResolutionScope());
 
-        m_output.addFieldQuotedString("scope", mcd->name())
-          .closeHash();
-      }
+      m_output.addFieldQuotedString("scope", mcd->name())
+        .closeHash();
     }
   }
   m_output.closeList();

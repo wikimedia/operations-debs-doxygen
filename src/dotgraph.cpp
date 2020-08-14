@@ -74,15 +74,6 @@ static bool checkDeliverables(const QCString &file1,
   return file1Ok && file2Ok;
 }
 
-static void removeDotGraph(const QCString &dotName)
-{
-  if (Config_getBool(DOT_CLEANUP))
-  {
-    QDir d;
-    d.remove(dotName);
-  }
-}
-
 static bool insertMapFile(FTextStream &out,const QCString &mapFile,
                           const QCString &relPath,const QCString &mapLabel)
 {
@@ -108,7 +99,7 @@ static bool insertMapFile(FTextStream &out,const QCString &mapFile,
 QCString DotGraph::imgName() const
 {
   return m_baseName + ((m_graphFormat == GOF_BITMAP) ?
-                      ("." + getDotImageExtension()) : (Config_getBool(USE_PDFLATEX) ? ".pdf" : ".eps")); 
+                      ("." + getDotImageExtension()) : (Config_getBool(USE_PDFLATEX) ? ".pdf" : ".eps"));
 }
 
 QCString DotGraph::writeGraph(
@@ -166,7 +157,6 @@ bool DotGraph::prepareDotFile()
      )
   {
     // all needed files are there
-    removeDotGraph(absDotName());
     return FALSE;
   }
 
@@ -246,7 +236,7 @@ void DotGraph::generateCode(FTextStream &t)
     else // add link to bitmap file with image map
     {
       if (!m_noDivTag) t << "<div class=\"center\">";
-      t << "<img src=\"" << relImgName() << "\" border=\"0\" usemap=\"#" << getMapLabel() << "\" alt=\"" << getImgAltText() << "\"/>";
+      t << "<img src=\"" << relImgName() << "\" border=\"0\" usemap=\"#" << correctId(getMapLabel()) << "\" alt=\"" << getImgAltText() << "\"/>";
       if (!m_noDivTag) t << "</div>";
       t << endl;
       if (m_regenerate || !insertMapFile(t, absMapName(), m_relPath, getMapLabel()))

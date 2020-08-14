@@ -93,7 +93,7 @@ class MemberDefImpl : public DefinitionImpl, public MemberDef
     virtual int getGroupStartLine() const;
     virtual bool getGroupHasDocs() const;
     virtual QCString qualifiedName() const;
-    virtual QCString objCMethodName(bool localLink,bool showStatic) const; 
+    virtual QCString objCMethodName(bool localLink,bool showStatic) const;
     virtual Protection protection() const;
     virtual Specifier virtualness(int count=0) const;
     virtual MemberType memberType() const;
@@ -205,7 +205,7 @@ class MemberDefImpl : public DefinitionImpl, public MemberDef
     virtual ArgumentList &argumentList();
     virtual const ArgumentList &declArgumentList() const;
     virtual const ArgumentList &templateArguments() const;
-    virtual const std::vector<ArgumentList> &definitionTemplateParameterLists() const;
+    virtual const ArgumentLists &definitionTemplateParameterLists() const;
     virtual int getMemberGroupId() const;
     virtual MemberGroup *getMemberGroup() const;
     virtual bool fromAnonymousScope() const;
@@ -275,9 +275,9 @@ class MemberDefImpl : public DefinitionImpl, public MemberDef
     virtual void setPrototype(bool p,const QCString &df,int line, int column);
     virtual void setExplicitExternal(bool b,const QCString &df,int line,int column);
     virtual void setDeclFile(const QCString &df,int line,int column);
-    virtual void setArgumentList(const ArgumentList &al);
-    virtual void setDeclArgumentList(const ArgumentList &al);
-    virtual void setDefinitionTemplateParameterLists(const std::vector<ArgumentList> &lists);
+    virtual void moveArgumentList(std::unique_ptr<ArgumentList> al);
+    virtual void moveDeclArgumentList(std::unique_ptr<ArgumentList> al);
+    virtual void setDefinitionTemplateParameterLists(const ArgumentLists &lists);
     virtual void setTypeConstraints(const ArgumentList &al);
     virtual void setType(const char *t);
     virtual void setAccessorType(ClassDef *cd,const char *t);
@@ -324,7 +324,7 @@ class MemberDefImpl : public DefinitionImpl, public MemberDef
     virtual void warnIfUndocumentedParams() const;
     virtual void detectUndocumentedParams(bool hasParamCommand,bool hasReturnCommand) const;
     virtual MemberDef *createTemplateInstanceMember(const ArgumentList &formalArgs,
-               const ArgumentList &actualArgs) const;
+               const std::unique_ptr<ArgumentList> &actualArgs) const;
     virtual void findSectionsInDocumentation();
     virtual void writeLink(OutputList &ol,
                    const ClassDef *cd,const NamespaceDef *nd,const FileDef *fd,const GroupDef *gd,
@@ -378,7 +378,7 @@ MemberDef *createMemberDef(const char *defFileName,int defLine,int defColumn,
 class MemberDefAliasImpl : public DefinitionAliasImpl, public MemberDef
 {
   public:
-    MemberDefAliasImpl(const Definition *newScope,const MemberDef *md) 
+    MemberDefAliasImpl(const Definition *newScope,const MemberDef *md)
     : DefinitionAliasImpl(newScope,md), m_memberGroup(0) {}
     virtual ~MemberDefAliasImpl() {}
     virtual DefType definitionType() const { return TypeMember; }
@@ -666,7 +666,7 @@ class MemberDefAliasImpl : public DefinitionAliasImpl, public MemberDef
     { return getMdAlias()->declArgumentList(); }
     virtual const ArgumentList &templateArguments() const
     { return getMdAlias()->templateArguments(); }
-    virtual const std::vector<ArgumentList> &definitionTemplateParameterLists() const
+    virtual const ArgumentLists &definitionTemplateParameterLists() const
     { return getMdAlias()->definitionTemplateParameterLists(); }
     virtual int getMemberGroupId() const
     { return getMdAlias()->getMemberGroupId(); }
@@ -787,9 +787,9 @@ class MemberDefAliasImpl : public DefinitionAliasImpl, public MemberDef
     virtual void setPrototype(bool p,const QCString &df,int line, int column) {}
     virtual void setExplicitExternal(bool b,const QCString &df,int line,int column) {}
     virtual void setDeclFile(const QCString &df,int line,int column) {}
-    virtual void setArgumentList(const ArgumentList &al) {}
-    virtual void setDeclArgumentList(const ArgumentList &al) {}
-    virtual void setDefinitionTemplateParameterLists(const std::vector<ArgumentList> &lists) {}
+    virtual void moveArgumentList(std::unique_ptr<ArgumentList> al) {}
+    virtual void moveDeclArgumentList(std::unique_ptr<ArgumentList> al) {}
+    virtual void setDefinitionTemplateParameterLists(const ArgumentLists &lists) {}
     virtual void setTypeConstraints(const ArgumentList &al) {}
     virtual void setType(const char *t) {}
     virtual void setAccessorType(ClassDef *cd,const char *t) {}
@@ -823,7 +823,7 @@ class MemberDefAliasImpl : public DefinitionAliasImpl, public MemberDef
     virtual void addToSearchIndex() const {}
     virtual void findSectionsInDocumentation() {}
     virtual MemberDef *createTemplateInstanceMember(const ArgumentList &formalArgs,
-               const ArgumentList &actualArgs) const
+               const std::unique_ptr<ArgumentList> &actualArgs) const
     { return getMdAlias()->createTemplateInstanceMember(formalArgs,actualArgs); }
     virtual void incrementFlowKeyWordCount() {}
 
@@ -1148,29 +1148,29 @@ static bool writeDefArgumentList(OutputList &ol,const Definition *scope,const Me
   {
     ol.docify(md->extraTypeChars());
   }
-  if (defArgList.constSpecifier)
+  if (defArgList.constSpecifier())
   {
     ol.docify(" const");
   }
-  if (defArgList.volatileSpecifier)
+  if (defArgList.volatileSpecifier())
   {
     ol.docify(" volatile");
   }
-  if (defArgList.refQualifier==RefQualifierLValue)
+  if (defArgList.refQualifier()==RefQualifierLValue)
   {
     ol.docify(" &");
   }
-  else if (defArgList.refQualifier==RefQualifierRValue)
+  else if (defArgList.refQualifier()==RefQualifierRValue)
   {
     ol.docify(" &&");
   }
-  if (!defArgList.trailingReturnType.isEmpty())
+  if (!defArgList.trailingReturnType().isEmpty())
   {
     linkifyText(TextGeneratorOLImpl(ol), // out
                 scope,                   // scope
                 md->getBodyDef(),        // fileScope
                 md,                      // self
-                defArgList.trailingReturnType, // text
+                defArgList.trailingReturnType(), // text
                 FALSE                    // autoBreak
                );
 
@@ -1324,7 +1324,7 @@ class MemberDefImpl::IMPL
     ArgumentList tArgList;      // template argument list of function template
     ArgumentList typeConstraints; // type constraints for template parameters
     MemberDef *templateMaster;
-    std::vector<ArgumentList> defTmpArgLists; // lists of template argument lists
+    ArgumentLists defTmpArgLists; // lists of template argument lists
                                          // (for template functions in nested template classes)
 
     QCString metaData;        // Slice metadata.
@@ -1478,7 +1478,7 @@ void MemberDefImpl::IMPL::init(Definition *d,
   // convert function declaration arguments (if any)
   if (!args.isEmpty())
   {
-    stringToArgumentList(d->getLanguage(),args,declArgList,&extraTypeChars);
+    declArgList = *stringToArgumentList(d->getLanguage(),args,&extraTypeChars);
     //printf("setDeclArgList %s to %s const=%d\n",args.data(),
     //    argListToString(declArgList).data(),declArgList->constSpecifier);
   }
@@ -1960,7 +1960,7 @@ bool MemberDefImpl::isLinkable() const
 }
 
 
-void MemberDefImpl::setDefinitionTemplateParameterLists(const std::vector<ArgumentList> &lists)
+void MemberDefImpl::setDefinitionTemplateParameterLists(const ArgumentLists &lists)
 {
   m_impl->defTmpArgLists = lists;
 }
@@ -2534,7 +2534,7 @@ void MemberDefImpl::writeDeclaration(OutputList &ol,
     ol.docify(" [implementation]");
     ol.endTypewriter();
   }
-  
+
   bool extractPrivate = Config_getBool(EXTRACT_PRIVATE);
 
   if (isProperty() && (isSettable() || isGettable() ||
@@ -2545,7 +2545,7 @@ void MemberDefImpl::writeDeclaration(OutputList &ol,
       ol.startTypewriter();
       ol.docify(" [");
       QStrList sl;
-      
+
       if (isGettable())             sl.append("get");
       if (isProtectedGettable())    sl.append("protected get");
       if (isSettable())             sl.append("set");
@@ -2606,8 +2606,8 @@ void MemberDefImpl::writeDeclaration(OutputList &ol,
      )
   {
     DocRoot *rootNode = validatingParseDoc(briefFile(),briefLine(),
-                getOuterScope()?getOuterScope():d,this,briefDescription(),
-                TRUE,FALSE,0,TRUE,FALSE);
+                getOuterScope()?getOuterScope():d,this,briefDescription(),TRUE,FALSE,
+                0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
 
     if (rootNode && !rootNode->isEmpty())
     {
@@ -2733,7 +2733,7 @@ void MemberDefImpl::getLabels(QStrList &sl,const Definition *container) const
        isFriend() || isRelated() ||
        (isInline() && inlineInfo) ||
        isSignal() || isSlot() ||
-       isStatic() ||
+       isStatic() || isExternal() ||
        (getClassDef() && getClassDef()!=container && container->definitionType()==TypeClass) ||
        (m_impl->memSpec & ~Entry::Inline)!=0
       )
@@ -2745,7 +2745,7 @@ void MemberDefImpl::getLabels(QStrList &sl,const Definition *container) const
     //ol.docify(" [");
     SrcLangExt lang = getLanguage();
     bool optVhdl = lang==SrcLangExt_VHDL;
-    bool extractPrivate = Config_getBool(EXTRACT_PRIVATE);
+    static bool extractPrivate = Config_getBool(EXTRACT_PRIVATE);
     if (optVhdl)
     {
       sl.append(theTranslator->trVhdlType(getMemberSpecifiers(),TRUE));
@@ -2756,7 +2756,8 @@ void MemberDefImpl::getLabels(QStrList &sl,const Definition *container) const
       else if (isRelated()) sl.append("related");
       else
       {
-        if      (Config_getBool(INLINE_INFO) && isInline()) sl.append("inline");
+        if      (isExternal())            sl.append("extern");
+        if      (inlineInfo && isInline()) sl.append("inline");
         if      (isExplicit())            sl.append("explicit");
         if      (isMutable())             sl.append("mutable");
         if      (isStatic())              sl.append("static");
@@ -3146,7 +3147,8 @@ void MemberDefImpl::_writeEnumValues(OutputList &ol,const Definition *container,
           {
             ol.generateDoc(fmd->briefFile(),fmd->briefLine(),
                 getOuterScope()?getOuterScope():container,
-                fmd,fmd->briefDescription(),TRUE,FALSE);
+                fmd,fmd->briefDescription(),TRUE,FALSE,
+                0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
           }
           // FIXME:PARA
           //if (!fmd->briefDescription().isEmpty() &&
@@ -3158,7 +3160,8 @@ void MemberDefImpl::_writeEnumValues(OutputList &ol,const Definition *container,
           {
             ol.generateDoc(fmd->docFile(),fmd->docLine(),
                 getOuterScope()?getOuterScope():container,
-                fmd,fmd->documentation()+"\n",TRUE,FALSE);
+                fmd,fmd->documentation()+"\n",TRUE,FALSE,
+                0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
           }
           ol.endDescTableData();
           ol.endDescTableRow();
@@ -3706,7 +3709,8 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
     ol.startParagraph();
     ol.generateDoc(briefFile(),briefLine(),
                 scopedContainer,this,
-                brief,FALSE,FALSE,0,TRUE,FALSE);
+                brief,FALSE,FALSE,
+                0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     ol.endParagraph();
   }
 
@@ -3722,14 +3726,16 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
     }
     else
     {
-      ol.generateDoc(docFile(),docLine(),scopedContainer,this,detailed+"\n",TRUE,FALSE);
+      ol.generateDoc(docFile(),docLine(),scopedContainer,this,detailed+"\n",TRUE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
 
     if (!inbodyDocumentation().isEmpty())
     {
       ol.generateDoc(inbodyFile(),inbodyLine(),
-                  scopedContainer,this,
-                  inbodyDocumentation()+"\n",TRUE,FALSE);
+                     scopedContainer,this,
+                     inbodyDocumentation()+"\n",TRUE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
   }
   else if (!brief.isEmpty() && (Config_getBool(REPEAT_BRIEF) ||
@@ -3737,7 +3743,8 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
   {
     if (!inbodyDocumentation().isEmpty())
     {
-      ol.generateDoc(inbodyFile(),inbodyLine(),scopedContainer,this,inbodyDocumentation()+"\n",TRUE,FALSE);
+      ol.generateDoc(inbodyFile(),inbodyLine(),scopedContainer,this,inbodyDocumentation()+"\n",TRUE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
   }
 
@@ -3754,7 +3761,7 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
       {
         QCString docsWithoutDir = a.docs;
         QCString direction = extractDirection(docsWithoutDir);
-        paramDocs+="@param"+direction+" "+a.name+" "+a.docs;
+        paramDocs+="@param"+direction+" "+a.name+" "+docsWithoutDir;
       }
     }
     // feed the result to the documentation parser
@@ -3764,7 +3771,8 @@ void MemberDefImpl::writeDocumentation(const MemberList *ml,
         this,         // memberDef
         paramDocs,    // docStr
         TRUE,         // indexWords
-        FALSE         // isExample
+        FALSE,        // isExample
+        0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT)
         );
 
   }
@@ -3958,7 +3966,8 @@ void MemberDefImpl::writeMemberDocSimple(OutputList &ol, const Definition *conta
   {
     ol.generateDoc(briefFile(),briefLine(),
                 getOuterScope()?getOuterScope():container,this,
-                brief,FALSE,FALSE,0,TRUE,FALSE);
+                brief,FALSE,FALSE,
+                0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
   }
 
   /* write detailed description */
@@ -3966,7 +3975,8 @@ void MemberDefImpl::writeMemberDocSimple(OutputList &ol, const Definition *conta
   {
     ol.generateDoc(docFile(),docLine(),
                 getOuterScope()?getOuterScope():container,this,
-                detailed+"\n",FALSE,FALSE,0,FALSE,FALSE);
+                detailed+"\n",FALSE,FALSE,
+                0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
 
   }
 
@@ -4008,16 +4018,13 @@ void MemberDefImpl::warnIfUndocumented() const
   const FileDef      *fd = getFileDef();
   const GroupDef     *gd = getGroupDef();
   const Definition *d=0;
-  const char *t=0;
+  QCString t;
   if (cd)
-    t="class", d=cd;
+    t=cd->compoundTypeString(), d=cd;
   else if (nd)
   {
     d=nd;
-    if (d->getLanguage() == SrcLangExt_Fortran)
-      t="module";
-    else
-      t="namespace";
+    t=nd->compoundTypeString();
   }
   else if (gd)
     t="group", d=gd;
@@ -4036,7 +4043,7 @@ void MemberDefImpl::warnIfUndocumented() const
      )
   {
     warn_undoc(getDefFileName(),getDefLine(),"Member %s%s (%s) of %s %s is not documented.",
-         qPrint(name()),qPrint(argsString()),qPrint(memberTypeName()),t,qPrint(d->name()));
+         qPrint(name()),qPrint(argsString()),qPrint(memberTypeName()),qPrint(t),qPrint(d->name()));
   }
   else if (!isDetailedSectionLinkable())
   {
@@ -4143,7 +4150,7 @@ void MemberDefImpl::detectUndocumentedParams(bool hasParamCommand,bool hasReturn
     warn_doc_error(getDefFileName(),getDefLine(),"documented empty return type of %s",
                           qualifiedName().data());
   }
-  else if ( // see if return needs to documented 
+  else if ( // see if return needs to documented
             m_impl->hasDocumentedReturnType ||
            isVoidReturn        || // void return type
            isFortranSubroutine || // fortran subroutine
@@ -4160,6 +4167,7 @@ void MemberDefImpl::warnIfUndocumentedParams() const
   if (!Config_getBool(EXTRACT_ALL) &&
       Config_getBool(WARN_IF_UNDOCUMENTED) &&
       Config_getBool(WARN_NO_PARAMDOC) &&
+      isFunction() &&
       !isDeleted() &&
       !isReference() &&
       !Doxygen::suppressDocWarnings)
@@ -4172,7 +4180,7 @@ void MemberDefImpl::warnIfUndocumentedParams() const
           qPrint(qualifiedName()));
     }
     if (!m_impl->hasDocumentedReturnType &&
-        isFunction() && hasDocumentation() && !returnType.isEmpty())
+        hasDocumentation() && !returnType.isEmpty())
     {
       warn_doc_error(getDefFileName(),getDefLine(),
           "return type of member %s is not documented",
@@ -4193,7 +4201,7 @@ bool MemberDefImpl::isDocumentedFriendClass() const
 
 bool MemberDefImpl::isDeleted() const
 {
-  return m_impl->defArgList.isDeleted;
+  return m_impl->defArgList.isDeleted();
 }
 
 bool MemberDefImpl::hasDocumentation() const
@@ -4328,21 +4336,25 @@ void MemberDefImpl::setNamespace(NamespaceDef *nd)
 }
 
 MemberDef *MemberDefImpl::createTemplateInstanceMember(
-        const ArgumentList &formalArgs,const ArgumentList &actualArgs) const
+        const ArgumentList &formalArgs,const std::unique_ptr<ArgumentList> &actualArgs) const
 {
   //printf("  Member %s %s %s\n",typeString(),name().data(),argsString());
-  ArgumentList actualArgList;
+  std::unique_ptr<ArgumentList> actualArgList;
   if (!m_impl->defArgList.empty())
   {
-    actualArgList = m_impl->defArgList;
+    actualArgList = std::make_unique<ArgumentList>(m_impl->defArgList);
 
     // replace formal arguments with actuals
-    for (Argument &arg : actualArgList)
+    for (Argument &arg : *actualArgList)
     {
       arg.type = substituteTemplateArgumentsInString(arg.type,formalArgs,actualArgs);
     }
-    actualArgList.trailingReturnType =
-       substituteTemplateArgumentsInString(actualArgList.trailingReturnType,formalArgs,actualArgs);
+    actualArgList->setTrailingReturnType(
+       substituteTemplateArgumentsInString(actualArgList->trailingReturnType(),formalArgs,actualArgs));
+  }
+  else
+  {
+    actualArgList = std::make_unique<ArgumentList>();
   }
 
   QCString methodName=name();
@@ -4357,10 +4369,10 @@ MemberDef *MemberDefImpl::createTemplateInstanceMember(
                        methodName,
                        substituteTemplateArgumentsInString(m_impl->args,formalArgs,actualArgs),
                        m_impl->exception, m_impl->prot,
-                       m_impl->virt, m_impl->stat, m_impl->related, m_impl->mtype, 
+                       m_impl->virt, m_impl->stat, m_impl->related, m_impl->mtype,
                        ArgumentList(), ArgumentList(), ""
                    );
-  imd->setArgumentList(actualArgList);
+  imd->moveArgumentList(std::move(actualArgList));
   imd->setDefinition(substituteTemplateArgumentsInString(m_impl->def,formalArgs,actualArgs));
   imd->setBodyDef(getBodyDef());
   imd->setBodySegment(getDefLine(),getStartBodyLine(),getEndBodyLine());
@@ -4450,7 +4462,7 @@ void MemberDefImpl::addListReference(Definition *)
       memArgs = argsString();
     }
   }
-  const std::vector<RefItem*> &xrefItems = xrefListItems();
+  const RefItemVector &xrefItems = xrefListItems();
   addRefItem(xrefItems,
         qualifiedName()+argsString(), // argsString is needed for overloaded functions (see bug 609624)
         memLabel,
@@ -4789,14 +4801,14 @@ void MemberDefImpl::writeEnumDeclaration(OutputList &typeDecl,
   }
 }
 
-void MemberDefImpl::setArgumentList(const ArgumentList &al)
+void MemberDefImpl::moveArgumentList(std::unique_ptr<ArgumentList> al)
 {
-  m_impl->defArgList = al;
+  m_impl->defArgList = *al;
 }
 
-void MemberDefImpl::setDeclArgumentList(const ArgumentList &al)
+void MemberDefImpl::moveDeclArgumentList(std::unique_ptr<ArgumentList> al)
 {
-  m_impl->declArgList = al;
+  m_impl->declArgList = *al;
 }
 
 void MemberDefImpl::setTypeConstraints(const ArgumentList &al)
@@ -5476,7 +5488,7 @@ const ArgumentList &MemberDefImpl::templateArguments() const
   return m_impl->tArgList;
 }
 
-const std::vector<ArgumentList> &MemberDefImpl::definitionTemplateParameterLists() const
+const ArgumentLists &MemberDefImpl::definitionTemplateParameterLists() const
 {
   return m_impl->defTmpArgLists;
 }
@@ -5927,8 +5939,8 @@ static void transferArgumentDocumentation(ArgumentList &decAl,ArgumentList &defA
             decIt!= decAl.end() && defIt!= defAl.end();
           ++decIt,               ++defIt)
   {
-    Argument decA = *decIt;
-    Argument defA = *defIt;
+    Argument &decA = *decIt;
+    Argument &defA = *defIt;
     if (decA.docs.isEmpty() && !defA.docs.isEmpty())
     {
       decA.docs = defA.docs;
@@ -5956,8 +5968,8 @@ void combineDeclarationAndDefinition(MemberDef *mdec,MemberDef *mdef)
     const MemberDef *cmdef = const_cast<const MemberDef*>(mdef);
     ArgumentList &mdefAl = mdef->argumentList();
     ArgumentList &mdecAl = mdec->argumentList();
-    if (matchArguments2(cmdef->getOuterScope(),cmdef->getFileDef(),mdefAl,
-                        cmdec->getOuterScope(),cmdec->getFileDef(),mdecAl,
+    if (matchArguments2(cmdef->getOuterScope(),cmdef->getFileDef(),&mdefAl,
+                        cmdec->getOuterScope(),cmdec->getFileDef(),&mdecAl,
                         TRUE
                        )
        ) /* match found */
@@ -5987,10 +5999,9 @@ void combineDeclarationAndDefinition(MemberDef *mdec,MemberDef *mdef)
         mdec->setDocsForDefinition(mdef->isDocsForDefinition());
         if (mdefAl.hasParameters())
         {
-          ArgumentList mdefAlComb;
-          stringToArgumentList(mdef->getLanguage(),mdef->argsString(),mdefAlComb);
-          transferArgumentDocumentation(mdefAl,mdefAlComb);
-          mdec->setArgumentList(mdefAlComb);
+          auto mdefAlComb = stringToArgumentList(mdef->getLanguage(),mdef->argsString());
+          transferArgumentDocumentation(mdefAl,*mdefAlComb);
+          mdec->moveArgumentList(std::move(mdefAlComb));
         }
       }
       else if (!mdec->documentation().isEmpty())
@@ -6000,10 +6011,9 @@ void combineDeclarationAndDefinition(MemberDef *mdec,MemberDef *mdef)
         mdef->setDocsForDefinition(mdec->isDocsForDefinition());
         if (mdecAl.hasParameters())
         {
-          ArgumentList mdecAlComb;
-          stringToArgumentList(mdec->getLanguage(),mdec->argsString(),mdecAlComb);
-          transferArgumentDocumentation(mdecAl,mdecAlComb);
-          mdef->setDeclArgumentList(mdecAlComb);
+          auto mdecAlComb = stringToArgumentList(mdec->getLanguage(),mdec->argsString());
+          transferArgumentDocumentation(mdecAl,*mdecAlComb);
+          mdef->moveDeclArgumentList(std::move(mdecAlComb));
         }
       }
       if (!mdef->inbodyDocumentation().isEmpty())
