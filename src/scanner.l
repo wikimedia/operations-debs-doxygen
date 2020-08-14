@@ -38,7 +38,6 @@
 #include <ctype.h>
 
 #include <qarray.h>
-#include <qstack.h>
 #include <qregexp.h>
 #include <qfile.h>
 
@@ -161,7 +160,6 @@ struct scannerYY_state
   QGString        *pCopyHereDocGString = 0;
   QGString        *pCopyRawGString = 0;
   QGString        *pSkipVerbString = 0;
-  QStack<Grouping> autoGroupStack;
 
   bool             insideFormula = false;
   bool             insideTryBlock = false;
@@ -195,6 +193,8 @@ struct scannerYY_state
   uint             fencedSize = 0;
   bool             nestedComment = false;
   std::vector< std::pair<Entry*,std::shared_ptr<Entry> > > outerScopeEntries;
+
+  ClangTUParser * clangParser = 0;
 };
 
 #if USE_STATE2STRING
@@ -251,7 +251,7 @@ RAWBEGIN  (u|U|L|u8)?R\"[^ \t\(\)\\]{0,16}"("
 RAWEND    ")"[^ \t\(\)\\]{0,16}\"
 ARITHOP   "+"|"-"|"/"|"*"|"%"|"--"|"++"
 ASSIGNOP  "="|"*="|"/="|"%="|"+="|"-="|"<<="|">>="|"&="|"^="|"|="
-LOGICOP   "=="|"!="|">"|"<"|">="|"<="|"&&"|"||"|"!"
+LOGICOP   "=="|"!="|">"|"<"|">="|"<="|"&&"|"||"|"!"|"<=>"
 BITOP     "&"|"|"|"^"|"<<"|">>"|"~"
 OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 
@@ -768,9 +768,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    yyextra->current->type = "id";
 					  }
 					  yyextra->current->name = yytext;
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
   					}
 <ObjCMethod>":"{B}*			{ // start of parameter list
@@ -852,7 +852,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  }
                                           if (yyextra->current->argList.empty()) // method without parameters
                                           {
-                                            yyextra->current->argList.noParameters = TRUE;
+                                            yyextra->current->argList.setNoParameters(TRUE);
                                           }
   					  yyextra->current->args = argListToString(yyextra->current->argList);
 					  //printf("argList=%s\n",yyextra->current->args.data());
@@ -870,7 +870,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  }
                                           if (yyextra->current->argList.empty()) // method without parameters
                                           {
-                                            yyextra->current->argList.noParameters = TRUE;
+                                            yyextra->current->argList.setNoParameters(TRUE);
                                           }
   					  yyextra->current->args = argListToString(yyextra->current->argList);
                                           unput('{');
@@ -1644,17 +1644,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					}
 <NSAliasArg>({ID}"::")*{ID}		{
   					  //printf("Inserting namespace alias %s::%s->%s\n",yyextra->current_root->name.data(),yyextra->aliasName.data(),yytext);
-					  //if (yyextra->current_root->name.isEmpty())
-					  //{
                                           // TODO: namespace aliases are now treated as global entities
                                           // while they should be aware of the scope they are in
-                                            Doxygen::namespaceAliasDict.insert(yyextra->aliasName,new QCString(yytext));
-					  //}
-					  //else
-					  //{
-                                          //  Doxygen::namespaceAliasDict.insert(yyextra->current_root->name+"::"+yyextra->aliasName,
-					  //	new QCString(yyextra->current_root->name+"::"+yytext));
-					  //}
+                                          Doxygen::namespaceAliasMap.insert({yyextra->aliasName.data(),std::string(yytext)});
   					}
 <NSAliasArg>";"				{
   					  BEGIN( FindMembers );
@@ -1687,9 +1679,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					  //printf("PHP: adding use as relation: %s->%s\n",yytext,yyextra->aliasName.data());
                                           if (!yyextra->aliasName.isEmpty())
                                           {
-                                            Doxygen::namespaceAliasDict.insert(yytext,
-					         new QCString(removeRedundantWhiteSpace(
-					  	   substitute(yyextra->aliasName,"\\","::"))));
+                                            Doxygen::namespaceAliasMap.insert({yytext,
+					         std::string(removeRedundantWhiteSpace(
+					  	   substitute(yyextra->aliasName,"\\","::")).data())});
                                           }
 					  yyextra->aliasName.resize(0);
   					}
@@ -2010,33 +2002,37 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					  unput(';');
 					  BEGIN(FindMembers);
   					}
-<QtPropType>"const"|"volatile"|"unsigned"|"signed"|"long"|"short" {
-  				          yyextra->current->type+=yytext;
-  					}
 <QtPropType>{B}+			{
-  				          yyextra->current->type+=yytext;
+  				          yyextra->current->name+=yytext;
+  					}
+<QtPropType>"*"				{
+  					  yyextra->current->type+= yyextra->current->name;
+  					  yyextra->current->type+= yytext;
+  				          yyextra->current->name="";
   					}
 <QtPropType>({TSCOPE}"::")*{TSCOPE}	{
-  					  yyextra->current->type+=yytext;
-                                          BEGIN(QtPropName);
-  					}
-<QtPropName>{ID}			{
+  					  yyextra->current->type+= yyextra->current->name;
   					  yyextra->current->name=yytext;
-  					  BEGIN(QtPropAttr);
   					}
-<QtPropAttr>"READ"			{
+<QtPropType,QtPropAttr>{B}+"READ"{B}+	{
   					  yyextra->current->spec |= Entry::Readable;
 					  BEGIN(QtPropRead);
   					}
-<QtPropAttr>"WRITE"			{
+<QtPropType,QtPropAttr>{B}+"WRITE"{B}+	{
   					  yyextra->current->spec |= Entry::Writable;
 					  BEGIN(QtPropWrite);
   					}
-<QtPropAttr>"RESET"{B}+{ID}		{ // reset method => not supported yet
-  					}
-<QtPropAttr>"SCRIPTABLE"{B}+{ID}	{ // scriptable property => not supported yet
-  					}
-<QtPropAttr>"DESIGNABLE"{B}+{ID}	{ // designable property => not supported yet
+<QtPropType,QtPropAttr>{B}+"MEMBER"{B}+{ID}	| // member property => not supported yet
+<QtPropType,QtPropAttr>{B}+"RESET"{B}+{ID}	| // reset method => not supported yet
+<QtPropType,QtPropAttr>{B}+"SCRIPTABLE"{B}+{ID}	| // scriptable property => not supported yet
+<QtPropType,QtPropAttr>{B}+"DESIGNABLE"{B}+{ID}	| // designable property => not supported yet
+<QtPropType,QtPropAttr>{B}+"NOTIFY"{B}+{ID}	| // notify property => not supported yet
+<QtPropType,QtPropAttr>{B}+"REVISION"{B}+{ID}	| // revision property => not supported yet
+<QtPropType,QtPropAttr>{B}+"STORED"{B}+{ID}	| // stored property => not supported yet
+<QtPropType,QtPropAttr>{B}+"USER"{B}+{ID}	| // user property => not supported yet
+<QtPropType,QtPropAttr>{B}+"CONSTANT"{B}	| // constant property => not supported yet
+<QtPropType,QtPropAttr>{B}+"FINAL"{B}		{ // final property => not supported yet
+  					  BEGIN(QtPropAttr);
   					}
 <QtPropRead>{ID}			{
   					  yyextra->current->read = yytext;
@@ -2051,9 +2047,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 				          BEGIN(FindMembers);
 			 	        }
 <FindMembers,FindMemberName>{SCOPENAME}	{
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
 					  yyextra->yyBegColNr=yyextra->yyColNr;
 					  yyextra->yyBegLineNr=yyextra->yyLineNr;
@@ -2354,9 +2350,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   */
 <Define>{ID}				{
   					  //printf("Define '%s' without args\n",yytext);
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
   					  yyextra->current->bodyLine = yyextra->yyLineNr;
 					  yyextra->current->bodyColumn = yyextra->yyColNr;
@@ -2365,7 +2361,6 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					}
 <DefineEnd>\n				{
   					  //printf("End define: doc=%s docFile=%s docLine=%d\n",yyextra->current->doc.data(),yyextra->current->docFile.data(),yyextra->current->docLine);
-                                          lineCount(yyscanner);
 					  yyextra->current->fileName   = yyextra->yyFileName;
 					  yyextra->current->startLine  = yyextra->yyLineNr;
 					  yyextra->current->startColumn = yyextra->yyColNr;
@@ -2374,6 +2369,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					  yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
 					  yyextra->current->section    = Entry::DEFINE_SEC;
 					  yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
+                                          lineCount(yyscanner);
 					  initEntry(yyscanner);
 					  BEGIN(yyextra->lastDefineContext);
   					}
@@ -2908,7 +2904,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                             *yyextra->pCopyRoundString+=yytext; 
 					  }
                                         }
-<CopyRound>[^"'()\n]+			{
+<CopyRound>[^"'()\n,]+			{
   					  *yyextra->pCopyRoundString+=yytext;
   					}
 <CopyRound>.				{
@@ -2958,7 +2954,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                             *yyextra->pCopyRoundGString+=yytext; 
 					  }
                                         }
-<GCopyRound>[^"'()\n/]+			{
+<GCopyRound>[^"'()\n\/,]+		{
   					  *yyextra->pCopyRoundGString+=yytext;
   					}
 <GCopyRound>.				{
@@ -3008,7 +3004,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                             *yyextra->pCopySquareGString+=yytext; 
                                           }
                                         }
-<GCopySquare>[^"\[\]\n/]+               {
+<GCopySquare>[^"\[\]\n\/,]+              {
                                           *yyextra->pCopySquareGString+=yytext;
                                         }
 <GCopySquare>.                          {
@@ -3049,7 +3045,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    *yyextra->pCopyCurlyString+=yytext; 
 					  }
                                         }
-<CopyCurly>[^"'{}\/\n]+			{
+<CopyCurly>[^"'{}\/\n,]+		{
   					  *yyextra->pCopyCurlyString+=yytext;
   					}
 <CopyCurly>"/"				{ *yyextra->pCopyCurlyString+=yytext; }
@@ -3469,9 +3465,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					}
 <Sharp>.				{ yyextra->current->type += *yytext ; }
 <FindFields>{ID}			{
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
   					  yyextra->current->bodyLine = yyextra->yyLineNr;
 					  yyextra->current->bodyColumn = yyextra->yyColNr;
@@ -4219,7 +4215,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 <ReadFuncArgType>")"			{ 
   					  *yyextra->copyArgString+=*yytext;
   					  yyextra->fullArgString+=*yytext;
-					  stringToArgumentList(yyextra->language, yyextra->fullArgString,yyextra->current->argList);
+                                          yyextra->current->argList = *stringToArgumentList(yyextra->language, yyextra->fullArgString);
 					  if (yyextra->insideJS)
 					  {
 					    fixArgumentListForJavaScript(yyextra->current->argList);
@@ -4246,7 +4242,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    {
 					      unput(yytext[i]);
 					    }
-					    stringToArgumentList(yyextra->language, yyextra->fullArgString,yyextra->current->argList);
+                                            yyextra->current->argList = *stringToArgumentList(yyextra->language, yyextra->fullArgString);
                                             handleParametersCommentBlocks(yyscanner,yyextra->current->argList);
 					    BEGIN( yyextra->currentArgumentContext );
 					  }
@@ -4299,7 +4295,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    }
 					    *yyextra->copyArgString+=*yytext;
 					    yyextra->fullArgString+=*yytext;
-					    stringToArgumentList(yyextra->language, yyextra->fullArgString,yyextra->current->argList);
+                                            yyextra->current->argList = *stringToArgumentList(yyextra->language, yyextra->fullArgString);
                                             handleParametersCommentBlocks(yyscanner,yyextra->current->argList);
 					    BEGIN( yyextra->currentArgumentContext );
 					  }
@@ -4380,7 +4376,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  *yyextra->copyArgString+=*yytext;
 					  yyextra->fullArgString+=*yytext;
 					  //printf("end template list '%s'\n",yyextra->copyArgString->data());
-					  stringToArgumentList(yyextra->language, yyextra->fullArgString,*yyextra->currentArgumentList);
+                                          *yyextra->currentArgumentList = *stringToArgumentList(yyextra->language, yyextra->fullArgString);
 					  BEGIN( yyextra->currentArgumentContext );
 					}
 <CopyArgRound>"("			{
@@ -4532,12 +4528,12 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 <FuncQual>{BN}*"const"{BN}*       	{ // const member function
   					  lineCount(yyscanner) ; 
   					  yyextra->current->args += " const "; 
-					  yyextra->current->argList.constSpecifier=TRUE;
+					  yyextra->current->argList.setConstSpecifier(TRUE);
 					}
 <FuncQual>{BN}*"volatile"{BN}*    	{ // volatile member function
   					  lineCount(yyscanner) ; 
   					  yyextra->current->args += " volatile "; 
-					  yyextra->current->argList.volatileSpecifier=TRUE;
+					  yyextra->current->argList.setVolatileSpecifier(TRUE);
 					}
 <FuncQual>{BN}*"noexcept"{BN}*    	{ // noexcept qualifier
   					  lineCount(yyscanner) ; 
@@ -4555,25 +4551,25 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                         }
 <FuncQual>{BN}*"&"                      {
                                           yyextra->current->args += " &";
-                                          yyextra->current->argList.refQualifier=RefQualifierLValue;
+                                          yyextra->current->argList.setRefQualifier(RefQualifierLValue);
                                         }
 <FuncQual>{BN}*"&&"                     {
                                           yyextra->current->args += " &&";
-                                          yyextra->current->argList.refQualifier=RefQualifierRValue;
+                                          yyextra->current->argList.setRefQualifier(RefQualifierRValue);
                                         }
 
 <FuncQual,TrailingReturn>{BN}*"="{BN}*"0"{BN}*  	{ // pure virtual member function
   					  lineCount(yyscanner) ; 
 					  yyextra->current->args += " = 0"; 
 					  yyextra->current->virt = Pure; 
-					  yyextra->current->argList.pureSpecifier=TRUE;
+					  yyextra->current->argList.setPureSpecifier(TRUE);
                                           BEGIN(FuncQual);
 					}
 <FuncQual,TrailingReturn>{BN}*"="{BN}*"delete"{BN}*     { // C++11 explicitly delete member
                                           lineCount(yyscanner);
                                           yyextra->current->args += " = delete";
 					  yyextra->current->spec |= Entry::Delete;
-					  yyextra->current->argList.isDeleted=TRUE;
+					  yyextra->current->argList.setIsDeleted(TRUE);
                                           BEGIN(FuncQual);
                                         }
 <FuncQual,TrailingReturn>{BN}*"="{BN}*"default"{BN}*     { // C++11 explicitly defaulted constructor/assignment operator
@@ -4584,7 +4580,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                         }
 <FuncQual>{BN}*"->"{BN}*                {
                                           lineCount(yyscanner);
-                                          yyextra->current->argList.trailingReturnType = " -> ";
+                                          yyextra->current->argList.setTrailingReturnType(" -> ");
                                           yyextra->current->args += " -> ";
                                           BEGIN(TrailingReturn);
                                         }
@@ -4593,12 +4589,12 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
                                           BEGIN(FuncQual);
                                         }
 <TrailingReturn>.                       {
-                                          yyextra->current->argList.trailingReturnType+=yytext;
+                                          yyextra->current->argList.setTrailingReturnType(yyextra->current->argList.trailingReturnType()+yytext);
                                           yyextra->current->args+=yytext;
                                         }
 <TrailingReturn>\n                      {
                                           lineCount(yyscanner);
-                                          yyextra->current->argList.trailingReturnType+=yytext;
+                                          yyextra->current->argList.setTrailingReturnType(yyextra->current->argList.trailingReturnType()+yytext);
                                           yyextra->current->args+=' ';
                                         }
 <FuncRound,FuncFunc>{BN}*","{BN}*	{ 
@@ -4724,7 +4720,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 <OldStyleArgs>"{"			{
                                           if (yyextra->current->argList.empty())
                                           {
-                                            yyextra->current->argList.noParameters=TRUE;
+                                            yyextra->current->argList.setNoParameters(TRUE);
                                           }
   					  yyextra->current->args = argListToString(yyextra->current->argList);
   					  unput('{');
@@ -5340,9 +5336,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					}
 <CompoundName>{SCOPENAME}		{ 
 					  yyextra->current->name = yytext ;
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
 					  lineCount(yyscanner);
 					  if (yyextra->current->spec & Entry::Protocol)
@@ -5405,9 +5401,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  }
 					}
 <ClassVar>{ID}				{
-                                          if (yyextra->insideCpp || yyextra->insideObjC) 
+                                          if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
-                                            yyextra->current->id = ClangParser::instance()->lookup(yyextra->yyLineNr,yytext);
+                                            yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
                                           }
   					  if (yyextra->insideIDL && qstrcmp(yytext,"switch")==0)
 					  {
@@ -5633,6 +5629,7 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					  }
   					}
 <CompoundName,ClassVar>{B}*"{"{B}*	{ 
+                                          yyextra->current->program.resize(0);
                                           yyextra->current->fileName = yyextra->yyFileName ;
 					  yyextra->current->bodyLine  = yyextra->yyLineNr;
 					  yyextra->current->bodyColumn = yyextra->yyColNr;
@@ -5884,7 +5881,9 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
 					    BEGIN(BasesProt);
 					  }
 					}
-<Bases>{B}*"{"{B}*			{ yyextra->current->fileName = yyextra->yyFileName ;
+<Bases>{B}*"{"{B}*			{
+                                          yyextra->current->program.resize(0);
+                                          yyextra->current->fileName = yyextra->yyFileName ;
 					  yyextra->current->bodyLine  = yyextra->yyLineNr;
 					  yyextra->current->bodyColumn = yyextra->yyColNr;
 					  yyextra->current->name = removeRedundantWhiteSpace(yyextra->current->name);
@@ -6532,16 +6531,16 @@ OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
   					}
 <PrototypeQual>{B}*"const"{B}*    	{ 
   					  yyextra->current->args += " const "; 
-					  yyextra->current->argList.constSpecifier=TRUE;
+					  yyextra->current->argList.setConstSpecifier(TRUE);
 					}
 <PrototypeQual>{B}*"volatile"{B}* 	{ 
   					  yyextra->current->args += " volatile "; 
-					  yyextra->current->argList.volatileSpecifier=TRUE;
+					  yyextra->current->argList.setVolatileSpecifier(TRUE);
 					}
 <PrototypeQual>{B}*"="{B}*"0"{B}*	{ 
 					  yyextra->current->args += " = 0"; 
 					  yyextra->current->virt = Pure; 
-					  yyextra->current->argList.pureSpecifier=TRUE;
+					  yyextra->current->argList.setPureSpecifier(TRUE);
 					}
 <PrototypeQual>"throw"{B}*"("	        {
   					  yyextra->current->exception = "throw(";
@@ -6675,9 +6674,7 @@ static void initParser(yyscan_t yyscanner)
   yyextra->virt = Normal;
   yyextra->baseVirt = Normal;
   yyextra->isTypedef = FALSE;
-  yyextra->autoGroupStack.clear();
   yyextra->insideTryBlock = FALSE;
-  yyextra->autoGroupStack.setAutoDelete(TRUE);
   yyextra->insideFormula = FALSE;
   yyextra->insideCode=FALSE;
   yyextra->insideCli=Config_getBool(CPP_CLI_SUPPORT);
@@ -7024,7 +7021,9 @@ static void handleCommentBlock(yyscan_t yyscanner,const QCString &doc,bool brief
 
   int position=0;
   bool needsEntry=FALSE;
-  QCString processedDoc = processMarkdownForCommentBlock(stripIndentation(doc),yyextra->yyFileName,lineNr);
+  Markdown markdown(yyextra->yyFileName,lineNr);
+  QCString strippedDoc = stripIndentation(doc);
+  QCString processedDoc = Config_getBool(MARKDOWN_SUPPORT) ? markdown.process(strippedDoc,lineNr) : strippedDoc;
   while (yyextra->commentScanner.parseCommentBlock(
 	yyextra->thisParser,
 	yyextra->docBlockInBody && yyextra->previous ? yyextra->previous.get() : yyextra->current.get(),
@@ -7036,7 +7035,8 @@ static void handleCommentBlock(yyscan_t yyscanner,const QCString &doc,bool brief
 	yyextra->docBlockInBody,                               // isInBody
 	yyextra->protection,
         position,
-        needsEntry
+        needsEntry,
+        Config_getBool(MARKDOWN_SUPPORT)
         )
      )
   {
@@ -7095,9 +7095,10 @@ static void handleParametersCommentBlocks(yyscan_t yyscanner,ArgumentList &al)
 	     FALSE,
 	     yyextra->protection,
 	     position,
-	     needsEntry
+	     needsEntry,
+             Config_getBool(MARKDOWN_SUPPORT)
 	    )
-	  ) 
+	  )
       {
 	//printf("handleParametersCommentBlock position=%d [%s]\n",position,doc.data()+position);
 	if (needsEntry) newEntry(yyscanner);
@@ -7236,8 +7237,7 @@ static void parseMain(yyscan_t yyscanner,
                       const char *fileName,
                       const char *fileBuf,
                       const std::shared_ptr<Entry> &rt,
-                      bool sameTranslationUnit,
-                      QStrList & filesInSameTranslationUnit)
+                      ClangTUParser *clangParser)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
   initParser(yyscanner);
@@ -7258,19 +7258,8 @@ static void parseMain(yyscan_t yyscanner,
   yyextra->yyBegLineNr   = 1;
   yyextra->yyBegColNr    = 0;
   yyextra->yyFileName = fileName;
+  yyextra->clangParser = clangParser;
   setContext(yyscanner);
-  bool processWithClang = yyextra->insideCpp || yyextra->insideObjC;
-  if (processWithClang)
-  {
-    if (!sameTranslationUnit) // new file
-    {
-      ClangParser::instance()->start(fileName,filesInSameTranslationUnit);
-    }
-    else
-    {
-      ClangParser::instance()->switchToFile(fileName);
-    }
-  }
   rt->lang = yyextra->language;
   msg("Parsing file %s...\n",yyextra->yyFileName.data());
 
@@ -7407,33 +7396,17 @@ COutlineParser::~COutlineParser()
   scannerYYlex_destroy(p->yyscanner);
 }
 
-void COutlineParser::startTranslationUnit(const char *)
-{
-}
-
-void COutlineParser::finishTranslationUnit()
-{
-  struct yyguts_t *yyg = (struct yyguts_t*)p->yyscanner;
-  bool processWithClang = yyextra->insideCpp || yyextra->insideObjC;
-  if (processWithClang)
-  {
-    ClangParser::instance()->finish();
-  }
-}
-
 void COutlineParser::parseInput(const char *fileName,
                                   const char *fileBuf,
                                   const std::shared_ptr<Entry> &root,
-                                  bool sameTranslationUnit,
-                                  QStrList & filesInSameTranslationUnit)
+                                  ClangTUParser *clangParser)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)p->yyscanner;
   yyextra->thisParser = this;
 
   printlex(yy_flex_debug, TRUE, __FILE__, fileName);
 
-  ::parseMain(p->yyscanner, fileName,fileBuf,root,
-              sameTranslationUnit,filesInSameTranslationUnit);
+  ::parseMain(p->yyscanner,fileName,fileBuf,root,clangParser);
 
   printlex(yy_flex_debug, FALSE, __FILE__, fileName);
 }

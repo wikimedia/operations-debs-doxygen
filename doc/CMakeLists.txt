@@ -32,7 +32,7 @@ set(DOC_INSTALL_DIR "share/doc/packages/doxygen" CACHE STRING "Relative path whe
 set(DOC_FILES
         arch.doc
         archoverview.eps
-        archoverview.gif
+        archoverview.svg
         autolink.doc
         changelog.doc
         commands.doc
@@ -85,8 +85,7 @@ set(DOC_FILES
         maintainers.txt
         translator.py
         smile.png
-        doxygen_logo.gif
-        doxygen_logo_low.gif
+        doxygen_logo.svg
 )
 
 if (build_doc_chm)
@@ -163,7 +162,7 @@ add_custom_target(doxygen_pdf
         COMMAND ${CMAKE_COMMAND} -E remove refman.tex
         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/doxygen_manual.tex  .
         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/manual.sty  .
-        COMMAND ${EPSTOPDF} ${CMAKE_SOURCE_DIR}/doc/doxygen_logo.eps --outfile=doxygen_logo.pdf
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/doc/doxygen_logo.pdf  .
         COMMAND ${PDFLATEX}  -shell-escape doxygen_manual.tex
         COMMAND ${MAKEINDEX} doxygen_manual.idx
         COMMAND ${PDFLATEX}  -shell-escape doxygen_manual.tex
@@ -212,12 +211,22 @@ install(FILES
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
 )
 
+install(CODE "if(NOT EXISTS \"${PROJECT_BINARY_DIR}/latex/doxygen_manual.pdf\")
+    message(FATAL_ERROR \"\nTerminating:\n    documentation has not been generated, \n    create documentation by using the 'docs' target followed by an 'install'\n\")
+endif()"
+)
+
 install(FILES
         "${PROJECT_BINARY_DIR}/latex/doxygen_manual.pdf"
         DESTINATION "${CMAKE_INSTALL_PREFIX}/${DOC_INSTALL_DIR}"
 )
 
 if (build_doc_chm)
+install(CODE "if(NOT EXISTS \"${PROJECT_BINARY_DIR}/chm/doxygen_manual.chm\")
+    message(FATAL_ERROR \"\nTerminating:\n    CHM documentation has not been generated, \n    create CHM documentation by using the 'docs_chm' target followed by an 'install'\n\")
+endif()"
+)
+
 install(FILES
         "${PROJECT_BINARY_DIR}/chm/doxygen_manual.chm"
         DESTINATION "${CMAKE_INSTALL_PREFIX}/${DOC_INSTALL_DIR}"

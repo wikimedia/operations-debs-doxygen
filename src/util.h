@@ -22,12 +22,16 @@
  *  \brief A bunch of utility functions.
  */
 
+#include <memory>
+
 #include <qlist.h>
 #include <ctype.h>
 #include "types.h"
 #include "sortdict.h"
 #include "docparser.h"
 #include "classdef.h"
+#include "arguments.h"
+#include "containers.h"
 
 //--------------------------------------------------------------------
 
@@ -48,7 +52,6 @@ class NamespaceSDict;
 class ClassList;
 class MemberGroupSDict;
 struct TagInfo;
-class MemberNameInfoSDict;
 class PageDef;
 class SectionInfo;
 class QDir;
@@ -184,8 +187,8 @@ void writePageRef(OutputDocInterface &od,const char *cn,const char *mn);
 
 QCString getCanonicalTemplateSpec(const Definition *d,const FileDef *fs,const QCString& spec);
 
-bool matchArguments2(const Definition *srcScope,const FileDef *srcFileScope,const ArgumentList &srcAl,
-                     const Definition *dstScope,const FileDef *dstFileScope,const ArgumentList &dstAl,
+bool matchArguments2(const Definition *srcScope,const FileDef *srcFileScope,const ArgumentList *srcAl,
+                     const Definition *dstScope,const FileDef *dstFileScope,const ArgumentList *dstAl,
                      bool checkCV
                     );
 
@@ -193,9 +196,6 @@ void mergeArguments(ArgumentList &,ArgumentList &,bool forceNameOverwrite=FALSE)
 
 QCString substituteClassNames(const QCString &s);
 
-QCString substitute(const QCString &s,const QCString &src,const QCString &dst);
-QCString substitute(const QCString &s,const QCString &src,const QCString &dst,int skip_seq);
-QCString substitute(const QCString &s,char srcChar,char dstChar);
 
 QCString clearBlock(const char *s,const char *begin,const char *end);
 
@@ -278,6 +278,7 @@ QCString insertTemplateSpecifierInScope(const QCString &scope,const QCString &te
 QCString stripScope(const char *name);
 
 QCString convertToId(const char *s);
+QCString correctId(QCString s);
 
 QCString convertToHtml(const char *s,bool keepEntities=TRUE);
 
@@ -308,7 +309,7 @@ QCString normalizeNonTemplateArgumentsInString(
 QCString substituteTemplateArgumentsInString(
        const QCString &name,
        const ArgumentList &formalArgs,
-       const ArgumentList &actualArgs);
+       const std::unique_ptr<ArgumentList> &actualArgs);
 
 //QList<ArgumentList> *copyArgumentLists(const QList<ArgumentList> *srcLists);
 
@@ -325,7 +326,7 @@ int getScopeFragment(const QCString &s,int p,int *l);
 
 int filterCRLF(char *buf,int len);
 
-void addRefItem(const std::vector<RefItem*> &sli,
+void addRefItem(const RefItemVector &sli,
                 const char *key,
                 const char *prefix,
                 const char *name,
@@ -337,7 +338,7 @@ PageDef *addRelatedPage(const char *name,
                         const QCString &ptitle,
                         const QCString &doc,
                         const char *fileName,int startLine,
-                        const std::vector<RefItem*> &sli = std::vector<RefItem*>(),
+                        const RefItemVector &sli = RefItemVector(),
                         GroupDef *gd=0,
                         const TagInfo *tagInfo=0,
                         bool xref=FALSE,
@@ -410,7 +411,7 @@ const ClassDef *newResolveTypedef(const FileDef *fileScope,
                                   const MemberDef **pMemType=0,
                                   QCString *pTemplSpec=0,
                                   QCString *pResolvedType=0,
-                                  const ArgumentList *actTemplParams=0);
+                                  const std::unique_ptr<ArgumentList> &actTemplParams=std::unique_ptr<ArgumentList>());
 
 QCString parseCommentAsText(const Definition *scope,const MemberDef *member,const QCString &doc,const QCString &fileName,int lineNr);
 
@@ -437,7 +438,7 @@ bool readInputFile(const char *fileName,BufStr &inBuf,
                    bool filter=TRUE,bool isSourceCode=FALSE);
 QCString filterTitle(const QCString &title);
 
-bool patternMatch(const QFileInfo &fi,const QStrList *patList);
+bool patternMatch(const QFileInfo &fi,const StringVector &patList);
 
 QCString externalLinkTarget(const bool parent = false);
 QCString externalRef(const QCString &relPath,const QCString &ref,bool href);
@@ -471,6 +472,7 @@ QCString processMarkup(const QCString &s);
 bool protectionLevelVisible(Protection prot);
 
 QCString stripIndentation(const QCString &s);
+void stripIndentation(QCString &doc,const int indentationLevel);
 
 QCString getDotImageExtension(void);
 
@@ -500,5 +502,4 @@ int usedTableLevels();
 void incUsedTableLevels();
 void decUsedTableLevels();
 
-QCString getFullVersion();
 #endif

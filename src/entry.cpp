@@ -1,12 +1,12 @@
 /******************************************************************************
  *
- * 
+ *
  *
  * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
- * documentation under the terms of the GNU General Public License is hereby 
- * granted. No representations are made about the suitability of this software 
+ * documentation under the terms of the GNU General Public License is hereby
+ * granted. No representations are made about the suitability of this software
  * for any purpose. It is provided "as is" without express or implied warranty.
  * See the GNU General Public License for more details.
  *
@@ -24,18 +24,15 @@
 #include "doxygen.h"
 #include "arguments.h"
 #include "config.h"
-//------------------------------------------------------------------
-
-#define HEADER ('D'<<24)+('O'<<16)+('X'<<8)+'!'
 
 //------------------------------------------------------------------
 
-int Entry::num=0;
+static AtomicInt g_num;
 
 Entry::Entry()
 {
   //printf("Entry::Entry(%p)\n",this);
-  num++;
+  g_num++;
   m_parent=0;
   section = EMPTY_SEC;
   //printf("Entry::Entry() tArgList=0\n");
@@ -50,7 +47,7 @@ Entry::Entry()
 Entry::Entry(const Entry &e)
 {
   //printf("Entry::Entry(%p):copy\n",this);
-  num++;
+  g_num++;
   section     = e.section;
   type        = e.type;
   name        = e.name;
@@ -123,11 +120,11 @@ Entry::Entry(const Entry &e)
 
 Entry::~Entry()
 {
-  //printf("Entry::~Entry(%p) num=%d\n",this,num);
+  //printf("Entry::~Entry(%p) num=%d\n",this,g_num);
   //printf("Deleting entry %d name %s type %x children %d\n",
   //       num,name.data(),section,sublist->count());
 
-  num--;
+  g_num--;
 }
 
 void Entry::moveToSubEntryAndRefresh(Entry *&current)
@@ -150,7 +147,7 @@ void Entry::moveToSubEntryAndKeep(Entry *current)
   m_sublist.emplace_back(current);
 }
 
-void Entry::moveToSubEntryAndKeep(std::shared_ptr<Entry> &current)
+void Entry::moveToSubEntryAndKeep(std::shared_ptr<Entry> current)
 {
   current->m_parent=this;
   m_sublist.push_back(current);
@@ -183,10 +180,10 @@ void Entry::removeSubEntry(const Entry *e)
 
 void Entry::reset()
 {
-  static bool entryCallGraph   = Config_getBool(CALL_GRAPH);
-  static bool entryCallerGraph = Config_getBool(CALLER_GRAPH);
-  static bool entryReferencedByRelation = Config_getBool(REFERENCED_BY_RELATION);
-  static bool entryReferencesRelation   = Config_getBool(REFERENCES_RELATION);
+  bool entryCallGraph   = Config_getBool(CALL_GRAPH);
+  bool entryCallerGraph = Config_getBool(CALLER_GRAPH);
+  bool entryReferencedByRelation = Config_getBool(REFERENCED_BY_RELATION);
+  bool entryReferencesRelation   = Config_getBool(REFERENCES_RELATION);
   //printf("Entry::reset()\n");
   name.resize(0);
   type.resize(0);
@@ -240,9 +237,8 @@ void Entry::reset()
   extends.clear();
   groups.clear();
   anchors.clear();
-  argList.clear();
-  tArgLists.clear();
   argList.reset();
+  tArgLists.clear();
   typeConstr.reset();
   sli.clear();
   m_fileDef = 0;

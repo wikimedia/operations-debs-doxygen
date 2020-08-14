@@ -71,7 +71,7 @@ struct commentcnvYY_state
 {
   BufStr * inBuf = 0;
   BufStr * outBuf = 0;
-  int      inBufPos = 0;
+  yy_size_t inBufPos = 0;
   int      col = 0;
   int      blockHeadCol = 0;
   bool     mlBrief = FALSE;
@@ -488,7 +488,7 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
 <Verbatim,VerbatimCode>\n	   { /* new line in verbatim block */
                                      copyToOutput(yyscanner,yytext,(int)yyleng); 
                                    }
-<Verbatim>^[ \t]*"///"             {
+<Verbatim>^[ \t]*"//"[/!]          {
   				     if (yyextra->blockName=="dot" || yyextra->blockName=="msc" || yyextra->blockName=="uml" || yyextra->blockName.at(0)=='f')
 				     {
 				       // see bug 487871, strip /// from dot images and formulas.
@@ -870,6 +870,9 @@ MAILADR   ("mailto:")?[a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z
   				     copyToOutput(yyscanner,yytext,(int)yyleng);
   				   }
 
+<*>.                               {
+  				     copyToOutput(yyscanner,yytext,(int)yyleng);
+                                   }
 %%
 
 static void replaceCommentMarker(yyscan_t yyscanner,const char *s,int len)
