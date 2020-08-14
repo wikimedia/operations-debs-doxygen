@@ -6,19 +6,19 @@ Index: doxygen/src/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/src/CMakeLists.txt
 +++ doxygen/src/CMakeLists.txt
-@@ -309,6 +309,9 @@ if (use_libclang)
-     llvm_map_components_to_libnames(llvm_libs core option)
+@@ -344,6 +344,9 @@ if (use_libclang)
+         set(CLANG_LIBS libclang clang-cpp)
+     endif()
      target_compile_definitions(doxygen PRIVATE ${LLVM_DEFINITIONS})
-     set(CLANG_LIBS libclang clangTooling ${llvm_libs})
 +    if ($ENV{DEB_HOST_ARCH} STREQUAL "armel")
 +        set(EXTRA_CLANG_LIBS atomic)
 +    endif()
  endif()
  
- target_link_libraries(doxygen
-@@ -326,6 +329,7 @@ target_link_libraries(doxygen
-     ${EXTRA_LIBS}
+ target_link_libraries(doxygen PRIVATE
+@@ -362,6 +365,7 @@ target_link_libraries(doxygen PRIVATE
      ${CLANG_LIBS}
+     ${COVERAGE_LINKER_FLAGS}
      ${DOXYGEN_EXTRA_LINK_OPTIONS}
 +    ${EXTRA_CLANG_LIBS}
  )
@@ -28,20 +28,20 @@ Index: doxygen/addon/doxyparse/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/addon/doxyparse/CMakeLists.txt
 +++ doxygen/addon/doxyparse/CMakeLists.txt
-@@ -15,6 +15,9 @@ doxyparse.cpp
- 
- if (use_libclang)
-     set(CLANG_LIBS libclang clangTooling ${llvm_libs})
+@@ -20,6 +20,9 @@ if (use_libclang)
+     else()
+         set(CLANG_LIBS libclang clang-cpp ${llvm_libs})
+     endif()
 +    if ($ENV{DEB_HOST_ARCH} STREQUAL "armel")
 +        set(EXTRA_CLANG_LIBS atomic)
 +    endif()
  endif()
  
  target_link_libraries(doxyparse
-@@ -31,6 +34,7 @@ ${CMAKE_THREAD_LIBS_INIT}
- ${SQLITE3_LIBRARIES}
+@@ -37,6 +40,7 @@ ${SQLITE3_LIBRARIES}
  ${EXTRA_LIBS}
  ${CLANG_LIBS}
+ ${COVERAGE_LINKER_FLAGS}
 +${EXTRA_CLANG_LIBS}
  )
  
