@@ -1,4 +1,4 @@
-doxygen (1.8.19-1~exp1) UNRELEASED; urgency=medium
+doxygen (1.8.19-1~exp1) experimental; urgency=medium
 
   [ Pino Toscano ]
   * Remove the git build dependency, no more needed since doxygen 1.8.17.
@@ -6,7 +6,7 @@ doxygen (1.8.19-1~exp1) UNRELEASED; urgency=medium
   [ Paolo Greppi ]
   * doxygen 1.8.19 release.
 
- -- Paolo Greppi <paolo.greppi@libpf.com>  Fri, 14 Aug 2020 18:49:45 +0200
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 20 Aug 2020 21:49:38 +0200
 
 doxygen (1.8.18-1) unstable; urgency=medium
 
