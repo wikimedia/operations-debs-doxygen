@@ -5,8 +5,8 @@ set -e
 WORKDIR=$(mktemp -d)
 trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
 cd $WORKDIR
-apt-get source json-c 2>&1
-cd json-c-*
+apt-get source xdotool 2>&1
+cd xdotool-*
 doxygen 2>&1
 cd /
 rm -Rf "$WORKDIR"
