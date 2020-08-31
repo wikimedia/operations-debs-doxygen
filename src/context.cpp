@@ -1071,7 +1071,7 @@ class TranslateContext::Private
         s_inst.addProperty("namespaceList",     &Private::namespaceList);
         //%% string namespaceMembers
         s_inst.addProperty("namespaceMembers",  &Private::namespaceMembers);
-        //%% srting fileList
+        //%% string fileList
         s_inst.addProperty("fileList",          &Private::fileList);
         //%% string fileMembers
         s_inst.addProperty("fileMembers",       &Private::fileMembers);
@@ -9238,7 +9238,7 @@ class InheritedMemberInfoListContext::Private : public GenericNodeListContext
             MemberDef *md;
             for (li.toFirst();(md=li.current());++li)
             {
-              if (lt==md->getSectionList()->listType() &&
+              if (lt==md->getSectionList(mg->container())->listType() &&
                   !md->isReimplementedBy(inheritedFrom) &&
                   md->isBriefSectionVisible())
               {

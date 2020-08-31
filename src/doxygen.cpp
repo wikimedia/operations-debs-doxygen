@@ -3680,17 +3680,18 @@ static void transferFunctionReferences()
   {
     MemberDef *mdef=0,*mdec=0;
     /* find a matching function declaration and definition for this function */
-    for (const auto &md : *mn)
+    for (const auto &md_p : *mn)
     {
+      MemberDef *md = md_p.get();
       if (md->isPrototype())
-        mdec=md.get();
+        mdec=md;
       else if (md->isVariable() && md->isExternal())
-        mdec=md.get();
+        mdec=md;
 
       if (md->isFunction() && !md->isStatic() && !md->isPrototype())
-        mdef=md.get();
+        mdef=md;
       else if (md->isVariable() && !md->isExternal() && !md->isStatic())
-        mdef=md.get();
+        mdef=md;
 
       if (mdef && mdec) break;
     }
@@ -7708,23 +7709,23 @@ static void buildDefineList()
       for (const auto &def : it->second)
       {
         std::unique_ptr<MemberDef> md { createMemberDef(
-            def->fileName,def->lineNr,def->columnNr,
-            "#define",def->name,def->args,0,
+            def.fileName,def.lineNr,def.columnNr,
+            "#define",def.name,def.args,0,
             Public,Normal,FALSE,Member,MemberType_Define,
             ArgumentList(),ArgumentList(),"") };
 
-        if (!def->args.isEmpty())
+        if (!def.args.isEmpty())
         {
-          md->moveArgumentList(stringToArgumentList(SrcLangExt_Cpp, def->args));
+          md->moveArgumentList(stringToArgumentList(SrcLangExt_Cpp, def.args));
         }
-        md->setInitializer(def->definition);
-        md->setFileDef(def->fileDef);
-        md->setDefinition("#define "+def->name);
+        md->setInitializer(def.definition);
+        md->setFileDef(def.fileDef);
+        md->setDefinition("#define "+def.name);
 
-        MemberName *mn=Doxygen::functionNameLinkedMap->add(def->name);
-        if (def->fileDef)
+        MemberName *mn=Doxygen::functionNameLinkedMap->add(def.name);
+        if (def.fileDef)
         {
-          def->fileDef->insertMember(md.get());
+          def.fileDef->insertMember(md.get());
         }
         mn->push_back(std::move(md));
       }
@@ -9142,7 +9143,7 @@ static void parseFilesMultiThreading(const std::shared_ptr<Entry> &root)
     {
       numThreads = std::thread::hardware_concurrency();
     }
-    msg("Processing input using %lu threads.\n",numThreads);
+    msg("Processing input using %zu threads.\n",numThreads);
     ThreadPool threadPool(numThreads);
     using FutureType = std::vector< std::shared_ptr<Entry> >;
     std::vector< std::future< FutureType > > results;
@@ -9237,7 +9238,7 @@ static void parseFilesMultiThreading(const std::shared_ptr<Entry> &root)
 #endif
   {
     std::size_t numThreads = std::thread::hardware_concurrency();
-    msg("Processing input using %lu threads.\n",numThreads);
+    msg("Processing input using %zu threads.\n",numThreads);
     ThreadPool threadPool(numThreads);
     using FutureType = std::shared_ptr<Entry>;
     std::vector< std::future< FutureType > > results;
