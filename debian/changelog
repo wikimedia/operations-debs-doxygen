@@ -1,3 +1,9 @@
+doxygen (1.8.19-1) unstable; urgency=medium
+
+  * Upload to unstable. Closes: #967950, #968340.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Mon, 31 Aug 2020 09:36:22 +0200
+
 doxygen (1.8.19-1~exp1) experimental; urgency=medium
 
   [ Pino Toscano ]
