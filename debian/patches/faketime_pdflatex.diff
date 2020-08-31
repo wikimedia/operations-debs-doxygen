@@ -23,7 +23,7 @@ Index: doxygen/doc/CMakeLists.txt
 ===================================================================
 --- doxygen.orig/doc/CMakeLists.txt
 +++ doxygen/doc/CMakeLists.txt
-@@ -163,9 +163,9 @@ add_custom_target(doxygen_pdf
+@@ -164,9 +164,9 @@ add_custom_target(doxygen_pdf
          COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/doxygen_manual.tex  .
          COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/manual.sty  .
          COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/doc/doxygen_logo.pdf  .
