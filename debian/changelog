@@ -1,3 +1,9 @@
+doxygen (1.8.20-1) unstable; urgency=medium
+
+  * Upload to unstable. Closes: #969142.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 13 Sep 2020 18:21:49 +0200
+
 doxygen (1.8.20-1~exp1) experimental; urgency=medium
 
   * doxygen 1.8.20 release. Closes: #969313.
