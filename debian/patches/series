@@ -13,3 +13,4 @@ libatomic.diff
 reproducible_changelog.diff
 reproducible_manpages.diff
 sass_fix.diff
+doxygen-1.8.20-enums-multiple-files.patch
