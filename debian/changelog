@@ -1,8 +1,9 @@
-doxygen (1.8.20-2) UNRELEASED; urgency=medium
+doxygen (1.8.20-2) unstable; urgency=medium
 
+  [ Scott Talbert ]
   * Fix wxpython4.0 FTBFS due to doxygen regression
 
- -- Scott Talbert <swt@techie.net>  Wed, 16 Sep 2020 12:33:24 -0400
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Tue, 22 Sep 2020 17:44:26 +0200
 
 doxygen (1.8.20-1) unstable; urgency=medium
 

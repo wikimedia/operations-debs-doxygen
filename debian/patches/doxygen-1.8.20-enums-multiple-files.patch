@@ -3,6 +3,7 @@ From: Dimitri van Heesch <doxygen@gmail.com>
 Date: Fri, 28 Aug 2020 20:22:46 +0200
 Subject: [PATCH] issue #7979: C++ enums being defined in multiple files after
  b265433 (multi-thread input processing)
+Forwarded: https://github.com/doxygen/doxygen/issues/7979
 
 ---
  src/scanner.l | 16 ++++++++--------
