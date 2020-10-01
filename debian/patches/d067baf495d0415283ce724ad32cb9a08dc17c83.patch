@@ -1,0 +1,45 @@
+From d067baf495d0415283ce724ad32cb9a08dc17c83 Mon Sep 17 00:00:00 2001
+From: Dimitri van Heesch <doxygen@gmail.com>
+Date: Thu, 17 Sep 2020 20:14:39 +0200
+Subject: [PATCH] issue #8034: doxygen crashes
+
+---
+ src/definition.cpp | 6 +++---
+ src/util.cpp       | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/definition.cpp b/src/definition.cpp
+index 7874a5e44..dc968399b 100644
+--- a/src/definition.cpp
++++ b/src/definition.cpp
+@@ -176,14 +176,14 @@ static bool matchExcludedSymbols(const char *name)
+       QRegExp re(substitute(pattern,"*",".*"),TRUE);
+       int pl;
+       int i = re.match(symName,0,&pl);
+-      //printf("  %d = re.match(%s) pattern=%s\n",i,symName.data(),pattern.data());
++      //printf("  %d = re.match(%s) pattern=%s pl=%d len=%d\n",i,symName.data(),pattern.data(),pl,symName.length());
+       if (i!=-1) // wildcard match
+       {
+         uint ui=(uint)i;
+         uint sl=symName.length();
+         // check if it is a whole word match
+-        if ((ui==0     || pattern.at(0)=='*'     || (!isId(symName.at(ui-1))  && !forceStart)) &&
+-            (ui+pl==sl || pattern.at(ui+pl)=='*' || (!isId(symName.at(ui+pl)) && !forceEnd))
++        if ((ui==0     || pattern.at(0)=='*'                  || (!isId(symName.at(ui-1))  && !forceStart)) &&
++            (ui+pl==sl || pattern.at(pattern.length()-1)=='*' || (!isId(symName.at(ui+pl)) && !forceEnd))
+            )
+         {
+           //printf("--> name=%s pattern=%s match at %d\n",symName.data(),pattern.data(),i);
+diff --git a/src/util.cpp b/src/util.cpp
+index 0581b5fad..34df8d7b4 100644
+--- a/src/util.cpp
++++ b/src/util.cpp
+@@ -5714,7 +5714,7 @@ QCString normalizeNonTemplateArgumentsInString(
+     result += name.mid(p,i-p);
+     QCString n = name.mid(i,l);
+     bool found=FALSE;
+-    for (const Argument formArg : formalArgs)
++    for (const Argument &formArg : formalArgs)
+     {
+       if (formArg.name == n)
+       {
