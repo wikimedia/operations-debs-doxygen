@@ -1,3 +1,12 @@
+doxygen (1.8.20-4) unstable; urgency=medium
+
+  * Team upload (salsa.d.o namepsace)
+  * debian/patches/02b8dea10813606db4a013799a3e354368d0280f.patch:
+    - cherry-pick upstream fix for another crash during parse with CLANG
+      helper enabled (See: https://github.com/doxygen/doxygen/issues/8066)
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Fri, 02 Oct 2020 12:32:00 +0200
+
 doxygen (1.8.20-3) unstable; urgency=medium
 
   * Team upload (salsa.d.o namespace)

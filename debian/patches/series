@@ -15,3 +15,4 @@ reproducible_manpages.diff
 sass_fix.diff
 doxygen-1.8.20-enums-multiple-files.patch
 d067baf495d0415283ce724ad32cb9a08dc17c83.patch
+02b8dea10813606db4a013799a3e354368d0280f.patch

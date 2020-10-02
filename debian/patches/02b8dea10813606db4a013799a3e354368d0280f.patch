@@ -1,0 +1,76 @@
+From 02b8dea10813606db4a013799a3e354368d0280f Mon Sep 17 00:00:00 2001
+From: Dimitri van Heesch <doxygen@gmail.com>
+Date: Wed, 30 Sep 2020 21:30:35 +0200
+Subject: [PATCH] issue #8066: Doxygen crashes in ClangTUParser
+
+---
+ src/clangparser.cpp | 5 +++--
+ src/doxygen.cpp     | 9 +++++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+Index: doxygen-1.8.20/src/clangparser.cpp
+===================================================================
+--- doxygen-1.8.20.orig/src/clangparser.cpp
++++ doxygen-1.8.20/src/clangparser.cpp
+@@ -129,7 +129,7 @@
+     std::vector<CXUnsavedFile> ufs;
+     std::vector<CXCursor> cursors;
+     std::unordered_map<std::string,uint> fileMapping;
+-    CXTranslationUnit tu;
++    CXTranslationUnit tu = 0;
+     CXToken *tokens = 0;
+     uint numTokens = 0;
+     StringVector filesInSameTU;
+@@ -858,7 +858,7 @@
+       QCString clangCompileDatabase = Config_getString(CLANG_DATABASE_PATH);
+       // load a clang compilation database (https://clang.llvm.org/docs/JSONCompilationDatabase.html)
+       db = clang::tooling::CompilationDatabase::loadFromDirectory(clangCompileDatabase.data(), error);
+-      if (clangCompileDatabase!="0" && db==nullptr)
++      if (!clangCompileDatabase.isEmpty() && clangCompileDatabase!="0" && db==nullptr)
+       {
+           // user specified a path, but DB file was not found
+           err("%s using clang compilation database path of: \"%s\"\n", error.c_str(),
+@@ -884,6 +884,7 @@
+ 
+ std::unique_ptr<ClangTUParser> ClangParser::createTUParser(const FileDef *fd) const
+ {
++  //printf("ClangParser::createTUParser()\n");
+   return std::make_unique<ClangTUParser>(*this,fd);
+ }
+ 
+Index: doxygen-1.8.20/src/doxygen.cpp
+===================================================================
+--- doxygen-1.8.20.orig/src/doxygen.cpp
++++ doxygen-1.8.20/src/doxygen.cpp
+@@ -7499,7 +7499,11 @@
+       {
+         for (const auto &fd : *fn)
+         {
+-          if (fd->isSource() && !fd->isReference())
++          if (fd->isSource() && !fd->isReference() &&
++              ((fd->generateSourceFile() && !g_useOutputTemplate) ||
++               (!fd->isReference() && Doxygen::parseSourcesNeeded)
++              )
++             )
+           {
+             auto clangParser = ClangParser::instance()->createTUParser(fd.get());
+             if (fd->generateSourceFile() && !g_useOutputTemplate) // sources need to be shown in the output
+@@ -7554,9 +7558,9 @@
+         {
+           if (processedFiles.find(fd->absFilePath().str())==processedFiles.end()) // not yet processed
+           {
+-            auto clangParser = ClangParser::instance()->createTUParser(fd.get());
+             if (fd->generateSourceFile() && !Htags::useHtags && !g_useOutputTemplate) // sources need to be shown in the output
+             {
++              auto clangParser = ClangParser::instance()->createTUParser(fd.get());
+               msg("Generating code for file %s...\n",fd->docName().data());
+               clangParser->parse();
+               fd->writeSource(*g_outputList,clangParser.get());
+@@ -7565,6 +7569,7 @@
+             else if (!fd->isReference() && Doxygen::parseSourcesNeeded)
+               // we needed to parse the sources even if we do not show them
+             {
++              auto clangParser = ClangParser::instance()->createTUParser(fd.get());
+               msg("Parsing code for file %s...\n",fd->docName().data());
+               clangParser->parse();
+               fd->parseSource(clangParser.get());
