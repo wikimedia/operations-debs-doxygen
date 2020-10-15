@@ -8,7 +8,6 @@ dot-config.diff
 no-timestamps.diff
 #issue759241.diff
 avoid-compass.diff
-llvm_libs.diff
 faketime_pdflatex.diff
 libatomic.diff
 reproducible_changelog.diff

@@ -81,7 +81,7 @@ sub looks_like_doxygen_doc($)
 {
     my ($path) = @_;
     return 0 unless -f "$path/doxygen.css";
-    return 0 unless -f "$path/doxygen.png";
+    return 0 unless -f "$path/doxygen.svg";
     return 0 unless -f "$path/index.html";
     return 1;
 }

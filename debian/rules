@@ -35,6 +35,12 @@ CONFIGUREFLAGS += -DPYTHON_EXECUTABLE=/usr/bin/python3
 CONFIGUREFLAGS += -Duse_libclang=$(if $(filter $(DEB_HOST_ARCH),$(clang_archs)),ON,OFF)
 CONFIGUREFLAGS += -Dbuild_search=ON
 CONFIGUREFLAGS += -Dbuild_parse=ON
+
+# Doxygen 1.8.19 links against clang-cpp instead of CLangTooling, however it is
+# not available in LLVM 7 shipped by Debian Buster. T254465.
+# https://github.com/doxygen/doxygen/issues/7883
+CONFIGUREFLAGS += -Dstatic_libclang=ON
+
 # still experimental according to upstream
 #CONFIGUREFLAGS += -Duse_sqlite3=ON
 

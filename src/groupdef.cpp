@@ -1,12 +1,12 @@
 /******************************************************************************
  *
- * 
+ *
  *
  * Copyright (C) 1997-2015 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
- * documentation under the terms of the GNU General Public License is hereby 
- * granted. No representations are made about the suitability of this software 
+ * documentation under the terms of the GNU General Public License is hereby
+ * granted. No representations are made about the suitability of this software
  * for any purpose. It is provided "as is" without express or implied warranty.
  * See the GNU General Public License for more details.
  *
@@ -58,13 +58,13 @@ class GroupDefImpl : public DefinitionImpl, public GroupDef
     virtual const char *groupTitle() const { return m_title; }
     virtual void setGroupTitle( const char *newtitle );
     virtual bool hasGroupTitle( ) const { return m_titleSet; }
-    virtual void addFile(const FileDef *def); 
+    virtual void addFile(const FileDef *def);
     virtual bool addClass(const ClassDef *def);
     virtual bool addNamespace(const NamespaceDef *def);
     virtual void addGroup(const GroupDef *def);
     virtual void addPage(PageDef *def);
     virtual void addExample(const PageDef *def);
-    virtual void addDir(const DirDef *dd);
+    virtual void addDir(DirDef *dd);
     virtual bool insertMember(MemberDef *def,bool docOnly=FALSE);
     virtual void removeMember(MemberDef *md);
     virtual bool findGroup(const GroupDef *def) const; // true if def is a subgroup of this group
@@ -101,12 +101,12 @@ class GroupDefImpl : public DefinitionImpl, public GroupDef
     virtual NamespaceSDict * getNamespaces() const  { return m_namespaceSDict; }
     virtual GroupList *     getSubGroups() const    { return m_groupList; }
     virtual PageSDict *     getPages() const        { return m_pageDict; }
-    virtual DirList *       getDirs() const         { return m_dirList; }
+    virtual const DirList & getDirs() const         { return m_dirList; }
     virtual PageSDict *     getExamples() const     { return m_exampleDict; }
     virtual bool hasDetailedDescription() const;
     virtual void sortSubGroups();
-    
-  private: 
+
+  private:
     void addMemberListToGroup(MemberList *,bool (MemberDef::*)() const);
     MemberList *createMemberList(MemberListType lt);
     void addMemberToList(MemberListType lt,MemberDef *md);
@@ -141,9 +141,9 @@ class GroupDefImpl : public DefinitionImpl, public GroupDef
     GroupList *          m_groupList;           // list of sub groups.
     PageSDict *          m_pageDict;            // list of pages in the group
     PageSDict *          m_exampleDict;         // list of examples in the group
-    DirList *            m_dirList;             // list of directories in the group
+    DirList              m_dirList;             // list of directories in the group
     MemberList *         m_allMemberList;
-    MemberNameInfoSDict *m_allMemberNameInfoSDict;
+    MemberNameInfoLinkedMap m_allMemberNameInfoLinkedMap;
     Definition *         m_groupScope;
     QList<MemberList>    m_memberLists;
     MemberGroupSDict *   m_memberGroupSDict;
@@ -169,9 +169,6 @@ GroupDefImpl::GroupDefImpl(const char *df,int dl,const char *na,const char *t,
   m_namespaceSDict = new NamespaceSDict(17);
   m_pageDict = new PageSDict(17);
   m_exampleDict = new PageSDict(17);
-  m_dirList = new DirList;
-  m_allMemberNameInfoSDict = new MemberNameInfoSDict(17);
-  m_allMemberNameInfoSDict->setAutoDelete(TRUE);
   if (refFileName)
   {
     m_fileName=stripExtension(refFileName);
@@ -200,9 +197,7 @@ GroupDefImpl::~GroupDefImpl()
   delete m_pageDict;
   delete m_exampleDict;
   delete m_allMemberList;
-  delete m_allMemberNameInfoSDict;
   delete m_memberGroupSDict;
-  delete m_dirList;
 }
 
 void GroupDefImpl::setGroupTitle( const char *t )
@@ -284,13 +279,13 @@ bool GroupDefImpl::addClass(const ClassDef *cd)
       //printf("i=%d\n",i);
       if (i>0)
       {
-        // add nested classes (e.g. A::B, A::C) after their parent (A) in 
+        // add nested classes (e.g. A::B, A::C) after their parent (A) in
         // order of insertion
         QCString scope = qn.left(i);
         int j=m_classSDict->findAt(scope);
         if (j!=-1)
         {
-          while (j<(int)m_classSDict->count() && 
+          while (j<(int)m_classSDict->count() &&
                         m_classSDict->at(j)->qualifiedName().left(i)==scope)
           {
             //printf("skipping over %s\n",classSDict->at(j)->qualifiedName().data());
@@ -319,7 +314,7 @@ bool GroupDefImpl::addNamespace(const NamespaceDef *def)
   if (m_namespaceSDict->find(def->name())==0)
   {
     if (sortBriefDocs)
-      m_namespaceSDict->inSort(def->name(),def);  
+      m_namespaceSDict->inSort(def->name(),def);
     else
       m_namespaceSDict->append(def->name(),def);
     return TRUE;
@@ -327,13 +322,10 @@ bool GroupDefImpl::addNamespace(const NamespaceDef *def)
   return FALSE;
 }
 
-void GroupDefImpl::addDir(const DirDef *def)
+void GroupDefImpl::addDir(DirDef *def)
 {
   if (def->isHidden()) return;
-  if (Config_getBool(SORT_BRIEF_DOCS))
-    m_dirList->inSort(def);  
-  else
-    m_dirList->append(def);
+  m_dirList.push_back(def);
 }
 
 void GroupDefImpl::addPage(PageDef *def)
@@ -378,108 +370,97 @@ bool GroupDefImpl::insertMember(MemberDef *md,bool docOnly)
   if (md->isHidden()) return FALSE;
   updateLanguage(md);
   //printf("GroupDef(%s)::insertMember(%s)\n", title.data(), md->name().data());
-  MemberNameInfo *mni=0;
-  if ((mni=(*m_allMemberNameInfoSDict)[md->name()]))
-  { // member with this name already found
-    MemberNameInfoIterator srcMnii(*mni); 
-    const MemberInfo *srcMi;
-    for ( ; (srcMi=srcMnii.current()) ; ++srcMnii )
-    {
-      const MemberDef *srcMd = srcMi->memberDef;
-      if (srcMd==md) return FALSE; // already added before!
-
-      bool sameScope = srcMd->getOuterScope()==md->getOuterScope() || // same class or namespace
-          // both inside a file => definition and declaration do not have to be in the same file
-           (srcMd->getOuterScope()->definitionType()==Definition::TypeFile &&
-               md->getOuterScope()->definitionType()==Definition::TypeFile); 
-
-      const ArgumentList &srcMdAl  = srcMd->argumentList();
-      const ArgumentList &mdAl     = md->argumentList();
-      const ArgumentList &tSrcMdAl = srcMd->templateArguments();
-      const ArgumentList &tMdAl    = md->templateArguments();
-
-      if (srcMd->isFunction() && md->isFunction() && // both are a function
-          (tSrcMdAl.size()==tMdAl.size()) &&       // same number of template arguments
-          matchArguments2(srcMd->getOuterScope(),srcMd->getFileDef(),srcMdAl,
-                          md->getOuterScope(),md->getFileDef(),mdAl,
-                          TRUE
-                         ) && // matching parameters
-          sameScope // both are found in the same scope
-         )
-      {
-        if (srcMd->getGroupAlias()==0) 
-        {
-          md->setGroupAlias(srcMd); 
-        }
-        else if (md!=srcMd->getGroupAlias())
-        {
-          md->setGroupAlias(srcMd->getGroupAlias()); 
-        }
-        return FALSE; // member is the same as one that is already added
-      }
-    }
-    mni->append(new MemberInfo(md,md->protection(),md->virtualness(),FALSE));
-  }
-  else
+  MemberNameInfo *mni = m_allMemberNameInfoLinkedMap.add(md->name());
+  for (auto &srcMi : *mni)
   {
-    mni = new MemberNameInfo(md->name());
-    mni->append(new MemberInfo(md,md->protection(),md->virtualness(),FALSE));
-    m_allMemberNameInfoSDict->append(mni->memberName(),mni);
+    const MemberDef *srcMd = srcMi->memberDef();
+    if (srcMd==md) return FALSE; // already added before!
+
+    bool sameScope = srcMd->getOuterScope()==md->getOuterScope() || // same class or namespace
+        // both inside a file => definition and declaration do not have to be in the same file
+         (srcMd->getOuterScope()->definitionType()==Definition::TypeFile &&
+             md->getOuterScope()->definitionType()==Definition::TypeFile);
+
+    const ArgumentList &srcMdAl  = srcMd->argumentList();
+    const ArgumentList &mdAl     = md->argumentList();
+    const ArgumentList &tSrcMdAl = srcMd->templateArguments();
+    const ArgumentList &tMdAl    = md->templateArguments();
+
+    if (srcMd->isFunction() && md->isFunction() && // both are a function
+        (tSrcMdAl.size()==tMdAl.size()) &&       // same number of template arguments
+        matchArguments2(srcMd->getOuterScope(),srcMd->getFileDef(),&srcMdAl,
+                        md->getOuterScope(),md->getFileDef(),&mdAl,
+                        TRUE
+                       ) && // matching parameters
+        sameScope // both are found in the same scope
+       )
+    {
+      if (srcMd->getGroupAlias()==0)
+      {
+        md->setGroupAlias(srcMd);
+      }
+      else if (md!=srcMd->getGroupAlias())
+      {
+        md->setGroupAlias(srcMd->getGroupAlias());
+      }
+      return FALSE; // member is the same as one that is already added
+    }
   }
+  mni->push_back(std::make_unique<MemberInfo>(md,md->protection(),md->virtualness(),FALSE));
   //printf("Added member!\n");
-  m_allMemberList->append(md); 
+  m_allMemberList->append(md);
   switch(md->memberType())
   {
-    case MemberType_Variable:     
+    case MemberType_Variable:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decVarMembers,md);
       }
       addMemberToList(MemberListType_docVarMembers,md);
       break;
-    case MemberType_Function: 
+    case MemberType_Function:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decFuncMembers,md);
       }
       addMemberToList(MemberListType_docFuncMembers,md);
       break;
-    case MemberType_Typedef:      
+    case MemberType_Typedef:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decTypedefMembers,md);
       }
       addMemberToList(MemberListType_docTypedefMembers,md);
       break;
-    case MemberType_Enumeration:  
+    case MemberType_Enumeration:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decEnumMembers,md);
       }
       addMemberToList(MemberListType_docEnumMembers,md);
       break;
-    case MemberType_EnumValue:    
+    case MemberType_EnumValue:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decEnumValMembers,md);
       }
       addMemberToList(MemberListType_docEnumValMembers,md);
       break;
-    case MemberType_Define:       
+    case MemberType_Define:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decDefineMembers,md);
       }
       addMemberToList(MemberListType_docDefineMembers,md);
       break;
-    case MemberType_Signal:       
+    case MemberType_Signal:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decSignalMembers,md);
       }
       addMemberToList(MemberListType_docSignalMembers,md);
       break;
-    case MemberType_Slot:       
+    case MemberType_Slot:
       if (md->protection()==Public)
       {
         if (!docOnly)
@@ -505,21 +486,21 @@ bool GroupDefImpl::insertMember(MemberDef *md,bool docOnly)
         addMemberToList(MemberListType_docPriSlotMembers,md);
       }
       break;
-    case MemberType_Event:       
+    case MemberType_Event:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decEventMembers,md);
       }
       addMemberToList(MemberListType_docEventMembers,md);
       break;
-    case MemberType_Property:       
+    case MemberType_Property:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decPropMembers,md);
       }
       addMemberToList(MemberListType_docPropMembers,md);
       break;
-    case MemberType_Friend:       
+    case MemberType_Friend:
       if (!docOnly)
       {
         addMemberToList(MemberListType_decFriendMembers,md);
@@ -539,23 +520,10 @@ bool GroupDefImpl::insertMember(MemberDef *md,bool docOnly)
 void GroupDefImpl::removeMember(MemberDef *md)
 {
   // fprintf(stderr, "GroupDef(%s)::removeMember( %s )\n", title.data(), md->name().data());
-  MemberNameInfo *mni = m_allMemberNameInfoSDict->find(md->name());
+  MemberNameInfo *mni = m_allMemberNameInfoLinkedMap.find(md->name());
   if (mni)
   {
-    MemberNameInfoIterator mnii(*mni);
-    while( mnii.current() )
-    {
-      if( mnii.current()->memberDef == md )
-      {
-	mni->remove(mnii.current());
-        break;
-      }
-      ++mnii;
-    }
-    if( mni->isEmpty() )
-    {
-      m_allMemberNameInfoSDict->remove(md->name());
-    }
+    m_allMemberNameInfoLinkedMap.del(md->name());
 
     removeMemberFromList(MemberListType_allMembersList,md);
     switch(md->memberType())
@@ -564,31 +532,31 @@ void GroupDefImpl::removeMember(MemberDef *md)
 	removeMemberFromList(MemberListType_decVarMembers,md);
         removeMemberFromList(MemberListType_docVarMembers,md);
         break;
-      case MemberType_Function: 
+      case MemberType_Function:
         removeMemberFromList(MemberListType_decFuncMembers,md);
         removeMemberFromList(MemberListType_docFuncMembers,md);
         break;
-      case MemberType_Typedef:      
+      case MemberType_Typedef:
         removeMemberFromList(MemberListType_decTypedefMembers,md);
         removeMemberFromList(MemberListType_docTypedefMembers,md);
         break;
-      case MemberType_Enumeration:  
+      case MemberType_Enumeration:
         removeMemberFromList(MemberListType_decEnumMembers,md);
         removeMemberFromList(MemberListType_docEnumMembers,md);
         break;
-      case MemberType_EnumValue:    
+      case MemberType_EnumValue:
         removeMemberFromList(MemberListType_decEnumValMembers,md);
         removeMemberFromList(MemberListType_docEnumValMembers,md);
         break;
-      case MemberType_Define:       
+      case MemberType_Define:
         removeMemberFromList(MemberListType_decDefineMembers,md);
         removeMemberFromList(MemberListType_docDefineMembers,md);
         break;
-      case MemberType_Signal:       
+      case MemberType_Signal:
         removeMemberFromList(MemberListType_decSignalMembers,md);
         removeMemberFromList(MemberListType_docSignalMembers,md);
         break;
-      case MemberType_Slot:       
+      case MemberType_Slot:
         if (md->protection()==Public)
         {
           removeMemberFromList(MemberListType_decPubSlotMembers,md);
@@ -605,15 +573,15 @@ void GroupDefImpl::removeMember(MemberDef *md)
           removeMemberFromList(MemberListType_docPriSlotMembers,md);
         }
         break;
-      case MemberType_Event:       
+      case MemberType_Event:
         removeMemberFromList(MemberListType_decEventMembers,md);
         removeMemberFromList(MemberListType_docEventMembers,md);
         break;
-      case MemberType_Property:       
+      case MemberType_Property:
         removeMemberFromList(MemberListType_decPropMembers,md);
         removeMemberFromList(MemberListType_docPropMembers,md);
         break;
-      case MemberType_Friend:       
+      case MemberType_Friend:
         removeMemberFromList(MemberListType_decFriendMembers,md);
         removeMemberFromList(MemberListType_docFriendMembers,md);
         break;
@@ -691,7 +659,7 @@ int GroupDefImpl::numDocMembers() const
          m_exampleDict->count();
 }
 
-/*! Compute the HTML anchor names for all members in the group */ 
+/*! Compute the HTML anchor names for all members in the group */
 void GroupDefImpl::computeAnchors()
 {
   //printf("GroupDefImpl::computeAnchors()\n");
@@ -780,16 +748,11 @@ void GroupDefImpl::writeTagFile(FTextStream &tagFile)
         break;
       case LayoutDocEntry::GroupDirs:
         {
-          if (m_dirList)
+          for(const auto dd : m_dirList)
           {
-            QListIterator<DirDef> it(*m_dirList);
-            DirDef *dd;
-            for (;(dd=it.current());++it)
+            if (dd->isLinkableInProject())
             {
-              if (dd->isLinkableInProject())
-              {
-                tagFile << "    <dir>" << convertToXML(dd->displayName()) << "</dir>" << endl;
-              }
+              tagFile << "    <dir>" << convertToXML(dd->displayName()) << "</dir>" << endl;
             }
           }
         }
@@ -843,7 +806,7 @@ void GroupDefImpl::writeTagFile(FTextStream &tagFile)
 
 void GroupDefImpl::writeDetailedDescription(OutputList &ol,const QCString &title)
 {
-  if ((!briefDescription().isEmpty() && Config_getBool(REPEAT_BRIEF)) 
+  if ((!briefDescription().isEmpty() && Config_getBool(REPEAT_BRIEF))
       || !documentation().isEmpty() || !inbodyDocumentation().isEmpty()
      )
   {
@@ -871,7 +834,8 @@ void GroupDefImpl::writeDetailedDescription(OutputList &ol,const QCString &title
     // repeat brief description
     if (!briefDescription().isEmpty() && Config_getBool(REPEAT_BRIEF))
     {
-      ol.generateDoc(briefFile(),briefLine(),this,0,briefDescription(),FALSE,FALSE);
+      ol.generateDoc(briefFile(),briefLine(),this,0,briefDescription(),FALSE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
     // write separator between brief and details
     if (!briefDescription().isEmpty() && Config_getBool(REPEAT_BRIEF) &&
@@ -891,13 +855,15 @@ void GroupDefImpl::writeDetailedDescription(OutputList &ol,const QCString &title
     // write detailed documentation
     if (!documentation().isEmpty())
     {
-      ol.generateDoc(docFile(),docLine(),this,0,documentation()+"\n",TRUE,FALSE);
+      ol.generateDoc(docFile(),docLine(),this,0,documentation()+"\n",TRUE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
 
     // write inbody documentation
     if (!inbodyDocumentation().isEmpty())
     {
-      ol.generateDoc(inbodyFile(),inbodyLine(),this,0,inbodyDocumentation()+"\n",TRUE,FALSE);
+      ol.generateDoc(inbodyFile(),inbodyLine(),this,0,inbodyDocumentation()+"\n",TRUE,FALSE,
+                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     }
   }
 }
@@ -907,7 +873,8 @@ void GroupDefImpl::writeBriefDescription(OutputList &ol)
   if (hasBriefDescription())
   {
     DocRoot *rootNode = validatingParseDoc(briefFile(),briefLine(),this,0,
-                                briefDescription(),TRUE,FALSE,0,TRUE,FALSE);
+                                briefDescription(),TRUE,FALSE,
+                                0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
     if (rootNode && !rootNode->isEmpty())
     {
       ol.startParagraph();
@@ -981,7 +948,8 @@ void GroupDefImpl::writeFiles(OutputList &ol,const QCString &title)
       if (!fd->briefDescription().isEmpty() && Config_getBool(BRIEF_MEMBER_DESC))
       {
         ol.startMemberDescription(fd->getOutputFileBase());
-        ol.generateDoc(briefFile(),briefLine(),fd,0,fd->briefDescription(),FALSE,FALSE,0,TRUE,FALSE);
+        ol.generateDoc(briefFile(),briefLine(),fd,0,fd->briefDescription(),FALSE,FALSE,
+                       0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
         ol.endMemberDescription();
       }
       ol.endMemberDeclaration(0,0);
@@ -1036,7 +1004,8 @@ void GroupDefImpl::writeNestedGroups(OutputList &ol,const QCString &title)
         if (!gd->briefDescription().isEmpty() && Config_getBool(BRIEF_MEMBER_DESC))
         {
           ol.startMemberDescription(gd->getOutputFileBase());
-          ol.generateDoc(briefFile(),briefLine(),gd,0,gd->briefDescription(),FALSE,FALSE,0,TRUE,FALSE);
+          ol.generateDoc(briefFile(),briefLine(),gd,0,gd->briefDescription(),FALSE,FALSE,
+                         0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
           ol.endMemberDescription();
         }
         ol.endMemberDeclaration(0,0);
@@ -1049,15 +1018,13 @@ void GroupDefImpl::writeNestedGroups(OutputList &ol,const QCString &title)
 void GroupDefImpl::writeDirs(OutputList &ol,const QCString &title)
 {
   // write list of directories
-  if (m_dirList->count()>0)
+  if (!m_dirList.empty())
   {
     ol.startMemberHeader("dirs");
     ol.parseText(title);
     ol.endMemberHeader();
     ol.startMemberList();
-    QListIterator<DirDef> it(*m_dirList);
-    DirDef *dd;
-    for (;(dd=it.current());++it)
+    for(const auto dd : m_dirList)
     {
       if (!dd->hasDocumentation()) continue;
       ol.startMemberDeclaration();
@@ -1069,7 +1036,8 @@ void GroupDefImpl::writeDirs(OutputList &ol,const QCString &title)
       if (!dd->briefDescription().isEmpty() && Config_getBool(BRIEF_MEMBER_DESC))
       {
         ol.startMemberDescription(dd->getOutputFileBase());
-        ol.generateDoc(briefFile(),briefLine(),dd,0,dd->briefDescription(),FALSE,FALSE,0,TRUE,FALSE);
+        ol.generateDoc(briefFile(),briefLine(),dd,0,dd->briefDescription(),FALSE,FALSE,
+                       0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
         ol.endMemberDescription();
       }
       ol.endMemberDeclaration(0,0);
@@ -1107,7 +1075,8 @@ void GroupDefImpl::writePageDocumentation(OutputList &ol)
         ol.endSection(si->label(),SectionType::Subsection);
       }
       ol.startTextBlock();
-      ol.generateDoc(pd->docFile(),pd->docLine(),pd,0,pd->documentation()+pd->inbodyDocumentation(),TRUE,FALSE,0,TRUE,FALSE);
+      ol.generateDoc(pd->docFile(),pd->docLine(),pd,0,pd->documentation()+pd->inbodyDocumentation(),TRUE,FALSE,
+                     0,TRUE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
       ol.endTextBlock();
     }
   }
@@ -1183,15 +1152,15 @@ void GroupDefImpl::writeSummaryLinks(OutputList &ol) const
   SrcLangExt lang = getLanguage();
   for (eli.toFirst();(lde=eli.current());++eli)
   {
-    if ((lde->kind()==LayoutDocEntry::GroupClasses && m_classSDict->declVisible()) || 
+    if ((lde->kind()==LayoutDocEntry::GroupClasses && m_classSDict->declVisible()) ||
         (lde->kind()==LayoutDocEntry::GroupNamespaces && m_namespaceSDict->declVisible()) ||
         (lde->kind()==LayoutDocEntry::GroupFiles && m_fileList->count()>0) ||
         (lde->kind()==LayoutDocEntry::GroupNestedGroups && m_groupList->count()>0) ||
-        (lde->kind()==LayoutDocEntry::GroupDirs && m_dirList->count()>0)
+        (lde->kind()==LayoutDocEntry::GroupDirs && !m_dirList.empty())
        )
     {
       LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
-      QCString label = lde->kind()==LayoutDocEntry::GroupClasses      ? "nested-classes" : 
+      QCString label = lde->kind()==LayoutDocEntry::GroupClasses      ? "nested-classes" :
                        lde->kind()==LayoutDocEntry::GroupNamespaces   ? "namespaces"     :
                        lde->kind()==LayoutDocEntry::GroupFiles        ? "files"          :
                        lde->kind()==LayoutDocEntry::GroupNestedGroups ? "groups"         :
@@ -1238,6 +1207,11 @@ void GroupDefImpl::writeDocumentation(OutputList &ol)
   ol.pushGeneratorState();
   ol.disableAllBut(OutputGenerator::Man);
   ol.endTitleHead(getOutputFileBase(),name());
+  if (!m_title.isEmpty())
+  {
+    ol.writeString(" - ");
+    ol.parseText(m_title);
+  }
   ol.popGeneratorState();
   ol.endHeaderSection();
   ol.startContents();
@@ -1266,84 +1240,84 @@ void GroupDefImpl::writeDocumentation(OutputList &ol)
   {
     switch (lde->kind())
     {
-      case LayoutDocEntry::BriefDesc: 
+      case LayoutDocEntry::BriefDesc:
         writeBriefDescription(ol);
-        break; 
-      case LayoutDocEntry::MemberDeclStart: 
+        break;
+      case LayoutDocEntry::MemberDeclStart:
         startMemberDeclarations(ol);
-        break; 
-      case LayoutDocEntry::GroupClasses: 
+        break;
+      case LayoutDocEntry::GroupClasses:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeClasses(ol,ls->title(lang));
         }
-        break; 
-      case LayoutDocEntry::GroupInlineClasses: 
+        break;
+      case LayoutDocEntry::GroupInlineClasses:
         {
           writeInlineClasses(ol);
         }
         break;
-      case LayoutDocEntry::GroupNamespaces: 
+      case LayoutDocEntry::GroupNamespaces:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeNamespaces(ol,ls->title(lang));
         }
-        break; 
-      case LayoutDocEntry::MemberGroups: 
+        break;
+      case LayoutDocEntry::MemberGroups:
         writeMemberGroups(ol);
-        break; 
-      case LayoutDocEntry::MemberDecl: 
+        break;
+      case LayoutDocEntry::MemberDecl:
         {
           LayoutDocEntryMemberDecl *lmd = (LayoutDocEntryMemberDecl*)lde;
           writeMemberDeclarations(ol,lmd->type,lmd->title(lang));
         }
-        break; 
-      case LayoutDocEntry::MemberDeclEnd: 
+        break;
+      case LayoutDocEntry::MemberDeclEnd:
         endMemberDeclarations(ol);
         break;
-      case LayoutDocEntry::DetailedDesc: 
+      case LayoutDocEntry::DetailedDesc:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeDetailedDescription(ol,ls->title(lang));
         }
         break;
-      case LayoutDocEntry::MemberDefStart: 
+      case LayoutDocEntry::MemberDefStart:
         startMemberDocumentation(ol);
-        break; 
-      case LayoutDocEntry::MemberDef: 
+        break;
+      case LayoutDocEntry::MemberDef:
         {
           LayoutDocEntryMemberDef *lmd = (LayoutDocEntryMemberDef*)lde;
           writeMemberDocumentation(ol,lmd->type,lmd->title(lang));
         }
         break;
-      case LayoutDocEntry::MemberDefEnd: 
+      case LayoutDocEntry::MemberDefEnd:
         endMemberDocumentation(ol);
         break;
-      case LayoutDocEntry::GroupNestedGroups: 
+      case LayoutDocEntry::GroupNestedGroups:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeNestedGroups(ol,ls->title(lang));
         }
         break;
-      case LayoutDocEntry::GroupPageDocs: 
+      case LayoutDocEntry::GroupPageDocs:
         writePageDocumentation(ol);
         break;
-      case LayoutDocEntry::GroupDirs: 
+      case LayoutDocEntry::GroupDirs:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeDirs(ol,ls->title(lang));
         }
         break;
-      case LayoutDocEntry::GroupFiles: 
+      case LayoutDocEntry::GroupFiles:
         {
           LayoutDocEntrySection *ls = (LayoutDocEntrySection*)lde;
           writeFiles(ol,ls->title(lang));
         }
         break;
-      case LayoutDocEntry::GroupGraph: 
+      case LayoutDocEntry::GroupGraph:
         writeGroupGraph(ol);
         break;
-      case LayoutDocEntry::AuthorSection: 
+      case LayoutDocEntry::AuthorSection:
         writeAuthorSection(ol);
         break;
       case LayoutDocEntry::ClassIncludes:
@@ -1368,7 +1342,7 @@ void GroupDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::FileConstantGroups:
       case LayoutDocEntry::FileIncludes:
       case LayoutDocEntry::FileIncludeGraph:
-      case LayoutDocEntry::FileIncludedByGraph: 
+      case LayoutDocEntry::FileIncludedByGraph:
       case LayoutDocEntry::FileSourceLink:
       case LayoutDocEntry::FileInlineClasses:
       case LayoutDocEntry::DirSubDirs:
@@ -1382,7 +1356,7 @@ void GroupDefImpl::writeDocumentation(OutputList &ol)
 
   //---------------------------------------- end flexible part -------------------------------
 
-  endFile(ol); 
+  endFile(ol);
 
   ol.popGeneratorState();
 
@@ -1398,7 +1372,7 @@ void GroupDefImpl::writeMemberPages(OutputList &ol)
 {
   ol.pushGeneratorState();
   ol.disableAllBut(OutputGenerator::Html);
-  
+
   QListIterator<MemberList> mli(m_memberLists);
   MemberList *ml;
   for (mli.toFirst();(ml=mli.current());++mli)
@@ -1462,7 +1436,7 @@ void addClassToGroups(const Entry *root,ClassDef *cd)
     GroupDef *gd=0;
     if (!g.groupname.isEmpty() && (gd=Doxygen::groupSDict->find(g.groupname)))
     {
-      if (gd->addClass(cd)) 
+      if (gd->addClass(cd))
       {
         cd->makePartOfGroup(gd);
       }
@@ -1532,7 +1506,7 @@ void addGroupToGroups(const Entry *root,GroupDef *subGroup)
 /*! Add a member to the group with the highest priority */
 void addMemberToGroups(const Entry *root,MemberDef *md)
 {
-  //printf("addMemberToGroups:  Root %p = %s, md %p=%s groups=%d\n", 
+  //printf("addMemberToGroups:  Root %p = %s, md %p=%s groups=%d\n",
   //    root, root->name.data(), md, md->name().data(), root->groups->count() );
 
   // Search entry's group list for group with highest pri.
@@ -1545,7 +1519,7 @@ void addMemberToGroups(const Entry *root,MemberDef *md)
         (gd=Doxygen::groupSDict->find(g.groupname)) &&
         g.pri >= pri)
     {
-      if (fgd && gd!=fgd && g.pri==pri) 
+      if (fgd && gd!=fgd && g.pri==pri)
       {
         warn(root->fileName.data(), root->startLine,
             "Member %s found in multiple %s groups! "
@@ -1575,7 +1549,7 @@ void addMemberToGroups(const Entry *root,MemberDef *md)
     {
       bool moveit = FALSE;
 
-      // move member from one group to another if 
+      // move member from one group to another if
       // - the new one has a higher priority
       // - the new entry has the same priority, but with docs where the old one had no docs
       if (md->getGroupPri()<pri)
@@ -1624,7 +1598,7 @@ void addMemberToGroups(const Entry *root,MemberDef *md)
         md->setGroupDef(fgd,pri,root->fileName,root->startLine,
             !root->doc.isEmpty());
         ClassDef *cd = md->getClassDefOfAnonymousType();
-        if (cd) 
+        if (cd)
         {
           cd->setGroupDefForAllMembers(fgd,pri,root->fileName,root->startLine,root->doc.length() != 0);
         }
@@ -1656,7 +1630,7 @@ QCString GroupDefImpl::getOutputFileBase() const
 void GroupDefImpl::addListReferences()
 {
   {
-    const std::vector<RefItem*> &xrefItems = xrefListItems();
+    const RefItemVector &xrefItems = xrefListItems();
     addRefItem(xrefItems,
              getOutputFileBase(),
              theTranslator->trGroup(TRUE,TRUE),
@@ -1720,6 +1694,10 @@ void GroupDefImpl::sortMemberLists()
   {
     if (ml->needsSorting()) { ml->sort(); ml->setNeedsSorting(FALSE); }
   }
+  if (Config_getBool(SORT_BRIEF_DOCS))
+  {
+    std::sort(m_dirList.begin(), m_dirList.end(), compareDirDefs);
+  }
 }
 
 MemberList *GroupDefImpl::getMemberList(MemberListType lt) const
@@ -1741,12 +1719,12 @@ void GroupDefImpl::writeMemberDeclarations(OutputList &ol,MemberListType lt,cons
   static bool optimizeVhdl = Config_getBool(OPTIMIZE_OUTPUT_VHDL);
 
   MemberList * ml = getMemberList(lt);
-  if (optimizeVhdl && ml) 
+  if (optimizeVhdl && ml)
   {
     VhdlDocGen::writeVhdlDeclarations(ml,ol,this,0,0,0);
     return;
   }
-  if (ml) 
+  if (ml)
   {
     ml->writeDeclarations(ol,0,0,0,this,title,0);
   }
@@ -1761,12 +1739,12 @@ void GroupDefImpl::writeMemberDocumentation(OutputList &ol,MemberListType lt,con
 void GroupDefImpl::removeMemberFromList(MemberListType lt,MemberDef *md)
 {
   MemberList *ml = getMemberList(lt);
-  if (ml) ml->remove(md); 
+  if (ml) ml->remove(md);
 }
 
-void GroupDefImpl::sortSubGroups() 
-{ 
-  m_groupList->sort(); 
+void GroupDefImpl::sortSubGroups()
+{
+  m_groupList->sort();
 }
 
 bool GroupDefImpl::isLinkableInProject() const

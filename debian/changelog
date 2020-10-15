@@ -1,3 +1,10 @@
+doxygen (1.8.19-1~deb10+wmf1) buster-wikimedia; urgency=medium
+
+  * Rebuild debian/1.8.19-1 for buster. T254465
+  * Enable static linking of LLVM/Clang 7
+
+ -- Antoine Musso <hashar@free.fr>  Thu, 15 Oct 2020 09:34:25 +0200
+
 doxygen (1.8.18-1~exp1~~deb10+wmf1) buster-wikimedia; urgency=medium
 
   * Rebuild debian/1.8.18-1~exp1 for buster. T253793
@@ -22,6 +29,22 @@ doxygen (1.8.16-1~exp4~deb10+wmf1) buster-wikimedia; urgency=medium
   * Ignore some lintian errors for the source package.
 
  -- Antoine Musso <hashar@free.fr>  Fri, 29 Nov 2019 22:39:12 +0100
+
+doxygen (1.8.19-1~exp1) experimental; urgency=medium
+
+  [ Pino Toscano ]
+  * Remove the git build dependency, no more needed since doxygen 1.8.17.
+
+  [ Paolo Greppi ]
+  * doxygen 1.8.19 release.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 20 Aug 2020 21:49:38 +0200
+
+doxygen (1.8.18-1) unstable; urgency=medium
+
+  * Upload to unstable.
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sat, 25 Jul 2020 06:47:33 +0200
 
 doxygen (1.8.18-1~exp1) experimental; urgency=medium
 

@@ -13,6 +13,8 @@
 *
 */
 
+#include <cassert>
+
 #include "dotrunner.h"
 
 #include "qstring.h"
@@ -151,7 +153,6 @@ DotRunner::DotRunner(const std::string& absDotName, const std::string& md5Hash)
   , m_md5Hash(md5Hash.data())
   , m_dotExe(Config_getString(DOT_PATH)+"dot")
   , m_cleanUp(Config_getBool(DOT_CLEANUP))
-  , m_jobs()
 {
 }
 
@@ -272,7 +273,7 @@ DotRunner *DotRunnerQueue::dequeue()
   return result;
 }
 
-uint DotRunnerQueue::count() const
+size_t DotRunnerQueue::size() const
 {
   std::lock_guard<std::mutex> locker(m_mutex);
   return m_queue.size();
@@ -283,6 +284,14 @@ uint DotRunnerQueue::count() const
 DotWorkerThread::DotWorkerThread(DotRunnerQueue *queue)
   : m_queue(queue)
 {
+}
+
+DotWorkerThread::~DotWorkerThread()
+{
+  if (isRunning())
+  {
+    wait();
+  }
 }
 
 void DotWorkerThread::run()

@@ -154,7 +154,9 @@ static void writeXMLHeader(FTextStream &t)
   t << "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" << endl;;
   t << "<doxygen xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ";
   t << "xsi:noNamespaceSchemaLocation=\"compound.xsd\" ";
-  t << "version=\"" << getDoxygenVersion() << "\">" << endl;
+  t << "version=\"" << getDoxygenVersion() << "\" ";
+  t << "xml:lang=\"" << theTranslator->trISOLang() << "\"";
+  t << ">" << endl;
 }
 
 static void writeCombineScript()
@@ -178,7 +180,7 @@ static void writeCombineScript()
   "<xsl:stylesheet xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" version=\"1.0\">\n"
   "  <xsl:output method=\"xml\" version=\"1.0\" indent=\"no\" standalone=\"yes\" />\n"
   "  <xsl:template match=\"/\">\n"
-  "    <doxygen version=\"{doxygenindex/@version}\">\n"
+  "    <doxygen version=\"{doxygenindex/@version}\" xml:lang=\"{doxygenindex/@xml:lang}\">\n"
   "      <!-- Load all doxygen generated xml files -->\n"
   "      <xsl:for-each select=\"doxygenindex/compound\">\n"
   "        <xsl:copy-of select=\"document( concat( @refid, '.xml' ) )/doxygen/*\" />\n"
@@ -401,7 +403,8 @@ static void writeXMLDocBlock(FTextStream &t,
   QCString stext = text.stripWhiteSpace();
   if (stext.isEmpty()) return;
   // convert the documentation string into an abstract syntax tree
-  DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,text,FALSE,FALSE);
+  DocNode *root = validatingParseDoc(fileName,lineNr,scope,md,text,FALSE,FALSE,
+                                     0,FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
   // create a code generator
   XMLCodeGenerator *xmlCodeGen = new XMLCodeGenerator(t);
   // create a parse tree visitor for XML
@@ -586,7 +589,7 @@ static void generateXMLForMember(const MemberDef *md,FTextStream &ti,FTextStream
   {
     const ArgumentList &al = md->argumentList();
     t << " const=\"";
-    if (al.constSpecifier)    t << "yes"; else t << "no";
+    if (al.constSpecifier())    t << "yes"; else t << "no";
     t << "\"";
 
     t << " explicit=\"";
@@ -597,10 +600,10 @@ static void generateXMLForMember(const MemberDef *md,FTextStream &ti,FTextStream
     if (md->isInline()) t << "yes"; else t << "no";
     t << "\"";
 
-    if (al.refQualifier!=RefQualifierNone)
+    if (al.refQualifier()!=RefQualifierNone)
     {
       t << " refqual=\"";
-      if (al.refQualifier==RefQualifierLValue) t << "lvalue"; else t << "rvalue";
+      if (al.refQualifier()==RefQualifierLValue) t << "lvalue"; else t << "rvalue";
       t << "\"";
     }
 
@@ -634,7 +637,7 @@ static void generateXMLForMember(const MemberDef *md,FTextStream &ti,FTextStream
       t << " noexcept=\"yes\"";
     }
 
-    if (al.volatileSpecifier)
+    if (al.volatileSpecifier())
     {
       t << " volatile=\"yes\"";
     }
@@ -1076,45 +1079,38 @@ static void generateXMLSection(const Definition *d,FTextStream &ti,FTextStream &
 static void writeListOfAllMembers(const ClassDef *cd,FTextStream &t)
 {
   t << "    <listofallmembers>" << endl;
-  if (cd->memberNameInfoSDict())
+  for (auto &mni : cd->memberNameInfoLinkedMap())
   {
-    MemberNameInfoSDict::Iterator mnii(*cd->memberNameInfoSDict());
-    MemberNameInfo *mni;
-    for (mnii.toFirst();(mni=mnii.current());++mnii)
+    for (auto &mi : *mni)
     {
-      MemberNameInfoIterator mii(*mni);
-      MemberInfo *mi;
-      for (mii.toFirst();(mi=mii.current());++mii)
+      const MemberDef *md=mi->memberDef();
+      if (!md->isAnonymous())
       {
-        const MemberDef *md=mi->memberDef;
-        if (!md->isAnonymous())
+        Protection prot = mi->prot();
+        Specifier virt=md->virtualness();
+        t << "      <member refid=\"" << memberOutputFileBase(md) << "_1" <<
+          md->anchor() << "\" prot=\"";
+        switch (prot)
         {
-          Protection prot = mi->prot;
-          Specifier virt=md->virtualness();
-          t << "      <member refid=\"" << memberOutputFileBase(md) << "_1" <<
-            md->anchor() << "\" prot=\"";
-          switch (prot)
-          {
-            case Public:    t << "public";    break;
-            case Protected: t << "protected"; break;
-            case Private:   t << "private";   break;
-            case Package:   t << "package";   break;
-          }
-          t << "\" virt=\"";
-          switch(virt)
-          {
-            case Normal:  t << "non-virtual";  break;
-            case Virtual: t << "virtual";      break;
-            case Pure:    t << "pure-virtual"; break;
-          }
-          t << "\"";
-          if (!mi->ambiguityResolutionScope.isEmpty())
-          {
-            t << " ambiguityscope=\"" << convertToXML(mi->ambiguityResolutionScope) << "\"";
-          }
-          t << "><scope>" << convertToXML(cd->name()) << "</scope><name>" <<
-            convertToXML(md->name()) << "</name></member>" << endl;
+          case Public:    t << "public";    break;
+          case Protected: t << "protected"; break;
+          case Private:   t << "private";   break;
+          case Package:   t << "package";   break;
         }
+        t << "\" virt=\"";
+        switch(virt)
+        {
+          case Normal:  t << "non-virtual";  break;
+          case Virtual: t << "virtual";      break;
+          case Pure:    t << "pure-virtual"; break;
+        }
+        t << "\"";
+        if (!mi->ambiguityResolutionScope().isEmpty())
+        {
+          t << " ambiguityscope=\"" << convertToXML(mi->ambiguityResolutionScope()) << "\"";
+        }
+        t << "><scope>" << convertToXML(cd->name()) << "</scope><name>" <<
+          convertToXML(md->name()) << "</name></member>" << endl;
       }
     }
   }
@@ -1157,7 +1153,8 @@ static void writeInnerNamespaces(const NamespaceSDict *nl,FTextStream &t)
       if (!nd->isHidden() && !nd->isAnonymous())
       {
         t << "    <innernamespace refid=\"" << nd->getOutputFileBase()
-          << "\">" << convertToXML(nd->name()) << "</innernamespace>" << endl;
+          << "\"" << (nd->isInline() ? " inline=\"yes\"" : "")
+          << ">" << convertToXML(nd->name()) << "</innernamespace>" << endl;
       }
     }
   }
@@ -1214,9 +1211,7 @@ static void writeInnerDirs(const DirList *dl,FTextStream &t)
 {
   if (dl)
   {
-    QListIterator<DirDef> subdirs(*dl);
-    DirDef *subdir;
-    for (subdirs.toFirst();(subdir=subdirs.current());++subdirs)
+    for(const auto subdir : *dl)
     {
       t << "    <innerdir refid=\"" << subdir->getOutputFileBase()
         << "\">" << convertToXML(subdir->displayName()) << "</innerdir>" << endl;
@@ -1467,7 +1462,9 @@ static void generateXMLForNamespace(const NamespaceDef *nd,FTextStream &ti)
 
   writeXMLHeader(t);
   t << "  <compounddef id=\"" << nd->getOutputFileBase()
-    << "\" kind=\"namespace\" language=\""
+    << "\" kind=\"namespace\" "
+    << (nd->isInline()?"inline=\"yes\" ":"")
+    << "language=\""
     << langToString(nd->getLanguage()) << "\">" << endl;
   t << "    <compoundname>";
   writeXMLString(t,nd->name());
@@ -1916,6 +1913,7 @@ void generateXML()
   QDir xmlDir(outputDirectory);
   createSubDirs(xmlDir);
 
+  ResourceMgr::instance().copyResource("xml.xsd",outputDirectory);
   ResourceMgr::instance().copyResource("index.xsd",outputDirectory);
 
   QCString fileName=outputDirectory+"/compound.xsd";
@@ -1968,7 +1966,9 @@ void generateXML()
   t << "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" << endl;;
   t << "<doxygenindex xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ";
   t << "xsi:noNamespaceSchemaLocation=\"index.xsd\" ";
-  t << "version=\"" << getDoxygenVersion() << "\">" << endl;
+  t << "version=\"" << getDoxygenVersion() << "\" ";
+  t << "xml:lang=\"" << theTranslator->trISOLang() << "\"";
+  t << ">" << endl;
 
   {
     ClassSDict::Iterator cli(*Doxygen::classSDict);
